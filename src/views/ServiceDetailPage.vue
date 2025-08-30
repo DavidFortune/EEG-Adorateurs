@@ -58,7 +58,7 @@
                 <ion-icon :icon="createOutline" slot="start" />
                 <ion-label>
                   <h3>Créé le</h3>
-                  <p>{{ formatDateTime(service.createdAt) }}</p>
+                  <p>{{ formatTimestamp(service.createdAt) }}</p>
                 </ion-label>
               </ion-item>
               
@@ -66,7 +66,7 @@
                 <ion-icon :icon="syncOutline" slot="start" />
                 <ion-label>
                   <h3>Modifié le</h3>
-                  <p>{{ formatDateTime(service.modifiedAt) }}</p>
+                  <p>{{ formatTimestamp(service.modifiedAt) }}</p>
                 </ion-label>
               </ion-item>
             </ion-list>
