@@ -1,0 +1,181 @@
+<template>
+  <ion-page>
+    <ion-header>
+      <ion-toolbar>
+        <ion-buttons slot="start">
+          <ion-back-button default-href="/tabs/services"></ion-back-button>
+        </ion-buttons>
+        <ion-title>Détail du Service</ion-title>
+        <ion-buttons slot="end">
+          <ion-button @click="goToEdit" fill="clear">
+            <ion-icon :icon="pencil" />
+          </ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+    
+    <ion-content :fullscreen="true">
+      <ion-loading :is-open="loading" message="Chargement..."></ion-loading>
+      
+      <div v-if="service" class="ion-padding">
+        <ion-card>
+          <ion-card-header>
+            <ion-card-title>{{ service.title }}</ion-card-title>
+            <ion-card-subtitle>
+              <ion-chip :color="getCategoryColor(service.category)">
+                {{ service.category }}
+              </ion-chip>
+              <ion-chip v-if="service.isPublished" color="success">
+                <ion-icon :icon="checkmarkCircle" />
+                <ion-label>Publié</ion-label>
+              </ion-chip>
+              <ion-chip v-else color="warning">
+                <ion-icon :icon="timeOutline" />
+                <ion-label>Brouillon</ion-label>
+              </ion-chip>
+            </ion-card-subtitle>
+          </ion-card-header>
+          
+          <ion-card-content>
+            <ion-list>
+              <ion-item>
+                <ion-icon :icon="calendarOutline" slot="start" />
+                <ion-label>
+                  <h3>Date et heure</h3>
+                  <p>{{ formatDateTime(service.date, service.time) }}</p>
+                </ion-label>
+              </ion-item>
+              
+              <ion-item>
+                <ion-icon :icon="informationCircleOutline" slot="start" />
+                <ion-label>
+                  <h3>Catégorie</h3>
+                  <p>{{ service.category }}</p>
+                </ion-label>
+              </ion-item>
+              
+              <ion-item>
+                <ion-icon :icon="createOutline" slot="start" />
+                <ion-label>
+                  <h3>Créé le</h3>
+                  <p>{{ formatDateTime(service.createdAt) }}</p>
+                </ion-label>
+              </ion-item>
+              
+              <ion-item>
+                <ion-icon :icon="syncOutline" slot="start" />
+                <ion-label>
+                  <h3>Modifié le</h3>
+                  <p>{{ formatDateTime(service.modifiedAt) }}</p>
+                </ion-label>
+              </ion-item>
+            </ion-list>
+          </ion-card-content>
+        </ion-card>
+        
+        <ion-button expand="block" color="primary" @click="goToEdit" class="ion-margin-top">
+          <ion-icon :icon="pencil" slot="start" />
+          Modifier ce service
+        </ion-button>
+        
+        <ion-button expand="block" color="danger" fill="outline" @click="confirmDelete" class="ion-margin-top">
+          <ion-icon :icon="trashOutline" slot="start" />
+          Supprimer ce service
+        </ion-button>
+      </div>
+      
+      <div v-else-if="!loading" class="ion-text-center ion-padding">
+        <ion-icon :icon="alertCircleOutline" size="large" color="warning" />
+        <h2>Service non trouvé</h2>
+        <p>Le service demandé n'existe pas ou a été supprimé.</p>
+        <ion-button @click="goBack" fill="outline">
+          Retour aux services
+        </ion-button>
+      </div>
+    </ion-content>
+  </ion-page>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import {
+  IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonBackButton,
+  IonButton, IonIcon, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle,
+  IonCardContent, IonList, IonItem, IonLabel, IonChip, IonLoading, alertController
+} from '@ionic/vue';
+import {
+  pencil, calendarOutline, timeOutline, informationCircleOutline, createOutline,
+  syncOutline, checkmarkCircle, trashOutline, alertCircleOutline
+} from 'ionicons/icons';
+import { Service, ServiceCategory } from '@/types/service';
+import { serviceService } from '@/services/serviceService';
+import { timezoneUtils } from '@/utils/timezone';
+
+const route = useRoute();
+const router = useRouter();
+const service = ref<Service | null>(null);
+const loading = ref(true);
+
+const loadService = async () => {
+  const id = route.params.id as string;
+  try {
+    service.value = await serviceService.getServiceById(id);
+  } catch (error) {
+    console.error('Error loading service:', error);
+  } finally {
+    loading.value = false;
+  }
+};
+
+const formatDateTime = (dateStr: string, timeStr: string) => {
+  return timezoneUtils.formatDateTimeForDisplay(dateStr, timeStr);
+};
+
+const formatTimestamp = (dateTimeStr: string) => {
+  return new Date(dateTimeStr).toLocaleString('fr-CA', {
+    timeZone: 'America/Toronto'
+  });
+};
+
+const getCategoryColor = (category: ServiceCategory) => {
+  return category === ServiceCategory.SERVICE ? 'primary' : 'secondary';
+};
+
+const goToEdit = () => {
+  router.push(`/service-form/${service.value?.id}`);
+};
+
+const goBack = () => {
+  router.push('/tabs/services');
+};
+
+const confirmDelete = async () => {
+  const alert = await alertController.create({
+    header: 'Confirmer la suppression',
+    message: 'Êtes-vous sûr de vouloir supprimer ce service ? Cette action est irréversible.',
+    buttons: [
+      {
+        text: 'Annuler',
+        role: 'cancel'
+      },
+      {
+        text: 'Supprimer',
+        role: 'destructive',
+        handler: async () => {
+          if (service.value) {
+            await serviceService.deleteService(service.value.id);
+            router.push('/tabs/services');
+          }
+        }
+      }
+    ]
+  });
+  
+  await alert.present();
+};
+
+onMounted(() => {
+  loadService();
+});
+</script>
