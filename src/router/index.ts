@@ -5,7 +5,31 @@ import TabsPage from '../views/TabsPage.vue'
 const routes: Array<RouteRecordRaw> = [
   {
     path: '/',
-    redirect: '/tabs/accueil'
+    redirect: '/onboarding/login'
+  },
+  {
+    path: '/onboarding/login',
+    component: () => import('@/views/onboarding/LoginPage.vue')
+  },
+  {
+    path: '/onboarding/welcome',
+    component: () => import('@/views/onboarding/WelcomePage.vue')
+  },
+  {
+    path: '/onboarding/personal-info',
+    component: () => import('@/views/onboarding/PersonalInfoPage.vue')
+  },
+  {
+    path: '/onboarding/teams',
+    component: () => import('@/views/onboarding/TeamsPage.vue')
+  },
+  {
+    path: '/onboarding/availability',
+    component: () => import('@/views/onboarding/AvailabilityPage.vue')
+  },
+  {
+    path: '/onboarding/congratulations',
+    component: () => import('@/views/onboarding/CongratulationsPage.vue')
   },
   {
     path: '/tabs/',

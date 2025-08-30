@@ -27,13 +27,16 @@ export const timezoneUtils = {
    */
   formatDateForDisplay(dateStr: string): string {
     const date = new Date(dateStr + 'T00:00:00');
-    return date.toLocaleDateString('fr-CA', {
+    const formattedDate = date.toLocaleDateString('fr-CA', {
       timeZone: TIMEZONE,
       weekday: 'long',
       year: 'numeric',
       month: 'long',
       day: 'numeric'
     });
+    
+    // Capitalize the first letter (weekday)
+    return formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1);
   },
 
   /**
@@ -41,13 +44,18 @@ export const timezoneUtils = {
    */
   formatDateTimeForDisplay(dateStr: string, timeStr: string): string {
     const datetime = new Date(`${dateStr}T${timeStr}:00`);
-    return datetime.toLocaleDateString('fr-CA', {
+    const formattedDate = datetime.toLocaleDateString('fr-CA', {
       timeZone: TIMEZONE,
       weekday: 'long',
       year: 'numeric',
       month: 'long',
       day: 'numeric'
-    }) + ' à ' + timeStr;
+    });
+    
+    // Capitalize the first letter (weekday)
+    const capitalizedDate = formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1);
+    
+    return capitalizedDate + ' à ' + timeStr;
   },
 
   /**
