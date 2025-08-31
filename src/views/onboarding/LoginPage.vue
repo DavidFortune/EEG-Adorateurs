@@ -102,7 +102,7 @@ import { useOnboardingStore } from '@/stores/onboarding';
 const router = useRouter();
 const onboardingStore = useOnboardingStore();
 
-const logoUrl = 'https://eglisegalilee.com/wp-content/uploads/2015/09/cropped-EEG-icon-270x270.png';
+const logoUrl = '/favicon.png';
 const logoLoaded = ref(true);
 const email = ref('');
 const loading = ref(false);
