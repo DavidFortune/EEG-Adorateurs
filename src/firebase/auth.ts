@@ -15,9 +15,21 @@ const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 
 // Configuration pour le lien par email
+// Always use the production URL for email links to ensure they work correctly
+const getRedirectUrl = () => {
+  return 'https://adorateurs.eglisegalilee.com/auth/callback';
+};
+
 const actionCodeSettings = {
-  url: window.location.origin,  // Just use the root URL, let the app handle routing
-  handleCodeInApp: true
+  url: getRedirectUrl(),
+  handleCodeInApp: true,
+  // These settings help ensure the link is formatted correctly
+  iOS: {
+    bundleId: 'com.eglisegalilee.adorateurs'
+  },
+  android: {
+    packageName: 'com.eglisegalilee.adorateurs'
+  }
 };
 
 export const authService = {
@@ -39,9 +51,12 @@ export const authService = {
    */
   async sendEmailSignInLink(email: string): Promise<void> {
     try {
+      console.log('Sending email sign-in link to:', email);
+      console.log('Action code settings:', actionCodeSettings);
       await sendSignInLinkToEmail(auth, email, actionCodeSettings);
       // Stocker l'email dans localStorage pour la vérification
       localStorage.setItem('emailForSignIn', email);
+      console.log('Email sign-in link sent successfully');
     } catch (error) {
       console.error('Email link sending error:', error);
       throw error;
@@ -53,21 +68,29 @@ export const authService = {
    */
   async completeEmailSignIn(emailLink: string): Promise<User> {
     try {
+      console.log('Checking if URL is sign-in link...');
       if (isSignInWithEmailLink(auth, emailLink)) {
+        console.log('Valid sign-in link detected');
         let email = localStorage.getItem('emailForSignIn');
+        console.log('Email from localStorage:', email);
+        
         if (!email) {
           // Si l'email n'est pas disponible, demander à l'utilisateur
           email = window.prompt('Veuillez confirmer votre adresse email');
+          console.log('Email from prompt:', email);
         }
         
         if (!email) {
           throw new Error('Email requis pour compléter la connexion');
         }
 
+        console.log('Attempting to sign in with email:', email);
         const result = await signInWithEmailLink(auth, email, emailLink);
+        console.log('Sign-in successful, user:', result.user.email);
         localStorage.removeItem('emailForSignIn');
         return result.user;
       } else {
+        console.log('Not a valid sign-in link');
         throw new Error('Lien de connexion invalide');
       }
     } catch (error) {

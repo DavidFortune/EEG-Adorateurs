@@ -1,8 +1,8 @@
 <template>
   <ion-app>
-    <div v-if="isProcessingEmailLink" class="auth-loading">
+    <div v-if="isProcessingEmailLink || isCheckingAuth" class="auth-loading">
       <ion-spinner name="crescent" color="primary"></ion-spinner>
-      <p>Connexion en cours...</p>
+      <p>{{ loadingMessage }}</p>
     </div>
     <ion-router-outlet v-else />
   </ion-app>
@@ -10,13 +10,13 @@
 
 <script setup lang="ts">
 import { IonApp, IonRouterOutlet, IonSpinner } from '@ionic/vue';
-import { onMounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { onBeforeMount, ref } from 'vue';
 import { authService } from '@/firebase/auth';
 import { toastController } from '@ionic/vue';
 
-const router = useRouter();
 const isProcessingEmailLink = ref(false);
+const isCheckingAuth = ref(true);
+const loadingMessage = ref('Chargement...');
 
 const showToast = async (message: string, color: 'success' | 'danger' = 'success') => {
   const toast = await toastController.create({
@@ -28,33 +28,63 @@ const showToast = async (message: string, color: 'success' | 'danger' = 'success
   await toast.present();
 };
 
-// Handle email link authentication on app load
-onMounted(async () => {
-  // Check if the current URL is an email sign-in link
+// Handle email link authentication BEFORE router initialization
+onBeforeMount(async () => {
   const currentUrl = window.location.href;
+  const pathname = window.location.pathname;
+  console.log('App before mount, checking URL:', currentUrl);
+  console.log('Current pathname:', pathname);
   
-  if (authService.isSignInWithEmailLink(currentUrl)) {
+  // Check if this is the auth callback route or if the URL contains Firebase auth parameters
+  const urlParams = new URLSearchParams(window.location.search);
+  const mode = urlParams.get('mode');
+  const oobCode = urlParams.get('oobCode');
+  const apiKey = urlParams.get('apiKey');
+  
+  console.log('URL params - mode:', mode, 'oobCode:', oobCode ? 'present' : 'missing', 'apiKey:', apiKey ? 'present' : 'missing');
+  
+  // Also check hash parameters (Firebase sometimes uses hash)
+  const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
+  const hashMode = hashParams.get('mode');
+  const hashOobCode = hashParams.get('oobCode');
+  
+  console.log('Hash params - mode:', hashMode, 'oobCode:', hashOobCode ? 'present' : 'missing');
+  
+  // Check if this is an email link by multiple methods
+  const isAuthCallback = pathname === '/auth/callback';
+  const hasAuthParams = (mode === 'signIn' && oobCode) || (hashMode === 'signIn' && hashOobCode);
+  const isFirebaseEmailLink = authService.isSignInWithEmailLink(currentUrl);
+  
+  console.log('Auth checks - isAuthCallback:', isAuthCallback, 'hasAuthParams:', hasAuthParams, 'isFirebaseEmailLink:', isFirebaseEmailLink);
+  
+  if (isAuthCallback || hasAuthParams || isFirebaseEmailLink) {
+    console.log('Email sign-in link detected');
     isProcessingEmailLink.value = true;
+    loadingMessage.value = 'Connexion en cours...';
     
     try {
       // Complete the email sign-in process
-      await authService.completeEmailSignIn(currentUrl);
+      const user = await authService.completeEmailSignIn(currentUrl);
+      console.log('Email sign-in successful, user:', user.email);
       
       // Show success message
       await showToast('Connexion réussie !');
       
-      // The router guards will handle the redirect based on onboarding status
-      // Force navigation to trigger the router guards
-      router.push('/tabs/accueil');
+      // Wait a bit for auth state to propagate
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Navigate directly to home page
+      window.location.href = '/tabs/accueil';
     } catch (error) {
       console.error('Email sign-in error:', error);
       await showToast('Erreur lors de la connexion. Veuillez réessayer.', 'danger');
       
-      // Redirect to login page on error
-      router.push('/login');
-    } finally {
-      isProcessingEmailLink.value = false;
+      // If auth fails, redirect to login page
+      window.location.href = '/login';
     }
+  } else {
+    console.log('Not an email sign-in link, proceeding normally');
+    isCheckingAuth.value = false;
   }
 });
 </script>

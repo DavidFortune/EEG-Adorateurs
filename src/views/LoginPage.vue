@@ -190,7 +190,7 @@ const goToTerms = () => {
   router.push('/terms');
 };
 
-// Check if returning from email link or already authenticated
+// Check if already authenticated
 onMounted(async () => {
   // Check if user is already authenticated
   const currentUser = authService.getCurrentUser();
@@ -209,41 +209,9 @@ onMounted(async () => {
       // If error, default to onboarding flow
       router.replace('/onboarding/welcome');
     }
-    return;
   }
-
-  // Check if returning from email link
-  const currentUrl = window.location.href;
-  if (authService.isSignInWithEmailLink(currentUrl)) {
-    handleEmailLinkSignIn(currentUrl);
-  }
+  // Email link handling is now done in App.vue to avoid router conflicts
 });
-
-const handleEmailLinkSignIn = async (emailLink: string) => {
-  loading.value = true;
-  try {
-    const user = await authService.completeEmailSignIn(emailLink);
-    
-    // Check if user has completed onboarding
-    const hasCompletedOnboarding = await membersService.hasCompletedOnboarding(user.uid);
-    
-    if (hasCompletedOnboarding) {
-      await showToast('Connexion réussie !', 'success');
-      router.replace('/tabs/accueil');
-    } else {
-      onboardingStore.updateFormData({ 
-        email: user.email || '' 
-      });
-      await showToast('Connexion réussie !', 'success');
-      router.push('/onboarding/welcome');
-    }
-  } catch (error) {
-    console.error('Email link sign in error:', error);
-    await showToast('Erreur lors de la connexion par email');
-  } finally {
-    loading.value = false;
-  }
-};
 </script>
 
 <style scoped>
