@@ -6,7 +6,7 @@ export interface Member {
   firstName: string;
   lastName: string;
   fullName: string;
-  teams: string[];
+  ministries: string[];
   availabilities: {
     [serviceId: string]: 'available' | 'unavailable' | null;
   };
@@ -19,22 +19,20 @@ export interface Member {
 export interface OnboardingFormData {
   email: string;
   fullName: string;
-  teams: string[];
-  customTeam: string;
+  ministries: string[];
+  customMinistry: string;
   availabilities: {
     [serviceId: string]: 'available' | 'unavailable' | null;
   };
 }
 
-export const AVAILABLE_TEAMS = [
-  'Accueil',
-  'Audiovisuel',
-  'Diacre',
-  'Dirigeant',
-  'Louange',
-  'Musicien',
-  'Prédicateur',
-  'Sécurité'
-] as const;
+export interface Ministry {
+  id: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+}
 
-export type TeamType = typeof AVAILABLE_TEAMS[number];

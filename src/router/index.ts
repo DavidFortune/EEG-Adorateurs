@@ -3,6 +3,7 @@ import { RouteRecordRaw } from 'vue-router';
 import TabsPage from '../views/TabsPage.vue'
 import { authService } from '@/firebase/auth';
 import { membersService } from '@/firebase/members';
+import { useOnboardingStore } from '@/stores/onboarding';
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -25,8 +26,8 @@ const routes: Array<RouteRecordRaw> = [
     meta: { requiresAuth: true }
   },
   {
-    path: '/onboarding/teams',
-    component: () => import('@/views/onboarding/TeamsPage.vue'),
+    path: '/onboarding/ministries',
+    component: () => import('@/views/onboarding/MinistriesPage.vue'),
     meta: { requiresAuth: true }
   },
   {
@@ -91,6 +92,7 @@ const router = createRouter({
 router.beforeEach(async (to, _from, next) => {
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
   const requiresGuest = to.matched.some(record => record.meta.requiresGuest);
+  const isOnboardingRoute = to.path.startsWith('/onboarding/');
   
   // Wait for auth state to be initialized
   const user = await authService.waitForAuth();
@@ -101,14 +103,28 @@ router.beforeEach(async (to, _from, next) => {
   } else if (requiresGuest && user) {
     // Redirect to home if user is already logged in and trying to access guest-only pages
     next('/tabs/accueil');
-  } else if (user && to.path === '/') {
-    // Check onboarding status for authenticated users going to home
+  } else if (user) {
+    // Check onboarding status for authenticated users
     try {
       const hasCompletedOnboarding = await membersService.hasCompletedOnboarding(user.uid);
+      
       if (!hasCompletedOnboarding) {
-        next('/onboarding/welcome');
+        // If onboarding is not completed, continue from last completed step
+        if (!isOnboardingRoute && to.path !== '/') {
+          // Get the onboarding store to determine next step
+          const onboardingStore = useOnboardingStore();
+          const nextStep = onboardingStore.getNextIncompleteStep();
+          next(nextStep);
+        } else {
+          next();
+        }
       } else {
-        next();
+        // Onboarding completed - prevent access to onboarding pages
+        if (isOnboardingRoute) {
+          next('/tabs/accueil');
+        } else {
+          next();
+        }
       }
     } catch (error) {
       console.error('Error checking onboarding status:', error);

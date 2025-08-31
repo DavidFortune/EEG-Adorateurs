@@ -29,7 +29,7 @@
           <ul>
             <li><strong>Informations d'identification :</strong> Nom, prénom, adresse email</li>
             <li><strong>Informations de profil :</strong> Photo de profil (optionnelle), numéro de téléphone</li>
-            <li><strong>Informations de service :</strong> Équipes, instruments, disponibilités</li>
+            <li><strong>Informations de service :</strong> Ministères, instruments, disponibilités</li>
             <li><strong>Données d'authentification :</strong> Identifiants de connexion Google</li>
           </ul>
         </section>
@@ -57,8 +57,8 @@
         <section>
           <h2>5. Partage des Données</h2>
           <p>
-            Vos données personnelles ne sont partagées qu'avec les autres membres de l'équipe 
-            d'adoration de l'Église Évangélique Galilée dans le cadre de l'organisation des services. 
+            Vos données personnelles ne sont partagées qu'avec les autres adorateurs 
+            de l'Église Évangélique Galilée dans le cadre de l'organisation des services. 
             Nous ne vendons, n'échangeons ni ne transférons vos informations personnelles à des tiers 
             sans votre consentement.
           </p>

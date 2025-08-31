@@ -77,7 +77,7 @@
           <div v-if="emailSent" class="email-sent-message">
             <ion-icon :icon="checkmarkCircle" color="success"></ion-icon>
             <p>Lien de connexion envoyé à {{ email }}</p>
-            <p class="small-text">Vérifiez votre boîte mail et cliquez sur le lien pour vous connecter.</p>
+            <p class="small-text">Vérifiez votre boîte mail ou pourriel, et cliquez sur le lien pour vous connecter.</p>
           </div>
         </div>
 
@@ -274,7 +274,7 @@ const handleEmailLinkSignIn = async (emailLink: string) => {
   width: 8rem;
   height: 8rem;
   border-radius: 50%;
-  background: #DC2626;
+  background: #b5121b;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -321,8 +321,8 @@ const handleEmailLinkSignIn = async (emailLink: string) => {
 }
 
 .continue-button {
-  --background: #DC2626;
-  --background-hover: #B91C1C;
+  --background: #b5121b;
+  --background-hover: #9f1018;
   height: 3.5rem;
   font-size: 1.125rem;
   font-weight: 600;
@@ -389,13 +389,13 @@ const handleEmailLinkSignIn = async (emailLink: string) => {
 }
 
 .privacy-link {
-  color: #DC2626;
+  color: #b5121b;
   text-decoration: underline;
   cursor: pointer;
 }
 
 .privacy-link:hover {
-  color: #B91C1C;
+  color: #9f1018;
 }
 
 @media (max-width: 768px) {

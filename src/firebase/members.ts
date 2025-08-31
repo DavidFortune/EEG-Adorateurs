@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './config';
 import type { Member, OnboardingFormData } from '@/types/member';
+import { ministriesService } from './ministries';
 
 const MEMBERS_COLLECTION = 'members';
 
@@ -71,10 +72,23 @@ export const membersService = {
     try {
       const now = new Date().toISOString();
       
-      // Combine regular teams with custom team if provided
-      const allTeams = [...onboardingData.teams];
-      if (onboardingData.customTeam.trim()) {
-        allTeams.push(onboardingData.customTeam.trim());
+      // Combine regular ministries with custom ministry if provided
+      const ministries = onboardingData.ministries || [];
+      const customMinistry = onboardingData.customMinistry || '';
+      const allMinistries = [...ministries];
+      if (customMinistry.trim()) {
+        allMinistries.push(customMinistry.trim());
+      }
+
+      // Create ministries in the collection if they don't exist
+      if (allMinistries.length > 0) {
+        try {
+          await ministriesService.ensureMinistriesExist(allMinistries);
+          console.log('Ministries ensured to exist:', allMinistries);
+        } catch (error) {
+          console.warn('Failed to create ministries in collection:', error);
+          // Continue with member creation even if ministry creation fails
+        }
       }
       
       // Extract firstName and lastName from fullName
@@ -89,7 +103,7 @@ export const membersService = {
         firstName,
         lastName,
         fullName: onboardingData.fullName,
-        teams: allTeams,
+        ministries: allMinistries,
         availabilities: onboardingData.availabilities,
         isOnboardingCompleted: true,
         isAdmin: false, // Default to false, admin rights can be granted manually
@@ -119,6 +133,17 @@ export const membersService = {
       
       if (!docSnap.exists()) {
         return null;
+      }
+      
+      // If ministries are being updated, ensure they exist in the collection
+      if (updates.ministries && updates.ministries.length > 0) {
+        try {
+          await ministriesService.ensureMinistriesExist(updates.ministries);
+          console.log('Ministries ensured to exist:', updates.ministries);
+        } catch (error) {
+          console.warn('Failed to create ministries in collection:', error);
+          // Continue with member update even if ministry creation fails
+        }
       }
       
       const existingMember = convertFirestoreToMember({ id: docSnap.id, ...docSnap.data() } as FirestoreMember);

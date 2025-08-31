@@ -6,12 +6,13 @@ import type { Service } from '@/types/service';
 export const useOnboardingStore = defineStore('onboarding', () => {
   const currentStep = ref(0);
   const totalSteps = 6;
+  const completedSteps = ref<Set<number>>(new Set());
   
   const formData = ref<OnboardingFormData>({
     email: '',
     fullName: '',
-    teams: [],
-    customTeam: '',
+    ministries: [],
+    customMinistry: '',
     availabilities: {}
   });
 
@@ -26,8 +27,10 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     return formData.value.fullName.trim() !== '';
   });
 
-  const selectedTeamsCount = computed(() => {
-    return formData.value.teams.length + (formData.value.customTeam.trim() ? 1 : 0);
+  const selectedMinistriesCount = computed(() => {
+    const ministries = formData.value.ministries || [];
+    const custom = formData.value.customMinistry || '';
+    return ministries.length + (custom.trim() ? 1 : 0);
   });
 
   const nextStep = () => {
@@ -52,24 +55,24 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     formData.value = { ...formData.value, ...data };
   };
 
-  const addTeam = (team: string) => {
-    if (!formData.value.teams.includes(team)) {
-      formData.value.teams.push(team);
+  const addMinistry = (ministry: string) => {
+    if (!formData.value.ministries.includes(ministry)) {
+      formData.value.ministries.push(ministry);
     }
   };
 
-  const removeTeam = (team: string) => {
-    const index = formData.value.teams.indexOf(team);
+  const removeMinistry = (ministry: string) => {
+    const index = formData.value.ministries.indexOf(ministry);
     if (index > -1) {
-      formData.value.teams.splice(index, 1);
+      formData.value.ministries.splice(index, 1);
     }
   };
 
-  const toggleTeam = (team: string) => {
-    if (formData.value.teams.includes(team)) {
-      removeTeam(team);
+  const toggleMinistry = (ministry: string) => {
+    if (formData.value.ministries.includes(ministry)) {
+      removeMinistry(ministry);
     } else {
-      addTeam(team);
+      addMinistry(ministry);
     }
   };
 
@@ -81,15 +84,57 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     }
   };
 
+  const markStepCompleted = (step: number) => {
+    completedSteps.value.add(step);
+  };
+
+  const isStepCompleted = (step: number) => {
+    return completedSteps.value.has(step);
+  };
+
+  const getNextIncompleteStep = () => {
+    // Step mapping: 0=welcome, 1=unused, 2=personal-info, 3=ministries, 4=availability, 5=congratulations
+    const stepRoutes = [
+      '/onboarding/welcome',           // 0
+      '/onboarding/welcome',           // 1 (unused)
+      '/onboarding/personal-info',     // 2
+      '/onboarding/ministries',        // 3
+      '/onboarding/availability',      // 4
+      '/onboarding/congratulations'    // 5
+    ];
+
+    // Check what data exists to determine completion
+    const hasPersonalInfo = formData.value.fullName.trim() !== '';
+    const hasMinistries = (formData.value.ministries || []).length > 0 || 
+                         (formData.value.customMinistry || '').trim() !== '';
+    const hasAvailabilities = Object.keys(formData.value.availabilities).length > 0;
+
+    // Mark steps as completed based on data
+    if (hasPersonalInfo) markStepCompleted(2);
+    if (hasMinistries) markStepCompleted(3);
+    if (hasAvailabilities) markStepCompleted(4);
+
+    // Find the first incomplete step
+    for (let step = 2; step <= 4; step++) {
+      if (!isStepCompleted(step)) {
+        return stepRoutes[step];
+      }
+    }
+
+    // If all steps are completed, go to congratulations
+    return stepRoutes[5];
+  };
+
   const resetForm = () => {
     formData.value = {
       email: '',
       fullName: '',
-      teams: [],
-      customTeam: '',
+      ministries: [],
+      customMinistry: '',
       availabilities: {}
     };
     currentStep.value = 0;
+    completedSteps.value.clear();
   };
 
   const setAvailableServices = (services: Service[]) => {
@@ -105,16 +150,19 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     availableServices,
     progressPercentage,
     isStep3Valid,
-    selectedTeamsCount,
+    selectedMinistriesCount,
     nextStep,
     previousStep,
     goToStep,
     updateFormData,
-    addTeam,
-    removeTeam,
-    toggleTeam,
+    addMinistry,
+    removeMinistry,
+    toggleMinistry,
     setAvailability,
     resetForm,
-    setAvailableServices
+    setAvailableServices,
+    markStepCompleted,
+    isStepCompleted,
+    getNextIncompleteStep
   };
 });

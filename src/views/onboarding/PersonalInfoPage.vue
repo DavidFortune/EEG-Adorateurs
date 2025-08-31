@@ -86,9 +86,12 @@ const continueToNextStep = () => {
       fullName: fullName.value.trim()
     });
     
+    // Mark this step as completed
+    onboardingStore.markStepCompleted(2);
+    
     // Go to next step
     onboardingStore.nextStep();
-    router.push('/onboarding/teams');
+    router.push('/onboarding/ministries');
   }
 };
 
@@ -120,7 +123,7 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   margin: 0 auto 2rem auto;
-  color: #DC2626;
+  color: #b5121b;
 }
 
 .step-icon ion-icon {
@@ -157,8 +160,8 @@ onMounted(() => {
 }
 
 .continue-button {
-  --background: #DC2626;
-  --background-hover: #B91C1C;
+  --background: #b5121b;
+  --background-hover: #9f1018;
   height: 3.5rem;
   font-size: 1.125rem;
   font-weight: 600;
@@ -171,7 +174,7 @@ onMounted(() => {
 }
 
 ion-progress-bar {
-  --progress-background: #DC2626;
+  --progress-background: #b5121b;
   --buffer-background: #FEE2E2;
 }
 

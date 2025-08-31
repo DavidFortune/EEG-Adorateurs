@@ -113,24 +113,24 @@
           </ion-card-content>
         </ion-card>
 
-        <!-- My Teams Section -->
-        <ion-card v-if="memberTeams.length > 0" class="teams-card">
+        <!-- My Ministries Section -->
+        <ion-card v-if="memberMinistries.length > 0" class="ministries-card">
           <ion-card-header>
             <ion-card-title>
               <ion-icon :icon="peopleOutline" class="section-icon"></ion-icon>
-              Mes équipes
+              Mes ministères
             </ion-card-title>
           </ion-card-header>
           <ion-card-content>
-            <div class="teams-list">
+            <div class="ministries-list">
               <ion-chip 
-                v-for="team in memberTeams" 
-                :key="team" 
+                v-for="ministry in memberMinistries" 
+                :key="ministry" 
                 color="primary"
-                class="team-chip"
+                class="ministry-chip"
               >
                 <ion-icon :icon="checkmarkCircle" slot="start"></ion-icon>
-                <ion-label>{{ team }}</ion-label>
+                <ion-label>{{ ministry }}</ion-label>
               </ion-chip>
             </div>
           </ion-card-content>
@@ -188,8 +188,8 @@ const memberFirstName = computed(() => {
   return member.value?.firstName || 'Ami(e)';
 });
 
-const memberTeams = computed(() => {
-  return member.value?.teams || [];
+const memberMinistries = computed(() => {
+  return member.value?.ministries || [];
 });
 
 const formatServiceDateTime = (date: string, time: string) => {
@@ -270,7 +270,7 @@ onMounted(() => {
 /* Welcome Section */
 .welcome-section {
   margin-bottom: 1.5rem;
-  background: linear-gradient(135deg, var(--ion-color-primary) 0%, #B91C1C 100%);
+  background: linear-gradient(135deg, var(--ion-color-primary) 0%, #9f1018 100%);
   color: white;
 }
 
@@ -325,18 +325,18 @@ onMounted(() => {
   font-weight: 500;
 }
 
-/* Teams Card */
-.teams-card {
+/* Ministries Card */
+.ministries-card {
   margin-bottom: 1.5rem;
 }
 
-.teams-list {
+.ministries-list {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
 }
 
-.team-chip {
+.ministry-chip {
   --background: #000000;
   --color: white;
 }

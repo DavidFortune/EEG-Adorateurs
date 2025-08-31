@@ -27,13 +27,13 @@
           <h2>2. Description du Service</h2>
           <p>
             EEG Adorateurs est une application de gestion des services et des disponibilités pour 
-            les membres de l'équipe d'adoration de l'Église Évangélique Galilée. L'application permet :
+            les adorateurs de l'Église Évangélique Galilée. L'application permet :
           </p>
           <ul>
             <li>La gestion des profils des membres</li>
             <li>La planification des services religieux</li>
             <li>La gestion des disponibilités des adorateurs</li>
-            <li>La coordination des équipes de louange</li>
+            <li>La coordination des ministères de louange</li>
             <li>La communication entre les membres</li>
           </ul>
         </section>
@@ -44,7 +44,7 @@
             Pour utiliser cette application, vous devez :
           </p>
           <ul>
-            <li>Être membre actif de l'équipe d'adoration de l'Église Évangélique Galilée</li>
+            <li>Être adorateur actif de l'Église Évangélique Galilée</li>
             <li>Fournir des informations exactes et complètes lors de votre inscription</li>
             <li>Maintenir la confidentialité de vos informations de connexion</li>
             <li>Avoir au moins 13 ans</li>
@@ -95,7 +95,7 @@
             <li>Maintenir vos informations de profil à jour</li>
             <li>Respecter les engagements pris concernant vos disponibilités</li>
             <li>Communiquer tout changement de disponibilité en temps opportun</li>
-            <li>Respecter les autres membres de l'équipe</li>
+            <li>Respecter les autres adorateurs</li>
             <li>Signaler tout problème technique ou de sécurité</li>
           </ul>
         </section>
@@ -135,7 +135,7 @@
             <li>Violation de ces termes et conditions</li>
             <li>Comportement inapproprié</li>
             <li>Inactivité prolongée</li>
-            <li>Fin de votre participation à l'équipe d'adoration</li>
+            <li>Fin de votre participation aux ministères d'adoration</li>
           </ul>
         </section>
 
@@ -280,13 +280,13 @@ li {
 }
 
 .link {
-  color: #DC2626;
+  color: #b5121b;
   text-decoration: underline;
   cursor: pointer;
 }
 
 .link:hover {
-  color: #B91C1C;
+  color: #9f1018;
 }
 
 .contact-info {

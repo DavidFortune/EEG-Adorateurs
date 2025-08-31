@@ -3,10 +3,10 @@ http://ionicframework.com/docs/theming/ */
 
 :root {
   /** EEG Adorateurs Custom Colors **/
-  --ion-color-primary: #DC2626;
-  --ion-color-primary-rgb: 220, 38, 38;
+  --ion-color-primary: #b5121b;
+  --ion-color-primary-rgb: 181, 18, 27;
   --ion-color-primary-contrast: #ffffff;
   --ion-color-primary-contrast-rgb: 255, 255, 255;
-  --ion-color-primary-shade: #B91C1C;
-  --ion-color-primary-tint: #DC2626;
+  --ion-color-primary-shade: #9f1018;
+  --ion-color-primary-tint: #bc2a32;
 }

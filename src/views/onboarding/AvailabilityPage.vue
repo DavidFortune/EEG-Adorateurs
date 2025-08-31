@@ -5,16 +5,29 @@
       <ion-progress-bar :value="progressPercentage / 100" color="primary"></ion-progress-bar>
 
       <div class="content-container">
-        <!-- Back Button -->
-        <ion-button 
-          fill="clear" 
-          color="medium" 
-          class="back-button"
-          @click="goBack"
-        >
-          <ion-icon :icon="arrowBack" slot="start"></ion-icon>
-          Retour
-        </ion-button>
+        <!-- Header with Back and Skip buttons -->
+        <div class="header-buttons">
+          <!-- Back Button -->
+          <ion-button 
+            fill="clear" 
+            color="medium" 
+            class="back-button"
+            @click="goBack"
+          >
+            <ion-icon :icon="arrowBack" slot="start"></ion-icon>
+            Retour
+          </ion-button>
+
+          <!-- Skip Button -->
+          <ion-button 
+            fill="clear" 
+            color="medium" 
+            class="skip-button"
+            @click="skipAvailabilities"
+          >
+            Plus tard
+          </ion-button>
+        </div>
 
         <!-- Icon -->
         <div class="step-icon">
@@ -154,16 +167,23 @@ const loadServices = async () => {
 
 const goBack = () => {
   onboardingStore.previousStep();
-  router.push('/onboarding/teams');
+  router.push('/onboarding/ministries');
 };
 
 const confirmAvailabilities = () => {
+  // Mark this step as completed
+  onboardingStore.markStepCompleted(4);
+  
   onboardingStore.nextStep();
   router.push('/onboarding/congratulations');
 };
 
 const skipAvailabilities = () => {
   onboardingStore.updateFormData({ availabilities: {} });
+  
+  // Mark this step as completed even if skipped
+  onboardingStore.markStepCompleted(4);
+  
   onboardingStore.nextStep();
   router.push('/onboarding/congratulations');
 };
@@ -180,10 +200,23 @@ onMounted(() => {
   margin: 0 auto;
 }
 
+.header-buttons {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
 .back-button {
   --color: #6B7280;
-  margin-bottom: 1rem;
-  align-self: flex-start;
+}
+
+.skip-button {
+  --color: #9CA3AF;
+  font-size: 0.875rem;
+  font-weight: 400;
+  --padding-start: 0.5rem;
+  --padding-end: 0.5rem;
 }
 
 .step-icon {
@@ -195,7 +228,7 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   margin: 0 auto 2rem auto;
-  color: #DC2626;
+  color: #b5121b;
 }
 
 .step-icon ion-icon {
@@ -324,8 +357,8 @@ onMounted(() => {
 }
 
 .primary-button {
-  --background: #DC2626;
-  --background-hover: #B91C1C;
+  --background: #b5121b;
+  --background-hover: #9f1018;
   height: 3.5rem;
   font-size: 1.125rem;
   font-weight: 600;
@@ -340,7 +373,7 @@ onMounted(() => {
 }
 
 ion-progress-bar {
-  --progress-background: #DC2626;
+  --progress-background: #b5121b;
   --buffer-background: #FEE2E2;
 }
 </style>

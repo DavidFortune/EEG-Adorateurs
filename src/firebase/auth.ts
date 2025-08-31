@@ -16,7 +16,7 @@ const googleProvider = new GoogleAuthProvider();
 
 // Configuration pour le lien par email
 const actionCodeSettings = {
-  url: window.location.origin + '/onboarding/welcome',
+  url: window.location.origin,  // Just use the root URL, let the app handle routing
   handleCodeInApp: true
 };
 

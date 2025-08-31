@@ -12,7 +12,7 @@
 
         <!-- Description -->
         <p class="welcome-description">
-          Gérez facilement vos disponibilités et coordonnez-vous avec votre équipe à l'Église Évangélique Galilée.
+          Gérez facilement vos disponibilités et vos ministères à l'Église Évangélique Galilée.
         </p>
 
         <!-- Start Button -->
@@ -32,6 +32,7 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   IonPage, IonContent, IonButton, IonIcon
@@ -48,6 +49,11 @@ const startOnboarding = () => {
   onboardingStore.goToStep(2); // Go to personal info step
   router.push('/onboarding/personal-info');
 };
+
+// Set current step when arriving at welcome page
+onMounted(() => {
+  onboardingStore.goToStep(0);
+});
 </script>
 
 <style scoped>
@@ -68,7 +74,7 @@ const startOnboarding = () => {
 .welcome-icon {
   width: 8rem;
   height: 8rem;
-  background: #DC2626;
+  background: #b5121b;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -98,8 +104,8 @@ const startOnboarding = () => {
 }
 
 .start-button {
-  --background: #DC2626;
-  --background-hover: #B91C1C;
+  --background: #b5121b;
+  --background-hover: #9f1018;
   height: 3.5rem;
   font-size: 1.125rem;
   font-weight: 600;

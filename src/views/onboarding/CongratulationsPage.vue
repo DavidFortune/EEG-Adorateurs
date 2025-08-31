@@ -10,7 +10,7 @@
 
         <!-- Description -->
         <p class="congratulations-description">
-          Votre profil est maintenant configuré. Vous êtes prêt à servir dans {{ teamsList }}.
+          Votre profil est maintenant configuré. Vous êtes prêt à servir dans {{ ministriesList }}.
         </p>
 
         <!-- Encouragement Card -->
@@ -31,7 +31,7 @@
           @click="navigateToHome"
           :disabled="completing"
         >
-          <span v-if="!completing">Commencer à utiliser l'app</span>
+          <span v-if="!completing">C'est parti !</span>
           <span v-else>Sauvegarde en cours...</span>
           <ion-icon :icon="arrowForward" slot="end" v-if="!completing"></ion-icon>
         </ion-button>
@@ -64,17 +64,18 @@ const firstName = computed(() => {
   return nameParts[0] || 'Ami(e)';
 });
 
-const teamsList = computed(() => {
-  const teams = [...onboardingStore.formData.teams];
-  if (onboardingStore.formData.customTeam.trim()) {
-    teams.push(onboardingStore.formData.customTeam.trim());
+const ministriesList = computed(() => {
+  const ministries = [...(onboardingStore.formData.ministries || [])];
+  const customMinistry = onboardingStore.formData.customMinistry || '';
+  if (customMinistry.trim()) {
+    ministries.push(customMinistry.trim());
   }
   
-  if (teams.length === 0) return 'votre équipe';
-  if (teams.length === 1) return teams[0];
-  if (teams.length === 2) return `${teams[0]} et ${teams[1]}`;
+  if (ministries.length === 0) return 'votre ministère';
+  if (ministries.length === 1) return ministries[0];
+  if (ministries.length === 2) return `${ministries[0]} et ${ministries[1]}`;
   
-  return `${teams.slice(0, -1).join(', ')} et ${teams[teams.length - 1]}`;
+  return `${ministries.slice(0, -1).join(', ')} et ${ministries[ministries.length - 1]}`;
 });
 
 const showToast = async (message: string, color: 'success' | 'danger' = 'success') => {
@@ -107,12 +108,19 @@ const saveUserData = async () => {
       const firstName = nameParts[0] || '';
       const lastName = nameParts.slice(1).join(' ') || '';
       
+      // Combine regular ministries with custom ministry if provided
+      const ministries = [...(onboardingStore.formData.ministries || [])];
+      const customMinistry = onboardingStore.formData.customMinistry || '';
+      if (customMinistry.trim()) {
+        ministries.push(customMinistry.trim());
+      }
+      
       // Update existing member instead of creating a new one
       await membersService.updateMember(existingMember.id, {
         firstName,
         lastName,
         fullName: onboardingStore.formData.fullName,
-        teams: [...onboardingStore.formData.teams, ...(onboardingStore.formData.customTeam.trim() ? [onboardingStore.formData.customTeam.trim()] : [])],
+        ministries: ministries,
         availabilities: onboardingStore.formData.availabilities,
         isOnboardingCompleted: true
       });
@@ -237,8 +245,8 @@ onMounted(async () => {
 }
 
 .start-app-button {
-  --background: #DC2626;
-  --background-hover: #B91C1C;
+  --background: #b5121b;
+  --background-hover: #9f1018;
   height: 3.5rem;
   font-size: 1.125rem;
   font-weight: 600;
