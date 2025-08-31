@@ -28,11 +28,11 @@
           color="primary" 
           size="large" 
           class="start-app-button"
-          @click="completeOnboarding"
+          @click="navigateToHome"
           :disabled="completing"
         >
           <span v-if="!completing">Commencer à utiliser l'app</span>
-          <span v-else>Finalisation...</span>
+          <span v-else>Sauvegarde en cours...</span>
           <ion-icon :icon="arrowForward" slot="end" v-if="!completing"></ion-icon>
         </ion-button>
       </div>
@@ -57,6 +57,7 @@ const router = useRouter();
 const onboardingStore = useOnboardingStore();
 
 const completing = ref(false);
+const dataSaved = ref(false);
 
 const firstName = computed(() => {
   const nameParts = onboardingStore.formData.fullName.trim().split(' ');
@@ -86,7 +87,9 @@ const showToast = async (message: string, color: 'success' | 'danger' = 'success
   await toast.present();
 };
 
-const completeOnboarding = async () => {
+const saveUserData = async () => {
+  if (dataSaved.value) return; // Prevent multiple saves
+  
   completing.value = true;
   
   try {
@@ -125,23 +128,29 @@ const completeOnboarding = async () => {
       await showToast('Profil créé avec succès !');
     }
     
+    dataSaved.value = true;
+    
     // Reset onboarding data
     onboardingStore.resetForm();
     
-    // Navigate to main app
-    router.replace('/tabs/accueil');
-    
   } catch (error) {
-    console.error('Error completing onboarding:', error);
-    await showToast('Erreur lors de la finalisation du profil', 'danger');
+    console.error('Error saving user data:', error);
+    await showToast('Erreur lors de la sauvegarde du profil', 'danger');
   } finally {
     completing.value = false;
   }
 };
 
-onMounted(() => {
+const navigateToHome = () => {
+  router.replace('/tabs/accueil');
+};
+
+onMounted(async () => {
   // Ensure we're on the last step
   onboardingStore.goToStep(5);
+  
+  // Save user data automatically when page loads
+  await saveUserData();
 });
 </script>
 

@@ -79,7 +79,7 @@ const handleLogout = async () => {
             await authService.signOutUser();
             await showToast('Vous avez été déconnecté');
             emit('close');
-            router.replace('/onboarding/login');
+            router.replace('/login');
           } catch (error) {
             console.error('Logout error:', error);
             await showToast('Erreur lors de la déconnexion', 'danger');

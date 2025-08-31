@@ -80,6 +80,16 @@
             <p class="small-text">Vérifiez votre boîte mail et cliquez sur le lien pour vous connecter.</p>
           </div>
         </div>
+
+        <!-- Privacy Policy and Terms Links -->
+        <div class="privacy-link-container">
+          <p class="privacy-text">
+            En vous connectant, vous acceptez nos
+            <a @click="goToTerms" class="privacy-link">Termes et Conditions</a>
+            et notre
+            <a @click="goToPrivacy" class="privacy-link">Politique de Confidentialité</a>
+          </p>
+        </div>
       </div>
     </ion-content>
   </ion-page>
@@ -170,6 +180,14 @@ const handleEmailSignIn = async () => {
   } finally {
     emailSending.value = false;
   }
+};
+
+const goToPrivacy = () => {
+  router.push('/privacy');
+};
+
+const goToTerms = () => {
+  router.push('/terms');
 };
 
 // Check if returning from email link or already authenticated
@@ -358,6 +376,26 @@ const handleEmailLinkSignIn = async (emailLink: string) => {
 .small-text {
   font-size: 0.875rem;
   color: #6B7280 !important;
+}
+
+.privacy-link-container {
+  margin-top: 2rem;
+  text-align: center;
+}
+
+.privacy-text {
+  font-size: 0.875rem;
+  color: #6B7280;
+}
+
+.privacy-link {
+  color: #DC2626;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.privacy-link:hover {
+  color: #B91C1C;
 }
 
 @media (max-width: 768px) {
