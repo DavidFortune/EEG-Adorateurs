@@ -29,8 +29,13 @@ function convertFirestoreToMember(firestoreMember: FirestoreMember): Member {
 }
 
 function convertMemberToFirestore(member: Omit<Member, 'id'>): Omit<FirestoreMember, 'id'> {
+  // Filter out undefined values to prevent Firebase errors
+  const cleanMember = Object.fromEntries(
+    Object.entries(member).filter(([_, value]) => value !== undefined)
+  ) as Omit<Member, 'id'>;
+  
   return {
-    ...member,
+    ...cleanMember,
     createdAt: Timestamp.fromDate(new Date(member.createdAt)),
     updatedAt: Timestamp.fromDate(new Date(member.updatedAt))
   };
@@ -99,7 +104,7 @@ export const membersService = {
       const memberData: Omit<Member, 'id'> = {
         firebaseUserId,
         email,
-        avatar,
+        ...(avatar && { avatar }), // Only include avatar if it exists
         firstName,
         lastName,
         fullName: onboardingData.fullName,
