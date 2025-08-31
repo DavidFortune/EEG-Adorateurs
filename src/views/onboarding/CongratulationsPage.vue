@@ -130,7 +130,7 @@ const saveUserData = async () => {
       await membersService.createMember(
         user.uid,
         user.email || onboardingStore.formData.email,
-        user.photoURL || undefined,
+        user.photoURL || '',
         onboardingStore.formData
       );
       await showToast('Profil créé avec succès !');
