@@ -92,15 +92,29 @@ const completeOnboarding = async () => {
       throw new Error('Utilisateur non authentifié');
     }
 
-    // Create member profile in Firestore
-    await membersService.createMember(
-      user.uid,
-      user.email || onboardingStore.formData.email,
-      user.photoURL || undefined,
-      onboardingStore.formData
-    );
-
-    await showToast('Profil créé avec succès !');
+    // Check if member already exists
+    const existingMember = await membersService.getMemberByFirebaseUserId(user.uid);
+    
+    if (existingMember) {
+      // Update existing member instead of creating a new one
+      await membersService.updateMember(existingMember.id, {
+        firstName: onboardingStore.formData.firstName,
+        lastName: onboardingStore.formData.lastName,
+        teams: [...onboardingStore.formData.teams, ...(onboardingStore.formData.customTeam.trim() ? [onboardingStore.formData.customTeam.trim()] : [])],
+        availabilities: onboardingStore.formData.availabilities,
+        isOnboardingCompleted: true
+      });
+      await showToast('Profil mis à jour avec succès !');
+    } else {
+      // Create new member profile in Firestore
+      await membersService.createMember(
+        user.uid,
+        user.email || onboardingStore.formData.email,
+        user.photoURL || undefined,
+        onboardingStore.formData
+      );
+      await showToast('Profil créé avec succès !');
+    }
     
     // Reset onboarding data
     onboardingStore.resetForm();
