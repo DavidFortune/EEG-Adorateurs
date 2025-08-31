@@ -100,6 +100,7 @@ const completeOnboarding = async () => {
       await membersService.updateMember(existingMember.id, {
         firstName: onboardingStore.formData.firstName,
         lastName: onboardingStore.formData.lastName,
+        fullName: `${onboardingStore.formData.firstName} ${onboardingStore.formData.lastName}`,
         teams: [...onboardingStore.formData.teams, ...(onboardingStore.formData.customTeam.trim() ? [onboardingStore.formData.customTeam.trim()] : [])],
         availabilities: onboardingStore.formData.availabilities,
         isOnboardingCompleted: true

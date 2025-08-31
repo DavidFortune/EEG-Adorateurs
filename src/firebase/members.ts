@@ -83,6 +83,7 @@ export const membersService = {
         avatar,
         firstName: onboardingData.firstName,
         lastName: onboardingData.lastName,
+        fullName: `${onboardingData.firstName} ${onboardingData.lastName}`,
         teams: allTeams,
         availabilities: onboardingData.availabilities,
         isOnboardingCompleted: true,

@@ -5,6 +5,7 @@ export interface Member {
   avatar?: string;
   firstName: string;
   lastName: string;
+  fullName: string;
   teams: string[];
   availabilities: {
     [serviceId: string]: 'available' | 'unavailable' | null;
