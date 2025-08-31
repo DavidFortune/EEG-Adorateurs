@@ -18,8 +18,7 @@ export interface Member {
 
 export interface OnboardingFormData {
   email: string;
-  firstName: string;
-  lastName: string;
+  fullName: string;
   teams: string[];
   customTeam: string;
   availabilities: {

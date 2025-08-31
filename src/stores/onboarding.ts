@@ -9,8 +9,7 @@ export const useOnboardingStore = defineStore('onboarding', () => {
   
   const formData = ref<OnboardingFormData>({
     email: '',
-    firstName: '',
-    lastName: '',
+    fullName: '',
     teams: [],
     customTeam: '',
     availabilities: {}
@@ -24,7 +23,7 @@ export const useOnboardingStore = defineStore('onboarding', () => {
   });
 
   const isStep3Valid = computed(() => {
-    return formData.value.firstName.trim() !== '' && formData.value.lastName.trim() !== '';
+    return formData.value.fullName.trim() !== '';
   });
 
   const selectedTeamsCount = computed(() => {
@@ -85,8 +84,7 @@ export const useOnboardingStore = defineStore('onboarding', () => {
   const resetForm = () => {
     formData.value = {
       email: '',
-      firstName: '',
-      lastName: '',
+      fullName: '',
       teams: [],
       customTeam: '',
       availabilities: {}

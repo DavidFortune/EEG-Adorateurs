@@ -77,13 +77,18 @@ export const membersService = {
         allTeams.push(onboardingData.customTeam.trim());
       }
       
+      // Extract firstName and lastName from fullName
+      const nameParts = onboardingData.fullName.trim().split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      
       const memberData: Omit<Member, 'id'> = {
         firebaseUserId,
         email,
         avatar,
-        firstName: onboardingData.firstName,
-        lastName: onboardingData.lastName,
-        fullName: `${onboardingData.firstName} ${onboardingData.lastName}`,
+        firstName,
+        lastName,
+        fullName: onboardingData.fullName,
         teams: allTeams,
         availabilities: onboardingData.availabilities,
         isOnboardingCompleted: true,

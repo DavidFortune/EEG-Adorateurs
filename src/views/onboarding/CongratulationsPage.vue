@@ -58,7 +58,10 @@ const onboardingStore = useOnboardingStore();
 
 const completing = ref(false);
 
-const firstName = computed(() => onboardingStore.formData.firstName);
+const firstName = computed(() => {
+  const nameParts = onboardingStore.formData.fullName.trim().split(' ');
+  return nameParts[0] || 'Ami(e)';
+});
 
 const teamsList = computed(() => {
   const teams = [...onboardingStore.formData.teams];
@@ -96,11 +99,16 @@ const completeOnboarding = async () => {
     const existingMember = await membersService.getMemberByFirebaseUserId(user.uid);
     
     if (existingMember) {
+      // Extract firstName and lastName from fullName
+      const nameParts = onboardingStore.formData.fullName.trim().split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      
       // Update existing member instead of creating a new one
       await membersService.updateMember(existingMember.id, {
-        firstName: onboardingStore.formData.firstName,
-        lastName: onboardingStore.formData.lastName,
-        fullName: `${onboardingStore.formData.firstName} ${onboardingStore.formData.lastName}`,
+        firstName,
+        lastName,
+        fullName: onboardingStore.formData.fullName,
         teams: [...onboardingStore.formData.teams, ...(onboardingStore.formData.customTeam.trim() ? [onboardingStore.formData.customTeam.trim()] : [])],
         availabilities: onboardingStore.formData.availabilities,
         isOnboardingCompleted: true

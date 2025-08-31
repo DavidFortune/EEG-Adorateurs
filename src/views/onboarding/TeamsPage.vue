@@ -22,12 +22,7 @@
         </div>
 
         <!-- Title -->
-        <h1 class="step-title">Vos équipes</h1>
-
-        <!-- Description -->
-        <p class="step-description">
-          Dans quelles équipes servez-vous ?
-        </p>
+        <h1 class="step-title">Dans quelles équipes servez-vous ?</h1>
 
         <!-- Teams Grid -->
         <div class="teams-grid">
@@ -192,15 +187,7 @@ onMounted(() => {
   font-weight: bold;
   color: #111827;
   text-align: center;
-  margin: 0 0 1rem 0;
-}
-
-.step-description {
-  font-size: 1.125rem;
-  color: #6B7280;
-  text-align: center;
-  margin-bottom: 3rem;
-  line-height: 1.6;
+  margin: 0 0 3rem 0;
 }
 
 .teams-grid {
@@ -297,6 +284,12 @@ ion-progress-bar {
   --buffer-background: #FEE2E2;
 }
 
+@media (max-width: 768px) {
+  .step-title {
+    font-size: 1.5rem;
+  }
+}
+
 @media (max-width: 480px) {
   .teams-grid {
     grid-template-columns: 1fr;
@@ -304,6 +297,10 @@ ion-progress-bar {
   
   .team-card {
     min-height: 60px;
+  }
+  
+  .step-title {
+    font-size: 1.25rem;
   }
 }
 </style>

@@ -22,12 +22,7 @@
         </div>
 
         <!-- Title -->
-        <h1 class="step-title">Vos disponibilités</h1>
-
-        <!-- Description -->
-        <p class="step-description">
-          Indiquez votre disponibilité pour les services à venir
-        </p>
+        <h1 class="step-title">Indiquez votre disponibilité pour les services à venir</h1>
 
         <!-- Services List -->
         <div class="services-list">
@@ -212,15 +207,7 @@ onMounted(() => {
   font-weight: bold;
   color: #111827;
   text-align: center;
-  margin: 0 0 1rem 0;
-}
-
-.step-description {
-  font-size: 1.125rem;
-  color: #6B7280;
-  text-align: center;
-  margin-bottom: 3rem;
-  line-height: 1.6;
+  margin: 0 0 3rem 0;
 }
 
 .services-list {
@@ -240,6 +227,10 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
+  .step-title {
+    font-size: 1.5rem;
+  }
+  
   .service-card {
     flex-direction: column;
     align-items: stretch;
@@ -253,6 +244,12 @@ onMounted(() => {
   .availability-buttons {
     justify-content: center;
     gap: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .step-title {
+    font-size: 1.25rem;
   }
 }
 

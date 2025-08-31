@@ -22,29 +22,15 @@
         </div>
 
         <!-- Title -->
-        <h1 class="step-title">Informations personnelles</h1>
-
-        <!-- Description -->
-        <p class="step-description">
-          Comment souhaitez-vous être appelé(e) ?
-        </p>
+        <h1 class="step-title">Comment souhaitez-vous être appelé(e) ?</h1>
 
         <!-- Form -->
         <div class="form-container">
           <ion-item class="form-item">
             <ion-input
-              v-model="firstName"
+              v-model="fullName"
               type="text"
-              placeholder="Prénom *"
-              required
-            ></ion-input>
-          </ion-item>
-
-          <ion-item class="form-item">
-            <ion-input
-              v-model="lastName"
-              type="text"
-              placeholder="Nom de famille *"
+              placeholder="Nom complet *"
               required
             ></ion-input>
           </ion-item>
@@ -80,13 +66,12 @@ import { useOnboardingStore } from '@/stores/onboarding';
 const router = useRouter();
 const onboardingStore = useOnboardingStore();
 
-const firstName = ref('');
-const lastName = ref('');
+const fullName = ref('');
 
 const progressPercentage = computed(() => onboardingStore.progressPercentage);
 
 const isFormValid = computed(() => {
-  return firstName.value.trim() !== '' && lastName.value.trim() !== '';
+  return fullName.value.trim() !== '';
 });
 
 const goBack = () => {
@@ -98,8 +83,7 @@ const continueToNextStep = () => {
   if (isFormValid.value) {
     // Update form data
     onboardingStore.updateFormData({
-      firstName: firstName.value.trim(),
-      lastName: lastName.value.trim()
+      fullName: fullName.value.trim()
     });
     
     // Go to next step
@@ -110,8 +94,7 @@ const continueToNextStep = () => {
 
 // Initialize form with existing data
 onMounted(() => {
-  firstName.value = onboardingStore.formData.firstName;
-  lastName.value = onboardingStore.formData.lastName;
+  fullName.value = onboardingStore.formData.fullName;
 });
 </script>
 
@@ -149,15 +132,7 @@ onMounted(() => {
   font-weight: bold;
   color: #111827;
   text-align: center;
-  margin: 0 0 1rem 0;
-}
-
-.step-description {
-  font-size: 1.125rem;
-  color: #6B7280;
-  text-align: center;
-  margin-bottom: 3rem;
-  line-height: 1.6;
+  margin: 0 0 3rem 0;
 }
 
 .form-container {
@@ -198,5 +173,17 @@ onMounted(() => {
 ion-progress-bar {
   --progress-background: #DC2626;
   --buffer-background: #FEE2E2;
+}
+
+@media (max-width: 768px) {
+  .step-title {
+    font-size: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .step-title {
+    font-size: 1.25rem;
+  }
 }
 </style>
