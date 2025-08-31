@@ -46,6 +46,7 @@ const router = useRouter();
 const onboardingStore = useOnboardingStore();
 
 const startOnboarding = () => {
+  onboardingStore.markStepCompleted(0); // Mark welcome step as completed
   onboardingStore.goToStep(2); // Go to personal info step
   router.push('/onboarding/personal-info');
 };

@@ -114,7 +114,12 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     if (hasMinistries) markStepCompleted(3);
     if (hasAvailabilities) markStepCompleted(4);
 
-    // Find the first incomplete step
+    // Always start from welcome if step 0 is not completed
+    if (!isStepCompleted(0)) {
+      return stepRoutes[0];
+    }
+
+    // Find the first incomplete step starting from personal info
     for (let step = 2; step <= 4; step++) {
       if (!isStepCompleted(step)) {
         return stepRoutes[step];
