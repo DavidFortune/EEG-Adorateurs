@@ -2,18 +2,13 @@
   <ion-page>
     <ion-header>
       <ion-toolbar>
+        <ion-buttons slot="start">
+          <ion-menu-button menu="side-menu" color="dark"></ion-menu-button>
+        </ion-buttons>
         <ion-title>Services</ion-title>
         <ion-buttons slot="end">
-          <ion-button @click="goToCreateService" fill="clear">
+          <ion-button @click="goToCreateService" fill="clear" color="dark">
             <ion-icon :icon="addOutline" />
-          </ion-button>
-          <ion-button fill="clear" class="avatar-button" id="avatar-trigger-services" @click="toggleUserMenu">
-            <ion-avatar v-if="userAvatar" class="header-avatar">
-              <img :src="userAvatar" :alt="userName" />
-            </ion-avatar>
-            <ion-avatar v-else class="header-avatar initials-avatar">
-              <span class="initials">{{ userInitials }}</span>
-            </ion-avatar>
           </ion-button>
         </ion-buttons>
       </ion-toolbar>
@@ -32,7 +27,7 @@
       <ion-loading :is-open="loading" message="Chargement des services..."></ion-loading>
 
       <div class="ion-padding">
-        <div class="filter-section ion-margin-bottom">
+        <div class="filter-section">
           <ion-segment v-model="filterMode" @ionChange="onFilterChange">
             <ion-segment-button value="all">
               <ion-label>Tous</ion-label>
@@ -45,12 +40,6 @@
             </ion-segment-button>
           </ion-segment>
         </div>
-
-        <ion-fab vertical="bottom" horizontal="end" slot="fixed" class="create-service-fab">
-          <ion-fab-button @click="goToCreateService">
-            <ion-icon :icon="addOutline" />
-          </ion-fab-button>
-        </ion-fab>
 
         <div v-if="filteredServices.length === 0 && !loading" class="empty-state ion-text-center ion-padding">
           <ion-icon :icon="calendarOutline" size="large" color="medium" />
@@ -96,12 +85,6 @@
           </ion-card-content>
         </ion-card>
       </div>
-      
-      <UserMenu 
-        :is-open="isUserMenuOpen" 
-        trigger-id="avatar-trigger-services" 
-        @close="closeUserMenu"
-      />
     </ion-content>
   </ion-page>
 </template>
@@ -113,7 +96,7 @@ import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
   IonIcon, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent,
   IonRefresher, IonRefresherContent, IonLoading, IonSegment, IonSegmentButton,
-  IonLabel, IonFab, IonFabButton, IonChip, IonAvatar
+  IonLabel, IonChip, IonMenuButton
 } from '@ionic/vue';
 import {
   addOutline, calendarOutline, checkmarkCircle, timeOutline
@@ -121,24 +104,11 @@ import {
 import { Service, ServiceCategory } from '@/types/service';
 import { serviceService } from '@/services/serviceService';
 import { timezoneUtils } from '@/utils/timezone';
-import { useUser } from '@/composables/useUser';
-import UserMenu from '@/components/UserMenu.vue';
 
 const router = useRouter();
 const services = ref<Service[]>([]);
 const loading = ref(false);
 const filterMode = ref('all');
-const isUserMenuOpen = ref(false);
-
-const { userAvatar, userInitials, userName } = useUser();
-
-const toggleUserMenu = () => {
-  isUserMenuOpen.value = !isUserMenuOpen.value;
-};
-
-const closeUserMenu = () => {
-  isUserMenuOpen.value = false;
-};
 
 const filteredServices = computed(() => {
   switch (filterMode.value) {
@@ -237,33 +207,11 @@ onMounted(() => {
 .filter-section {
   background: var(--ion-color-light);
   border-radius: 8px;
-  padding: 8px;
+  padding: 12px;
+  margin-bottom: 1.5rem;
 }
 
 .create-service-fab {
   margin-bottom: 80px;
-}
-
-.header-avatar {
-  width: 32px;
-  height: 32px;
-}
-
-.initials-avatar {
-  background: var(--ion-color-primary);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.initials {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.avatar-button {
-  --padding-end: 0;
-  --padding-start: 0;
 }
 </style>

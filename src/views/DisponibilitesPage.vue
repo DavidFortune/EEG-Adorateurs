@@ -2,20 +2,18 @@
   <ion-page>
     <ion-header>
       <ion-toolbar>
-        <ion-title>Disponibilités</ion-title>
-        <ion-buttons slot="end">
-          <ion-button fill="clear" class="avatar-button" id="avatar-trigger-disponibilites" @click="toggleUserMenu">
-            <ion-avatar v-if="userAvatar" class="header-avatar">
-              <img :src="userAvatar" :alt="userName" />
-            </ion-avatar>
-            <ion-avatar v-else class="header-avatar initials-avatar">
-              <span class="initials">{{ userInitials }}</span>
-            </ion-avatar>
-          </ion-button>
+        <ion-buttons slot="start">
+          <ion-menu-button menu="side-menu" color="dark"></ion-menu-button>
         </ion-buttons>
+        <ion-title>Disponibilités</ion-title>
       </ion-toolbar>
     </ion-header>
     <ion-content :fullscreen="true">
+      <ion-header collapse="condense">
+        <ion-toolbar>
+          <ion-title size="large">Disponibilités</ion-title>
+        </ion-toolbar>
+      </ion-header>
 
       <ion-refresher slot="fixed" @ionRefresh="handleRefresh">
         <ion-refresher-content></ion-refresher-content>
@@ -89,12 +87,6 @@
           <span v-else>Enregistrement...</span>
         </ion-button>
       </div>
-      
-      <UserMenu 
-        :is-open="isUserMenuOpen" 
-        trigger-id="avatar-trigger-disponibilites" 
-        @close="closeUserMenu"
-      />
     </ion-content>
   </ion-page>
 </template>
@@ -102,8 +94,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import {
-  IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonButtons, IonAvatar,
-  IonIcon, IonRefresher, IonRefresherContent, IonLoading, toastController
+  IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonButtons,
+  IonIcon, IonRefresher, IonRefresherContent, IonLoading, IonMenuButton, toastController
 } from '@ionic/vue';
 import {
   thumbsUpOutline, thumbsDownOutline, calendarOutline
@@ -112,11 +104,9 @@ import { useUser } from '@/composables/useUser';
 import { serviceService } from '@/services/serviceService';
 import { membersService } from '@/firebase/members';
 import { timezoneUtils } from '@/utils/timezone';
-import UserMenu from '@/components/UserMenu.vue';
 import type { Service } from '@/types/service';
 
-const { userAvatar, userInitials, userName, member } = useUser();
-const isUserMenuOpen = ref(false);
+const { member } = useUser();
 const loading = ref(false);
 const saving = ref(false);
 const availableServices = ref<Service[]>([]);
@@ -206,13 +196,6 @@ const showToast = async (message: string, color: 'success' | 'danger' = 'success
   await toast.present();
 };
 
-const toggleUserMenu = () => {
-  isUserMenuOpen.value = !isUserMenuOpen.value;
-};
-
-const closeUserMenu = () => {
-  isUserMenuOpen.value = false;
-};
 
 // Watch for member data changes
 watch(() => member.value, (newMember) => {
@@ -227,29 +210,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.header-avatar {
-  width: 32px;
-  height: 32px;
-}
-
-.initials-avatar {
-  background: var(--ion-color-primary);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.initials {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.avatar-button {
-  --padding-end: 0;
-  --padding-start: 0;
-}
-
 .header-section {
   margin-bottom: 2rem;
 }

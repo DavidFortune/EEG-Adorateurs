@@ -2,6 +2,9 @@
   <ion-page>
     <ion-header>
       <ion-toolbar>
+        <ion-buttons slot="start">
+          <ion-menu-button menu="side-menu" color="dark"></ion-menu-button>
+        </ion-buttons>
         <ion-title>Accueil</ion-title>
         <ion-buttons slot="end">
           <ion-button fill="clear" class="avatar-button" id="avatar-trigger-accueil" @click="toggleUserMenu">
@@ -16,6 +19,11 @@
       </ion-toolbar>
     </ion-header>
     <ion-content :fullscreen="true">
+      <ion-header collapse="condense">
+        <ion-toolbar>
+          <ion-title size="large">Accueil</ion-title>
+        </ion-toolbar>
+      </ion-header>
 
       <ion-refresher slot="fixed" @ionRefresh="handleRefresh">
         <ion-refresher-content></ion-refresher-content>
@@ -166,7 +174,7 @@ import { useRouter } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonCard, IonCardHeader, IonCardTitle, 
   IonCardContent, IonButtons, IonButton, IonAvatar, IonIcon, IonRefresher, IonRefresherContent,
-  IonChip, IonLabel
+  IonChip, IonLabel, IonMenuButton
 } from '@ionic/vue';
 import {
   bookOutline, peopleOutline, checkmarkCircle, calendarOutline, checkmarkOutline, 
@@ -250,7 +258,7 @@ onMounted(() => {
 }
 
 .initials-avatar {
-  background: var(--ion-color-primary);
+  background: #3a3a3c;
   color: white;
   display: flex;
   align-items: center;

@@ -1,6 +1,7 @@
 <template>
   <ion-page>
-    <ion-tabs>
+    <SideMenu />
+    <ion-tabs id="main-content">
       <ion-router-outlet></ion-router-outlet>
       <ion-tab-bar slot="bottom">
         <ion-tab-button tab="accueil" href="/tabs/accueil">
@@ -26,6 +27,7 @@
 import { IonTabBar, IonTabButton, IonTabs, IonLabel, IonIcon, IonPage, IonRouterOutlet } from '@ionic/vue';
 import { home, calendar, checkboxOutline } from 'ionicons/icons';
 import { useUser } from '@/composables/useUser';
+import SideMenu from '@/components/SideMenu.vue';
 
 const { isAdmin } = useUser();
 </script>
