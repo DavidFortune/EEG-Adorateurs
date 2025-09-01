@@ -20,7 +20,7 @@
           <p class="app-subtitle">Gestion des Services</p>
           <div class="version-badge">
             <ion-chip color="primary">
-              <ion-label>Version 1.1.0</ion-label>
+              <ion-label>Version 1.1.1</ion-label>
             </ion-chip>
           </div>
         </div>

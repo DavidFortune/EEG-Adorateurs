@@ -241,6 +241,21 @@ class UpdateService {
   async getReleaseNotes(): Promise<ReleaseNote[]> {
     return [
       {
+        version: '1.1.1',
+        date: '2025-01-09',
+        title: 'Système de mise à jour automatique',
+        description: 'Mise à jour patch avec amélioration du système de mise à jour automatique',
+        features: [],
+        fixes: [
+          'Correction des erreurs TypeScript dans le service de mise à jour',
+          'Amélioration de la compatibilité du Service Worker'
+        ],
+        improvements: [
+          'Optimisation des performances de vérification des mises à jour',
+          'Interface utilisateur plus fluide pour les notifications de mise à jour'
+        ]
+      },
+      {
         version: '1.1.0',
         date: '2025-01-09',
         title: 'Notifications Push et Paramètres',
