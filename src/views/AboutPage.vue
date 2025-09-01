@@ -135,7 +135,7 @@
 
         <!-- Footer -->
         <div class="about-footer">
-          <p class="copyright">© 2024 Église Évangélique de Galilée</p>
+          <p class="copyright">© 2025 Église Évangélique de Galilée</p>
           <p class="rights">Tous droits réservés</p>
         </div>
       </div>

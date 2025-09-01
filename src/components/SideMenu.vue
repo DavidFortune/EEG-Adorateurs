@@ -19,12 +19,12 @@
         
         <ion-item button @click="navigateToTerms">
           <ion-icon :icon="documentTextOutline" slot="start" color="primary"></ion-icon>
-          <ion-label>Conditions d'utilisation</ion-label>
+          <ion-label>Termes et conditions</ion-label>
         </ion-item>
         
         <ion-item button @click="navigateToPrivacy">
           <ion-icon :icon="shieldCheckmarkOutline" slot="start" color="primary"></ion-icon>
-          <ion-label>Politique de confidentialité</ion-label>
+          <ion-label>Vie privée</ion-label>
         </ion-item>
       </ion-list>
 
