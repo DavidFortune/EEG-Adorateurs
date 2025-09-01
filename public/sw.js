@@ -1,5 +1,6 @@
 // Service Worker pour EEG Adorateurs
-const CACHE_NAME = 'eeg-adorateurs-v1';
+const CACHE_NAME = 'eeg-adorateurs-v1.1.0';
+const APP_VERSION = '1.1.0';
 const urlsToCache = [
   '/',
   '/manifest.json',
@@ -9,29 +10,53 @@ const urlsToCache = [
 
 // Installation du Service Worker
 self.addEventListener('install', event => {
+  console.log('SW: Installing version', APP_VERSION);
+  
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
+        console.log('SW: Caching app shell');
         return cache.addAll(urlsToCache);
       })
+      .then(() => {
+        console.log('SW: Installation complete');
+        // Skip waiting to activate immediately
+        return self.skipWaiting();
+      })
   );
-  self.skipWaiting();
 });
 
 // Activation du Service Worker
 self.addEventListener('activate', event => {
+  console.log('SW: Activating version', APP_VERSION);
+  
   event.waitUntil(
     caches.keys().then(cacheNames => {
+      console.log('SW: Cleaning old caches');
       return Promise.all(
         cacheNames.map(cacheName => {
           if (cacheName !== CACHE_NAME) {
+            console.log('SW: Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
+    }).then(() => {
+      console.log('SW: Activation complete');
+      // Take control of all pages immediately
+      return self.clients.claim();
+    }).then(() => {
+      // Notify clients that update is ready
+      return self.clients.matchAll().then(clients => {
+        clients.forEach(client => {
+          client.postMessage({
+            type: 'UPDATE_AVAILABLE',
+            version: APP_VERSION
+          });
+        });
+      });
     })
   );
-  self.clients.claim();
 });
 
 // Stratégie de cache : Network First puis Cache

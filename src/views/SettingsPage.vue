@@ -62,6 +62,17 @@
                   <p>America/Montreal</p>
                 </ion-label>
               </ion-item>
+              <ion-item lines="none" button router-link="/releases">
+                <ion-icon :icon="rocketOutline" slot="start" color="primary"></ion-icon>
+                <ion-label>
+                  <h3>Notes de version</h3>
+                  <p>Version {{ appVersion }} • Voir les nouveautés</p>
+                </ion-label>
+                <ion-chip v-if="hasUpdate" color="success" slot="end">
+                  <ion-label>Nouveau</ion-label>
+                </ion-chip>
+                <ion-icon :icon="chevronForwardOutline" slot="end" color="medium"></ion-icon>
+              </ion-item>
             </ion-list>
           </ion-card-content>
         </ion-card>
@@ -116,7 +127,7 @@
 
         <!-- App Info -->
         <div class="app-info">
-          <p class="version">Version 1.0.0</p>
+          <p class="version">Version {{ appVersion }}</p>
           <p class="copyright">© 2025 Église Évangélique Galilée</p>
         </div>
       </div>
@@ -133,13 +144,16 @@ import {
 import { 
   notificationsOutline, settingsOutline, languageOutline, timeOutline,
   shieldCheckmarkOutline, documentTextOutline, lockClosedOutline, 
-  helpCircleOutline, mailOutline, chevronForwardOutline
+  helpCircleOutline, mailOutline, chevronForwardOutline, rocketOutline
 } from 'ionicons/icons';
 import { ref, onMounted } from 'vue';
 import { pushNotificationService } from '@/services/pushNotificationService';
+import { updateService } from '@/services/updateService';
 
 const isNotificationsEnabled = ref(false);
 const notificationStatus = ref('Notifications désactivées');
+const appVersion = ref(updateService.getCurrentVersion());
+const hasUpdate = ref(false);
 
 const sendSupportEmail = () => {
   window.location.href = 'mailto:adorateurs@eglisegalilee.com?subject=Support EEG Adorateurs';
@@ -173,6 +187,14 @@ const toggleNotifications = async () => {
 onMounted(async () => {
   await pushNotificationService.initialize();
   await updateNotificationStatus();
+  
+  // Check for updates and listen for update notifications
+  const updateInfo = await updateService.checkForUpdates();
+  hasUpdate.value = updateInfo.hasUpdate;
+  
+  updateService.onUpdateAvailable((info) => {
+    hasUpdate.value = info.hasUpdate;
+  });
 });
 </script>
 

@@ -38,6 +38,9 @@ import './theme/variables.css';
 /* Push notifications */
 import { pushNotificationService } from './services/pushNotificationService';
 
+/* Update service */
+import { updateService } from './services/updateService';
+
 const pinia = createPinia();
 
 const app = createApp(App)
@@ -50,4 +53,7 @@ router.isReady().then(async () => {
   
   // Initialize push notifications
   await pushNotificationService.initialize();
+  
+  // Initialize update service
+  await updateService.initialize();
 });
