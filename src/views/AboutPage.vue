@@ -35,7 +35,7 @@
           </ion-card-header>
           <ion-card-content>
             <p>
-              EEG Adorateurs est l'application de gestion des services de l'Église Évangélique de Galilée. 
+              EEG Adorateurs est l'application de gestion des services de l'Église Évangélique Galilée. 
               Elle permet aux membres de gérer leur disponibilité et de coordonner les services.
             </p>
           </ion-card-content>
@@ -88,7 +88,7 @@
           <ion-card-header>
             <ion-card-title>
               <ion-icon :icon="businessOutline" class="section-icon"></ion-icon>
-              Église Évangélique de Galilée
+              Église Évangélique Galilée
             </ion-card-title>
           </ion-card-header>
           <ion-card-content>
@@ -135,7 +135,7 @@
 
         <!-- Footer -->
         <div class="about-footer">
-          <p class="copyright">© 2025 Église Évangélique de Galilée</p>
+          <p class="copyright">© 2025 Église Évangélique Galilée</p>
           <p class="rights">Tous droits réservés</p>
         </div>
       </div>
