@@ -2,9 +2,6 @@
   <ion-page>
     <ion-header>
       <ion-toolbar>
-        <ion-buttons slot="start">
-          <ion-menu-button menu="side-menu" color="dark"></ion-menu-button>
-        </ion-buttons>
         <ion-title>Accueil</ion-title>
         <ion-buttons slot="end">
           <ion-button fill="clear" class="avatar-button" id="avatar-trigger-accueil" @click="toggleUserMenu">
@@ -114,10 +111,10 @@
               Ensemble, nous servons dans la joie et l'unité pour l'avancement du Royaume de Dieu. 
               Chaque service est une opportunité de mettre nos dons au service de la communauté.
             </p>
-            <div class="church-contact">
+            <!--<div class="church-contact">
               <ion-icon :icon="globeOutline" color="primary"></ion-icon>
               <span>eglisegalilee.com</span>
-            </div>
+            </div>-->
           </ion-card-content>
         </ion-card>
 
@@ -174,7 +171,7 @@ import { useRouter } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonCard, IonCardHeader, IonCardTitle, 
   IonCardContent, IonButtons, IonButton, IonAvatar, IonIcon, IonRefresher, IonRefresherContent,
-  IonChip, IonLabel, IonMenuButton
+  IonChip, IonLabel
 } from '@ionic/vue';
 import {
   bookOutline, peopleOutline, checkmarkCircle, calendarOutline, checkmarkOutline, 

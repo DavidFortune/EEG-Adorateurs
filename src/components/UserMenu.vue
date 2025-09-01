@@ -23,6 +23,11 @@
           <ion-label>Mon compte</ion-label>
         </ion-item>
         
+        <ion-item button @click="goToSettings" class="settings-item">
+          <ion-icon :icon="settingsOutline" slot="start"></ion-icon>
+          <ion-label>Paramètres</ion-label>
+        </ion-item>
+        
         <ion-item button @click="handleLogout" class="logout-item">
           <ion-icon :icon="logOutOutline" slot="start" color="danger"></ion-icon>
           <ion-label color="danger">Se déconnecter</ion-label>
@@ -38,7 +43,7 @@ import {
   IonPopover, IonContent, IonAvatar, IonList, IonItem, IonLabel, IonIcon,
   toastController, alertController
 } from '@ionic/vue';
-import { logOutOutline, personOutline } from 'ionicons/icons';
+import { logOutOutline, personOutline, settingsOutline } from 'ionicons/icons';
 import { useUser } from '@/composables/useUser';
 import { authService } from '@/firebase/auth';
 
@@ -69,6 +74,11 @@ const showToast = async (message: string, color: 'success' | 'danger' = 'success
 const goToAccount = () => {
   emit('close');
   router.push('/my-account');
+};
+
+const goToSettings = () => {
+  emit('close');
+  router.push('/settings');
 };
 
 const handleLogout = async () => {
@@ -165,11 +175,13 @@ const handleLogout = async () => {
   padding: 8px 0;
 }
 
-.account-item {
+.account-item,
+.settings-item {
   --color: var(--ion-color-dark);
 }
 
-.account-item ion-icon {
+.account-item ion-icon,
+.settings-item ion-icon {
   margin-right: 12px;
   color: var(--ion-color-medium);
 }

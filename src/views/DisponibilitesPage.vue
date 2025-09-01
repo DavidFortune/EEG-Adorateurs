@@ -2,9 +2,6 @@
   <ion-page>
     <ion-header>
       <ion-toolbar>
-        <ion-buttons slot="start">
-          <ion-menu-button menu="side-menu" color="dark"></ion-menu-button>
-        </ion-buttons>
         <ion-title>Disponibilités</ion-title>
       </ion-toolbar>
     </ion-header>
@@ -94,8 +91,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import {
-  IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton, IonButtons,
-  IonIcon, IonRefresher, IonRefresherContent, IonLoading, IonMenuButton, toastController
+  IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton,
+  IonIcon, IonRefresher, IonRefresherContent, IonLoading, toastController
 } from '@ionic/vue';
 import {
   thumbsUpOutline, thumbsDownOutline, calendarOutline

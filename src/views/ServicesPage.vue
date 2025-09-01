@@ -2,9 +2,6 @@
   <ion-page>
     <ion-header>
       <ion-toolbar>
-        <ion-buttons slot="start">
-          <ion-menu-button menu="side-menu" color="dark"></ion-menu-button>
-        </ion-buttons>
         <ion-title>Services</ion-title>
         <ion-buttons slot="end">
           <ion-button @click="goToCreateService" fill="clear" color="dark">
@@ -96,7 +93,7 @@ import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
   IonIcon, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent,
   IonRefresher, IonRefresherContent, IonLoading, IonSegment, IonSegmentButton,
-  IonLabel, IonChip, IonMenuButton
+  IonLabel, IonChip
 } from '@ionic/vue';
 import {
   addOutline, calendarOutline, checkmarkCircle, timeOutline
