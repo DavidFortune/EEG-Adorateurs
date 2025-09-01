@@ -148,7 +148,8 @@ const isFullNameValid = computed(() => {
 
 const selectedMinistriesCount = computed(() => {
   const ministries = selectedMinistries.value.length;
-  const custom = formData.value.customMinistry.trim() ? 1 : 0;
+  const customMinistryName = formData.value.customMinistry.trim();
+  const custom = (customMinistryName && !selectedMinistries.value.includes(customMinistryName)) ? 1 : 0;
   return ministries + custom;
 });
 
@@ -164,8 +165,11 @@ const hasChanges = computed(() => {
   
   // Check if ministries changed
   const currentMinistries = [...selectedMinistries.value];
-  if (formData.value.customMinistry.trim()) {
-    currentMinistries.push(formData.value.customMinistry.trim());
+  const customMinistryName = formData.value.customMinistry.trim();
+  
+  // Only add custom ministry if it's not empty and not already in the list
+  if (customMinistryName && !currentMinistries.includes(customMinistryName)) {
+    currentMinistries.push(customMinistryName);
   }
   
   const originalMinistries = member.value.ministries || [];
@@ -242,8 +246,11 @@ const saveChanges = async () => {
   try {
     // Prepare ministries array
     const ministries = [...selectedMinistries.value];
-    if (formData.value.customMinistry.trim()) {
-      ministries.push(formData.value.customMinistry.trim());
+    const customMinistryName = formData.value.customMinistry.trim();
+    
+    // Only add custom ministry if it's not empty and not already in the list
+    if (customMinistryName && !ministries.includes(customMinistryName)) {
+      ministries.push(customMinistryName);
     }
 
     // Extract firstName and lastName from fullName
