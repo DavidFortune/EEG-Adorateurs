@@ -241,6 +241,19 @@ class UpdateService {
   async getReleaseNotes(): Promise<ReleaseNote[]> {
     return [
       {
+        version: '1.1.2',
+        date: '2025-01-09',
+        title: 'Optimisation du cache Firebase',
+        description: 'Amélioration des performances de cache pour les mises à jour automatiques',
+        features: [],
+        fixes: [],
+        improvements: [
+          'Configuration optimisée du cache Firebase Hosting',
+          'Service Worker mis en cache pour 30 minutes pour de meilleures performances',
+          'Amélioration de la stratégie de cache pour les assets statiques'
+        ]
+      },
+      {
         version: '1.1.1',
         date: '2025-01-09',
         title: 'Système de mise à jour automatique',

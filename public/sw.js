@@ -1,6 +1,6 @@
 // Service Worker pour EEG Adorateurs
-const CACHE_NAME = 'eeg-adorateurs-v1.1.1';
-const APP_VERSION = '1.1.1';
+const CACHE_NAME = 'eeg-adorateurs-v1.1.2';
+const APP_VERSION = '1.1.2';
 const urlsToCache = [
   '/',
   '/manifest.json',
