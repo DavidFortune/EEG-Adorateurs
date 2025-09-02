@@ -175,8 +175,7 @@ import {
 } from '@ionic/vue';
 import {
   bookOutline, peopleOutline, checkmarkCircle, calendarOutline, checkmarkOutline, 
-  closeOutline, helpOutline, arrowForwardOutline, homeOutline, 
-  globeOutline
+  closeOutline, helpOutline, arrowForwardOutline, homeOutline
 } from 'ionicons/icons';
 import { useUser } from '@/composables/useUser';
 import { serviceService } from '@/services/serviceService';

@@ -148,6 +148,7 @@ import {
 } from 'ionicons/icons';
 import { ref, onMounted } from 'vue';
 import { pushNotificationService } from '@/services/pushNotificationService';
+import { fcmService } from '@/services/fcmService';
 import { updateService } from '@/services/updateService';
 
 const isNotificationsEnabled = ref(false);
@@ -177,9 +178,16 @@ const updateNotificationStatus = async () => {
 
 const toggleNotifications = async () => {
   if (isNotificationsEnabled.value) {
+    // Désactiver les notifications
     await pushNotificationService.unsubscribeFromNotifications();
+    await fcmService.deleteToken();
   } else {
-    await pushNotificationService.subscribeToNotifications();
+    // Activer les notifications
+    const granted = await fcmService.requestPermission();
+    if (granted) {
+      await fcmService.getToken();
+      await pushNotificationService.subscribeToNotifications();
+    }
   }
   await updateNotificationStatus();
 };

@@ -38,6 +38,9 @@ import './theme/variables.css';
 /* Push notifications */
 import { pushNotificationService } from './services/pushNotificationService';
 
+/* FCM Service */
+import { fcmService } from './services/fcmService';
+
 /* Update service */
 import { updateService } from './services/updateService';
 
@@ -53,6 +56,41 @@ router.isReady().then(async () => {
   
   // Initialize push notifications
   await pushNotificationService.initialize();
+  
+  // Initialize FCM service
+  await fcmService.initialize();
+  
+  // Request notification permission and get FCM token
+  if ('Notification' in window) {
+    await fcmService.getToken();
+    
+    // Listen for foreground messages
+    fcmService.onMessage((payload) => {
+      console.log('Foreground message received:', payload);
+      // Handle foreground notification (show toast, update UI, etc.)
+      if (payload.notification) {
+        pushNotificationService.showLocalNotification({
+          title: payload.notification.title || 'Nouvelle notification',
+          body: payload.notification.body || '',
+          icon: '/icon-192x192.png',
+          badge: '/icon-192x192.png',
+          data: payload.data
+        });
+      }
+    });
+  }
+  
+  // Register Firebase Messaging Service Worker
+  if ('serviceWorker' in navigator) {
+    try {
+      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+        scope: '/firebase-cloud-messaging-push-scope'
+      });
+      console.log('Firebase Messaging SW registered:', registration);
+    } catch (error) {
+      console.error('Firebase Messaging SW registration failed:', error);
+    }
+  }
   
   // Initialize update service
   await updateService.initialize();
