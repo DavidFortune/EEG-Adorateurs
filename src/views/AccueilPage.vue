@@ -162,6 +162,14 @@
         @close="closeUserMenu"
       />
     </ion-content>
+
+    <!-- PWA Install Prompt -->
+    <InstallPrompt
+      :is-open="showInstallPrompt"
+      :deferred-prompt="deferredPrompt"
+      @dismiss="dismissInstallPrompt"
+      @installed="onAppInstalled"
+    />
   </ion-page>
 </template>
 
@@ -181,6 +189,7 @@ import { useUser } from '@/composables/useUser';
 import { serviceService } from '@/services/serviceService';
 import { timezoneUtils } from '@/utils/timezone';
 import UserMenu from '@/components/UserMenu.vue';
+import InstallPrompt from '@/components/InstallPrompt.vue';
 import type { Service } from '@/types/service';
 
 const router = useRouter();
@@ -195,6 +204,11 @@ const memberFirstName = computed(() => {
 const memberMinistries = computed(() => {
   return member.value?.ministries || [];
 });
+
+// PWA Install Prompt
+const showInstallPrompt = ref(false);
+const deferredPrompt = ref<any>(null);
+const hasBeenPrompted = ref(false);
 
 const formatServiceDateTime = (date: string, time: string) => {
   return timezoneUtils.formatDateTimeForDisplay(date, time);
@@ -238,8 +252,72 @@ const closeUserMenu = () => {
   isUserMenuOpen.value = false;
 };
 
+// PWA Install Prompt Functions
+const checkInstallPromptEligibility = () => {
+  // Check if already installed
+  if (window.matchMedia('(display-mode: standalone)').matches) {
+    return false;
+  }
+  
+  // Check if already prompted in this session
+  if (hasBeenPrompted.value) {
+    return false;
+  }
+  
+  // Check if user has dismissed the prompt recently (stored in localStorage)
+  const dismissedTime = localStorage.getItem('pwa-install-dismissed');
+  if (dismissedTime) {
+    const dismissed = new Date(dismissedTime);
+    const now = new Date();
+    const daysSinceDismissed = (now.getTime() - dismissed.getTime()) / (1000 * 3600 * 24);
+    if (daysSinceDismissed < 7) { // Don't show for 7 days after dismissing
+      return false;
+    }
+  }
+  
+  return true;
+};
+
+const showInstallPromptAfterDelay = () => {
+  if (!checkInstallPromptEligibility()) {
+    return;
+  }
+  
+  setTimeout(() => {
+    if (checkInstallPromptEligibility() && deferredPrompt.value) {
+      showInstallPrompt.value = true;
+      hasBeenPrompted.value = true;
+    }
+  }, 30000); // 30 seconds
+};
+
+const dismissInstallPrompt = () => {
+  showInstallPrompt.value = false;
+  localStorage.setItem('pwa-install-dismissed', new Date().toISOString());
+};
+
+const onAppInstalled = () => {
+  showInstallPrompt.value = false;
+  localStorage.removeItem('pwa-install-dismissed');
+  hasBeenPrompted.value = true;
+};
+
 onMounted(() => {
   loadUpcomingServices();
+  
+  // Listen for the beforeinstallprompt event
+  window.addEventListener('beforeinstallprompt', (e) => {
+    console.log('beforeinstallprompt event fired');
+    e.preventDefault();
+    deferredPrompt.value = e;
+    showInstallPromptAfterDelay();
+  });
+  
+  // Listen for the appinstalled event
+  window.addEventListener('appinstalled', () => {
+    console.log('PWA was installed');
+    onAppInstalled();
+  });
 });
 </script>
 
