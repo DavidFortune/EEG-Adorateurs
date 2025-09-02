@@ -61,6 +61,11 @@ self.addEventListener('activate', event => {
 
 // Stratégie de cache : Network First puis Cache
 self.addEventListener('fetch', event => {
+  // Only handle http/https requests
+  if (!event.request.url.startsWith('http')) {
+    return;
+  }
+
   event.respondWith(
     fetch(event.request)
       .then(response => {
