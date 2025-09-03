@@ -241,6 +241,32 @@ class UpdateService {
   async getReleaseNotes(): Promise<ReleaseNote[]> {
     return [
       {
+        version: '1.2.0',
+        date: '2025-01-14',
+        title: 'Système de gestion des équipes',
+        description: 'Nouvelle fonctionnalité complète de gestion des équipes avec contrôles administrateur',
+        features: [
+          'Nouvelle section Équipes accessible uniquement aux administrateurs',
+          'Gestion complète des équipes avec nom, description et icône personnalisée',
+          'Système de rôles (propriétaire, leader, membre, invité)',
+          'Fonctionnalité de transfert de propriété des équipes',
+          'Interface en grille avec cartes responsives pour affichage des équipes',
+          '13 icônes de ministères disponibles pour personnaliser les équipes',
+          'Tri alphabétique automatique des équipes et membres'
+        ],
+        fixes: [
+          'Correction des erreurs TypeScript lors de la compilation',
+          'Amélioration de la validation des formulaires'
+        ],
+        improvements: [
+          'Application du style iOS sur toutes les plateformes',
+          'Validation renforcée pour le nom complet et sélection de ministères',
+          'Interface utilisateur cohérente avec le design existant',
+          'Gestion optimisée des permissions et accès administrateur',
+          'Intégration Firebase complète pour la persistance des données'
+        ]
+      },
+      {
         version: '1.1.2',
         date: '2025-01-09',
         title: 'Optimisation du cache Firebase',
