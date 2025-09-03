@@ -18,6 +18,11 @@
           <ion-icon aria-hidden="true" :icon="checkboxOutline" />
           <ion-label>Disponibilités</ion-label>
         </ion-tab-button>
+
+        <ion-tab-button v-if="isAdmin" tab="teams" href="/tabs/teams">
+          <ion-icon aria-hidden="true" :icon="people" />
+          <ion-label>Équipes</ion-label>
+        </ion-tab-button>
       </ion-tab-bar>
     </ion-tabs>
   </ion-page>
@@ -25,7 +30,7 @@
 
 <script setup lang="ts">
 import { IonTabBar, IonTabButton, IonTabs, IonLabel, IonIcon, IonPage, IonRouterOutlet } from '@ionic/vue';
-import { home, calendar, checkboxOutline } from 'ionicons/icons';
+import { home, calendar, checkboxOutline, people } from 'ionicons/icons';
 import { useUser } from '@/composables/useUser';
 import SideMenu from '@/components/SideMenu.vue';
 

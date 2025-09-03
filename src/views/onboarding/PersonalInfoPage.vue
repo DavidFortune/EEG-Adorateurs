@@ -26,13 +26,15 @@
 
         <!-- Form -->
         <div class="form-container">
-          <ion-item class="form-item">
+          <ion-item class="form-item" :class="{ 'ion-invalid': !isFormValid && fullName.trim() }">
             <ion-input
               v-model="fullName"
               type="text"
               placeholder="Nom complet *"
               required
+              @ionBlur="validateName"
             ></ion-input>
+            <ion-note v-if="nameError" slot="error">{{ nameError }}</ion-note>
           </ion-item>
         </div>
 
@@ -56,7 +58,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import {
-  IonPage, IonContent, IonProgressBar, IonItem, IonInput, IonButton, IonIcon
+  IonPage, IonContent, IonProgressBar, IonItem, IonInput, IonButton, IonIcon, IonNote
 } from '@ionic/vue';
 import {
   personOutline, arrowBack
@@ -67,12 +69,28 @@ const router = useRouter();
 const onboardingStore = useOnboardingStore();
 
 const fullName = ref('');
+const nameError = ref('');
 
 const progressPercentage = computed(() => onboardingStore.progressPercentage);
 
 const isFormValid = computed(() => {
-  return fullName.value.trim() !== '';
+  const trimmed = fullName.value.trim();
+  // Check that the name is not empty and contains at least one letter
+  return trimmed !== '' && trimmed.length >= 2 && /[a-zA-ZÀ-ÿ]/.test(trimmed);
 });
+
+const validateName = () => {
+  const trimmed = fullName.value.trim();
+  if (!trimmed) {
+    nameError.value = 'Le nom complet est requis';
+  } else if (trimmed.length < 2) {
+    nameError.value = 'Le nom doit contenir au moins 2 caractères';
+  } else if (!/[a-zA-ZÀ-ÿ]/.test(trimmed)) {
+    nameError.value = 'Le nom doit contenir au moins une lettre';
+  } else {
+    nameError.value = '';
+  }
+};
 
 const goBack = () => {
   onboardingStore.previousStep();
@@ -176,6 +194,16 @@ onMounted(() => {
 ion-progress-bar {
   --progress-background: #b5121b;
   --buffer-background: #FEE2E2;
+}
+
+.ion-invalid {
+  --border-color: #EF4444;
+}
+
+ion-note[slot="error"] {
+  color: #EF4444;
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
 }
 
 @media (max-width: 768px) {

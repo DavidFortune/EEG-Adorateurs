@@ -10,3 +10,13 @@ http://ionicframework.com/docs/theming/ */
   --ion-color-primary-shade: #9f1018;
   --ion-color-primary-tint: #bc2a32;
 }
+
+/* Force iOS mode across all platforms */
+html.ios {
+  --ion-platform: 'ios';
+}
+
+/* Ensure all components use iOS styling */
+body {
+  --ion-platform: 'ios';
+}

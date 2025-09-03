@@ -288,7 +288,7 @@ const showInstallPromptAfterDelay = () => {
       showInstallPrompt.value = true;
       hasBeenPrompted.value = true;
     }
-  }, 30000); // 30 seconds
+  }, 5000); // 5 seconds
 };
 
 const dismissInstallPrompt = () => {

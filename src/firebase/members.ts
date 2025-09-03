@@ -81,12 +81,22 @@ export const membersService = {
     try {
       const now = new Date().toISOString();
       
+      // Validate required fields
+      if (!onboardingData.fullName || !onboardingData.fullName.trim()) {
+        throw new Error('Full name is required and cannot be empty');
+      }
+      
       // Combine regular ministries with custom ministry if provided
       const ministries = onboardingData.ministries || [];
       const customMinistry = onboardingData.customMinistry || '';
       const allMinistries = [...ministries];
       if (customMinistry.trim()) {
         allMinistries.push(customMinistry.trim());
+      }
+      
+      // Validate that at least one ministry is selected
+      if (allMinistries.length === 0) {
+        throw new Error('At least one ministry must be selected');
       }
 
       // Create ministries in the collection if they don't exist
@@ -101,9 +111,15 @@ export const membersService = {
       }
       
       // Extract firstName and lastName from fullName
-      const nameParts = onboardingData.fullName.trim().split(' ');
+      const trimmedFullName = onboardingData.fullName.trim();
+      const nameParts = trimmedFullName.split(' ').filter(part => part.length > 0);
       const firstName = nameParts[0] || '';
       const lastName = nameParts.slice(1).join(' ') || '';
+      
+      // Additional validation to ensure we have at least a first name
+      if (!firstName) {
+        throw new Error('A valid name with at least one word is required');
+      }
       
       const memberData: Omit<Member, 'id'> = {
         firebaseUserId,
@@ -111,7 +127,7 @@ export const membersService = {
         ...(avatar && avatar.trim() && { avatar }), // Only include avatar if it exists and is not empty
         firstName,
         lastName,
-        fullName: onboardingData.fullName,
+        fullName: trimmedFullName,
         ministries: allMinistries,
         availabilities: onboardingData.availabilities,
         isOnboardingCompleted: true,

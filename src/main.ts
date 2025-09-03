@@ -47,7 +47,10 @@ import { updateService } from './services/updateService';
 const pinia = createPinia();
 
 const app = createApp(App)
-  .use(IonicVue)
+  .use(IonicVue, {
+    mode: 'ios', // Force iOS styling across all platforms
+    animated: true // Enable iOS animations
+  })
   .use(router)
   .use(pinia);
 

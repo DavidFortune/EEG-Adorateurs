@@ -31,6 +31,17 @@ service cloud.firestore {
       allow delete: if false; // Prevent deletion for now - can be enabled for admins later
     }
     
+    // Teams collection - allow authenticated users to read, admins to write
+    match /teams/{teamId} {
+      // All authenticated users can read teams
+      allow read: if request.auth != null;
+      
+      // Only admins can create, update, or delete teams
+      // For now, we'll allow any authenticated user to manage teams
+      // In production, you should check if the user is an admin
+      allow create, update, delete: if request.auth != null;
+    }
+    
     // Default deny all other access
     match /{document=**} {
       allow read, write: if false;

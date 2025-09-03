@@ -60,6 +60,11 @@ const routes: Array<RouteRecordRaw> = [
       {
         path: 'disponibilites',
         component: () => import('@/views/DisponibilitesPage.vue')
+      },
+      {
+        path: 'teams',
+        component: () => import('@/views/TeamsPage.vue'),
+        meta: { requiresAdmin: true }
       }
     ]
   },
@@ -99,6 +104,16 @@ const routes: Array<RouteRecordRaw> = [
   {
     path: '/terms',
     component: () => import('@/views/TermsPage.vue')
+  },
+  {
+    path: '/team-detail/:id',
+    component: () => import('@/views/TeamDetailPage.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true }
+  },
+  {
+    path: '/team-form/:id?',
+    component: () => import('@/views/TeamFormPage.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true }
   }
 ]
 
@@ -111,6 +126,7 @@ const router = createRouter({
 router.beforeEach(async (to, _from, next) => {
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
   const requiresGuest = to.matched.some(record => record.meta.requiresGuest);
+  const requiresAdmin = to.matched.some(record => record.meta.requiresAdmin);
   const isOnboardingRoute = to.path.startsWith('/onboarding/');
   
   // Wait for auth state to be initialized
@@ -138,6 +154,16 @@ router.beforeEach(async (to, _from, next) => {
           next();
         }
       } else {
+        // Check admin access for admin-only routes
+        if (requiresAdmin) {
+          const member = await membersService.getMemberByFirebaseUserId(user.uid);
+          if (!member || !member.isAdmin) {
+            // Redirect non-admin users to home
+            next('/tabs/accueil');
+            return;
+          }
+        }
+        
         // Onboarding completed - prevent access to onboarding pages
         if (isOnboardingRoute) {
           next('/tabs/accueil');
