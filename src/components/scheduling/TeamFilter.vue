@@ -2,8 +2,7 @@
   <div class="team-filter-container" v-if="show">
     <ion-item class="team-filter">
       <ion-select
-        :value="modelValue"
-        @selection-change="handleChange"
+        v-model="selectedValue"
         placeholder="Sélectionner une équipe"
         interface="popover"
         class="team-select"
@@ -22,6 +21,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { IonItem, IonSelect, IonSelectOption, IonIcon } from '@ionic/vue';
 import { chevronDownOutline } from 'ionicons/icons';
 
@@ -36,15 +36,19 @@ interface Props {
   show: boolean;
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
+
 
 const emit = defineEmits<{
   'update:modelValue': [value: string];
 }>();
 
-function handleChange(event: CustomEvent) {
-  emit('update:modelValue', event.detail.value);
-}
+const selectedValue = computed({
+  get: () => props.modelValue,
+  set: (value: string) => {
+    emit('update:modelValue', value);
+  }
+});
 </script>
 
 <style scoped>
