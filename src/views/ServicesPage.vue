@@ -4,7 +4,7 @@
       <ion-toolbar>
         <ion-title>Services</ion-title>
         <ion-buttons slot="end">
-          <ion-button @click="goToScheduling" fill="clear" color="dark">
+          <ion-button v-if="isAdmin" @click="goToScheduling" fill="clear" color="dark">
             <ion-icon :icon="calendarOutline" />
           </ion-button>
           <ion-button @click="goToCreateService" fill="clear" color="dark">
@@ -111,8 +111,10 @@ import {
 import { Service, ServiceCategory } from '@/types/service';
 import { serviceService } from '@/services/serviceService';
 import { timezoneUtils } from '@/utils/timezone';
+import { useUser } from '@/composables/useUser';
 
 const router = useRouter();
+const { isAdmin } = useUser();
 const services = ref<Service[]>([]);
 const loading = ref(false);
 const filterMode = ref('all');
