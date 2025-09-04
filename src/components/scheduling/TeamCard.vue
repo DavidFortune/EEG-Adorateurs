@@ -230,15 +230,16 @@ function handleMemberClick(memberId: string) {
   align-items: center;
   gap: 8px;
   padding: 12px;
-  background: var(--ion-color-warning-tint);
-  border-radius: 8px;
-  color: var(--ion-color-warning-shade);
+  background: #fff9e6;
+  border: 1px solid #f0e68c;
+  border-radius: 12px;
+  color: #b8860b;
   font-weight: 500;
   font-size: 0.875rem;
 }
 
 .warning-icon {
   font-size: 1.25rem;
-  color: var(--ion-color-warning);
+  color: #daa520;
 }
 </style>

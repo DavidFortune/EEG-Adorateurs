@@ -140,7 +140,7 @@ function handleClick() {
   display: flex;
   align-items: center;
   padding: 12px;
-  border-radius: 8px;
+  border-radius: 12px;
   margin-bottom: 8px;
   transition: all 0.2s ease;
   background: white;
@@ -148,8 +148,9 @@ function handleClick() {
 }
 
 .member-item--assigned {
-  background: var(--ion-color-success-tint);
-  border-color: var(--ion-color-success);
+  background: #e8f5e8;
+  border-color: #c8e6c8;
+  border-radius: 12px;
 }
 
 .member-item--available {
@@ -169,8 +170,8 @@ function handleClick() {
 }
 
 .member-item--no-response {
-  background: var(--ion-color-light);
-  border-color: var(--ion-color-medium-shade);
+  background: #fff9e6;
+  border-color: #f0e68c;
 }
 
 .member-item--editing.member-item--no-response {
