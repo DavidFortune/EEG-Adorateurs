@@ -170,12 +170,13 @@ function handleClick() {
 }
 
 .member-item--no-response {
-  background: #fff9e6;
-  border-color: #f0e68c;
+  background: var(--ion-color-light);
+  border-color: var(--ion-color-medium);
+  opacity: 0.6;
 }
 
 .member-item--editing.member-item--no-response {
-  border-color: var(--ion-color-tertiary);
+  border-color: var(--ion-color-medium);
   border-width: 2px;
   cursor: pointer;
 }
