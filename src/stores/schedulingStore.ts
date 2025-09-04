@@ -262,7 +262,11 @@ export const useSchedulingStore = defineStore('scheduling', () => {
     if (!team || !event || !currentUserId.value) return;
     
     const member = team.members.find(m => m.id === memberId);
-    if (!member || (member.availability !== 'available' && member.availability !== 'maybe')) return;
+    if (!member) return;
+    
+    // Allow assignment of available, maybe, or no response members
+    // Only block unavailable members
+    if (member.availability === 'unavailable') return;
 
     try {
       if (member.isAssigned) {

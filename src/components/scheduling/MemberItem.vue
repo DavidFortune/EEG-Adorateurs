@@ -59,7 +59,7 @@ const memberItemClasses = computed(() => ({
   'member-item--unavailable': props.member.availability === 'unavailable',
   'member-item--maybe': props.member.availability === 'maybe' && !props.member.isAssigned,
   'member-item--no-response': props.member.availability === null,
-  'member-item--clickable': props.isEditing && (props.member.availability === 'available' || props.member.availability === 'maybe'),
+  'member-item--clickable': props.isEditing && (props.member.availability === 'available' || props.member.availability === 'maybe' || props.member.availability === null),
   'member-item--editing': props.isEditing
 }));
 
@@ -84,7 +84,7 @@ function getStatusText(): string {
     case 'unavailable':
       return 'Indisponible';
     case null:
-      return 'Pas de réponse';
+      return props.isEditing ? 'Pas de réponse (cliquer pour assigner)' : 'Pas de réponse';
     default:
       return 'Statut inconnu';
   }
@@ -129,7 +129,7 @@ function getStatusClass(): string {
 }
 
 function handleClick() {
-  if (props.isEditing && (props.member.availability === 'available' || props.member.availability === 'maybe')) {
+  if (props.isEditing && (props.member.availability === 'available' || props.member.availability === 'maybe' || props.member.availability === null)) {
     emit('click', props.member.id);
   }
 }
@@ -171,6 +171,12 @@ function handleClick() {
 .member-item--no-response {
   background: var(--ion-color-light);
   border-color: var(--ion-color-medium-shade);
+}
+
+.member-item--editing.member-item--no-response {
+  border-color: var(--ion-color-tertiary);
+  border-width: 2px;
+  cursor: pointer;
 }
 
 .member-item--clickable {
