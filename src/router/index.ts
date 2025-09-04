@@ -114,6 +114,16 @@ const routes: Array<RouteRecordRaw> = [
     path: '/team-form/:id?',
     component: () => import('@/views/TeamFormPage.vue'),
     meta: { requiresAuth: true, requiresAdmin: true }
+  },
+  {
+    path: '/scheduling',
+    component: () => import('@/views/SchedulingView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true }
+  },
+  {
+    path: '/availability-submission',
+    component: () => import('@/views/AvailabilitySubmissionPage.vue'),
+    meta: { requiresAuth: true }
   }
 ]
 

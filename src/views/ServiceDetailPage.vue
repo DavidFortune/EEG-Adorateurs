@@ -54,6 +54,17 @@
                 </ion-label>
               </ion-item>
               
+              <ion-item v-if="service.availabilityDeadline">
+                <ion-icon :icon="timerOutline" slot="start" :color="isDeadlinePassed ? 'danger' : 'warning'" />
+                <ion-label>
+                  <h3>Date limite pour les disponibilités</h3>
+                  <p :class="{ 'deadline-passed': isDeadlinePassed }">
+                    {{ formatDeadline(service.availabilityDeadline) }}
+                    <span v-if="isDeadlinePassed"> (Dépassée)</span>
+                  </p>
+                </ion-label>
+              </ion-item>
+              
               <ion-item>
                 <ion-icon :icon="createOutline" slot="start" />
                 <ion-label>
@@ -97,7 +108,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonBackButton,
@@ -106,7 +117,7 @@ import {
 } from '@ionic/vue';
 import {
   pencil, calendarOutline, timeOutline, informationCircleOutline, createOutline,
-  syncOutline, checkmarkCircle, trashOutline, alertCircleOutline
+  syncOutline, checkmarkCircle, trashOutline, alertCircleOutline, timerOutline
 } from 'ionicons/icons';
 import { Service, ServiceCategory } from '@/types/service';
 import { serviceService } from '@/services/serviceService';
@@ -140,6 +151,27 @@ const formatTimestamp = (dateTimeStr: string) => {
 
 const getCategoryColor = (category: ServiceCategory) => {
   return category === ServiceCategory.SERVICE ? 'primary' : 'secondary';
+};
+
+const isDeadlinePassed = computed(() => {
+  if (!service.value?.availabilityDeadline) return false;
+  const deadline = new Date(service.value.availabilityDeadline);
+  const now = new Date();
+  return deadline < now;
+});
+
+const formatDeadline = (dateStr: string) => {
+  const date = new Date(dateStr);
+  return date.toLocaleString('fr-CA', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'America/Toronto'
+  });
 };
 
 const goToEdit = () => {
@@ -179,3 +211,10 @@ onMounted(() => {
   loadService();
 });
 </script>
+
+<style scoped>
+.deadline-passed {
+  color: var(--ion-color-danger);
+  font-weight: 600;
+}
+</style>

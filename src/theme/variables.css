@@ -9,6 +9,16 @@ http://ionicframework.com/docs/theming/ */
   --ion-color-primary-contrast-rgb: 255, 255, 255;
   --ion-color-primary-shade: #9f1018;
   --ion-color-primary-tint: #bc2a32;
+  
+  /** Scheduling Status Colors **/
+  --color-brouillon: #3B82F6;             /* Bleu */
+  --color-confirme: #10B981;              /* Vert */
+  --color-annule: #EF4444;                /* Rouge */
+  
+  /** Team Status Colors **/
+  --color-available: #6B7280;             /* Gris */
+  --color-assigned: #10B981;              /* Vert */
+  --color-unavailable: #EF4444;           /* Rouge */
 }
 
 /* Force iOS mode across all platforms */

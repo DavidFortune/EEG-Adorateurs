@@ -4,6 +4,9 @@
       <ion-toolbar>
         <ion-title>Services</ion-title>
         <ion-buttons slot="end">
+          <ion-button @click="goToScheduling" fill="clear" color="dark">
+            <ion-icon :icon="calendarOutline" />
+          </ion-button>
           <ion-button @click="goToCreateService" fill="clear" color="dark">
             <ion-icon :icon="addOutline" />
           </ion-button>
@@ -79,6 +82,13 @@
           </ion-card-header>
           
           <ion-card-content>
+            <div v-if="service.availabilityDeadline" class="deadline-info">
+              <ion-icon :icon="timerOutline" :color="isDeadlinePassed(service.availabilityDeadline) ? 'danger' : 'warning'"></ion-icon>
+              <span :class="{ 'deadline-passed': isDeadlinePassed(service.availabilityDeadline) }">
+                Date limite: {{ formatDeadlineShort(service.availabilityDeadline) }}
+                <span v-if="isDeadlinePassed(service.availabilityDeadline)" class="deadline-status"> (Dépassée)</span>
+              </span>
+            </div>
           </ion-card-content>
         </ion-card>
       </div>
@@ -96,7 +106,7 @@ import {
   IonLabel, IonChip
 } from '@ionic/vue';
 import {
-  addOutline, calendarOutline, checkmarkCircle, timeOutline
+  addOutline, calendarOutline, checkmarkCircle, timeOutline, timerOutline
 } from 'ionicons/icons';
 import { Service, ServiceCategory } from '@/types/service';
 import { serviceService } from '@/services/serviceService';
@@ -176,6 +186,28 @@ const goToCreateService = () => {
   router.push('/service-form');
 };
 
+const goToScheduling = () => {
+  router.push('/scheduling');
+};
+
+const isDeadlinePassed = (deadlineStr: string) => {
+  const deadline = new Date(deadlineStr);
+  const now = new Date();
+  return deadline < now;
+};
+
+const formatDeadlineShort = (dateStr: string) => {
+  const date = new Date(dateStr);
+  return date.toLocaleString('fr-CA', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'America/Toronto'
+  });
+};
+
 onMounted(() => {
   loadServices();
 });
@@ -210,5 +242,60 @@ onMounted(() => {
 
 .create-service-fab {
   margin-bottom: 80px;
+}
+
+.deadline-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--ion-color-warning);
+  padding-top: 0.5rem;
+}
+
+.deadline-passed {
+  color: var(--ion-color-danger);
+}
+
+.deadline-status {
+  font-weight: 600;
+}
+
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+  ion-card-title {
+    font-size: 1rem !important;
+    line-height: 1.3;
+  }
+  
+  ion-card-subtitle {
+    font-size: 0.875rem !important;
+  }
+  
+  .card-header-content {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .card-badges {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+  
+  .card-badges ion-chip {
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  ion-card-title {
+    font-size: 0.95rem !important;
+  }
+  
+  ion-card-subtitle {
+    font-size: 0.8rem !important;
+  }
 }
 </style>

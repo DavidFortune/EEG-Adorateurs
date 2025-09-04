@@ -22,6 +22,17 @@
         <div class="header-section">
           <h2>Vos disponibilités actuelles</h2>
           <p>Mettez à jour votre disponibilité pour les services à venir</p>
+          
+          <!-- Navigation to detailed availability submission -->
+          <ion-button 
+            expand="block" 
+            fill="outline" 
+            @click="goToAvailabilitySubmission"
+            class="submission-button"
+          >
+            <ion-icon :icon="createOutline" slot="start" />
+            Gérer mes disponibilités détaillées
+          </ion-button>
         </div>
 
         <!-- Services List -->
@@ -90,12 +101,13 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton,
   IonIcon, IonRefresher, IonRefresherContent, IonLoading, toastController
 } from '@ionic/vue';
 import {
-  thumbsUpOutline, thumbsDownOutline, calendarOutline
+  thumbsUpOutline, thumbsDownOutline, calendarOutline, createOutline
 } from 'ionicons/icons';
 import { useUser } from '@/composables/useUser';
 import { serviceService } from '@/services/serviceService';
@@ -104,6 +116,7 @@ import { timezoneUtils } from '@/utils/timezone';
 import type { Service } from '@/types/service';
 
 const { member } = useUser();
+const router = useRouter();
 const loading = ref(false);
 const saving = ref(false);
 const availableServices = ref<Service[]>([]);
@@ -193,6 +206,10 @@ const showToast = async (message: string, color: 'success' | 'danger' = 'success
   await toast.present();
 };
 
+const goToAvailabilitySubmission = () => {
+  router.push('/availability-submission');
+};
+
 
 // Watch for member data changes
 watch(() => member.value, (newMember) => {
@@ -221,7 +238,13 @@ onMounted(() => {
 .header-section p {
   color: #6B7280;
   font-size: 1rem;
-  margin: 0;
+  margin: 0 0 1rem 0;
+}
+
+.submission-button {
+  --border-radius: 12px;
+  font-weight: 500;
+  margin-bottom: 1rem;
 }
 
 .services-list {

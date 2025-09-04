@@ -29,12 +29,27 @@ function convertFirestoreToService(firestoreService: FirestoreService): Service 
   };
 }
 
-function convertServiceToFirestore(service: Omit<Service, 'id'>): Omit<FirestoreService, 'id'> {
-  return {
-    ...service,
+function convertServiceToFirestore(service: Omit<Service, 'id'>): any {
+  const result: any = {
+    title: service.title,
+    date: service.date,
+    time: service.time,
+    category: service.category,
+    isPublished: service.isPublished,
     createdAt: Timestamp.fromDate(new Date(service.createdAt)),
     modifiedAt: Timestamp.fromDate(new Date(service.modifiedAt))
   };
+
+  // Only add optional fields if they are defined
+  if (service.availabilityDeadline !== undefined) {
+    result.availabilityDeadline = service.availabilityDeadline;
+  }
+  
+  if (service.teamRequirements !== undefined) {
+    result.teamRequirements = service.teamRequirements;
+  }
+
+  return result;
 }
 
 export const firestoreService = {
@@ -121,6 +136,8 @@ export const firestoreService = {
         time: request.time,
         category: request.category,
         isPublished: request.isPublished,
+        availabilityDeadline: request.availabilityDeadline,
+        teamRequirements: request.teamRequirements,
         modifiedAt: new Date().toISOString()
       };
       
