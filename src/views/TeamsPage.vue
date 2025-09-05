@@ -4,7 +4,7 @@
       <ion-toolbar>
         <ion-title>Équipes</ion-title>
         <ion-buttons slot="end">
-          <ion-button fill="clear" @click="() => router.push('/team-form')">
+          <ion-button v-if="isAdmin" fill="clear" @click="() => router.push('/team-form')">
             <ion-icon :icon="addOutline" />
           </ion-button>
         </ion-buttons>
@@ -31,7 +31,7 @@
           <ion-icon :icon="peopleOutline" color="medium"></ion-icon>
           <h2>Aucune équipe</h2>
           <p>Créez la première équipe pour commencer</p>
-          <ion-button fill="solid" @click="() => router.push('/team-form')">
+          <ion-button v-if="isAdmin" fill="solid" @click="() => router.push('/team-form')">
             <ion-icon :icon="addOutline" slot="start"></ion-icon>
             Créer une équipe
           </ion-button>
@@ -83,15 +83,6 @@
                     <ion-icon :icon="checkmarkDoneOutline" slot="start"></ion-icon>
                     Assignations
                   </ion-button>
-                  <ion-button 
-                    fill="clear" 
-                    size="small" 
-                    class="view-button"
-                    @click.stop="() => router.push(`/team-detail/${team.id}`)"
-                  >
-                    Voir
-                    <ion-icon :icon="arrowForwardOutline" slot="end"></ion-icon>
-                  </ion-button>
                 </div>
               </div>
             </ion-card-content>
@@ -110,11 +101,12 @@ import {
   IonButtons, IonButton, IonIcon, IonRefresher, IonRefresherContent, IonSpinner
 } from '@ionic/vue';
 import {
-  addOutline, peopleOutline, personCircleOutline, arrowForwardOutline, calendarOutline,
+  addOutline, peopleOutline, personCircleOutline, calendarOutline,
   checkmarkDoneOutline
 } from 'ionicons/icons';
 import { teamsService } from '@/firebase/teams';
 import { membersService } from '@/firebase/members';
+import { authService } from '@/firebase/auth';
 import type { Team } from '@/types/team';
 import type { Member } from '@/types/member';
 
@@ -122,10 +114,24 @@ const router = useRouter();
 const teams = ref<Team[]>([]);
 const members = ref<Member[]>([]);
 const loading = ref(true);
+const isAdmin = ref(false);
 
 const getOwnerName = (ownerId: string) => {
   const owner = members.value.find(m => m.id === ownerId);
   return owner ? owner.fullName : 'Propriétaire inconnu';
+};
+
+const checkAdminStatus = async () => {
+  try {
+    const user = authService.getCurrentUser();
+    if (user) {
+      const member = await membersService.getMemberByFirebaseUserId(user.uid);
+      isAdmin.value = member?.isAdmin || false;
+    }
+  } catch (error) {
+    console.error('Error checking admin status:', error);
+    isAdmin.value = false;
+  }
 };
 
 const loadTeams = async () => {
@@ -151,8 +157,9 @@ const handleRefresh = async (event: any) => {
   event.target.complete();
 };
 
-onMounted(() => {
-  loadTeams();
+onMounted(async () => {
+  await checkAdminStatus();
+  await loadTeams();
 });
 </script>
 

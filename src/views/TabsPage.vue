@@ -19,7 +19,7 @@
           <ion-label>Disponibilités</ion-label>
         </ion-tab-button>
 
-        <ion-tab-button v-if="isAdmin" tab="teams" href="/tabs/teams">
+        <ion-tab-button tab="teams" href="/tabs/teams">
           <ion-icon aria-hidden="true" :icon="people" />
           <ion-label>Équipes</ion-label>
         </ion-tab-button>
