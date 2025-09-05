@@ -2,6 +2,30 @@
 
 All notable changes to EEG Adorateurs will be documented in this file.
 
+## [1.3.1] - 2025-09-05
+
+### Fixed
+- **Team Section Avatar Display**: Fixed avatar display issues across all Team components
+  - Added proper circular styling with `border-radius: 50%` for avatar initials
+  - Added `object-fit: cover` to avatar images for proper scaling
+  - Standardized `getInitials` functions to use consistent `fullName.split()` approach
+  - Ensured first and last name initials are returned (e.g., "John Smith" → "JS")
+
+### Enhanced
+- **Date Formatting**: Improved date formatting consistency in Team section
+  - Centralized timezone utilities for French Canadian locale with America/Toronto timezone
+  - Implemented 3-line layout for segments in TeamAvailabilityPage for better mobile display
+  - Updated date format to display as "Dim 7 sept 2025 à 11:00"
+
+- **Mobile Layout**: Enhanced mobile experience for Team pages
+  - Side-by-side availability and assignment buttons in TeamsPage team cards
+  - Better responsive design for Team detail and management pages
+  - Removed clutter by removing unnecessary assignment info lines
+
+### Technical
+- **Code Quality**: Cleaned up unused imports and functions across Team components
+- **CSS Consistency**: Standardized avatar styling with CSS variables for consistent theming
+
 ## [1.3.0] - 2025-09-04
 
 ### Added
