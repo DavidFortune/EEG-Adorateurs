@@ -64,15 +64,35 @@
                   <ion-icon :icon="personCircleOutline" class="owner-icon"></ion-icon>
                   <span class="owner-name">{{ getOwnerName(team.ownerId) }}</span>
                 </div>
-                <ion-button 
-                  fill="clear" 
-                  size="small" 
-                  class="view-button"
-                  @click.stop="() => router.push(`/team-detail/${team.id}`)"
-                >
-                  Voir
-                  <ion-icon :icon="arrowForwardOutline" slot="end"></ion-icon>
-                </ion-button>
+                <div class="team-actions">
+                  <ion-button 
+                    fill="clear" 
+                    size="small" 
+                    class="availability-button"
+                    @click.stop="() => router.push(`/team-availability/${team.id}`)"
+                  >
+                    <ion-icon :icon="calendarOutline" slot="start"></ion-icon>
+                    Disponibilités
+                  </ion-button>
+                  <ion-button 
+                    fill="clear" 
+                    size="small" 
+                    class="assignments-button"
+                    @click.stop="() => router.push(`/team-assignments/${team.id}`)"
+                  >
+                    <ion-icon :icon="checkmarkDoneOutline" slot="start"></ion-icon>
+                    Assignations
+                  </ion-button>
+                  <ion-button 
+                    fill="clear" 
+                    size="small" 
+                    class="view-button"
+                    @click.stop="() => router.push(`/team-detail/${team.id}`)"
+                  >
+                    Voir
+                    <ion-icon :icon="arrowForwardOutline" slot="end"></ion-icon>
+                  </ion-button>
+                </div>
               </div>
             </ion-card-content>
           </ion-card>
@@ -90,7 +110,8 @@ import {
   IonButtons, IonButton, IonIcon, IonRefresher, IonRefresherContent, IonSpinner
 } from '@ionic/vue';
 import {
-  addOutline, peopleOutline, personCircleOutline, arrowForwardOutline
+  addOutline, peopleOutline, personCircleOutline, arrowForwardOutline, calendarOutline,
+  checkmarkDoneOutline
 } from 'ionicons/icons';
 import { teamsService } from '@/firebase/teams';
 import { membersService } from '@/firebase/members';
@@ -275,6 +296,12 @@ onMounted(() => {
   margin-top: auto;
 }
 
+.team-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
 .owner-info {
   display: flex;
   align-items: center;
@@ -325,9 +352,18 @@ onMounted(() => {
     gap: 0.75rem;
   }
   
-  .view-button {
-    align-self: flex-end;
+  .team-actions {
+    align-self: stretch;
+    flex-direction: column;
+    gap: 0.25rem;
+    width: 100%;
+  }
+  
+  .view-button,
+  .availability-button,
+  .assignments-button {
     margin-left: 0;
+    justify-content: flex-start;
   }
 }
 

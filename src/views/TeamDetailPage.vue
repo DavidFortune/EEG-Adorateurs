@@ -54,6 +54,36 @@
           </ion-card-content>
         </ion-card>
 
+        <!-- Quick Actions -->
+        <ion-card class="quick-actions-card">
+          <ion-card-header>
+            <ion-card-title class="section-title">
+              <ion-icon :icon="flashOutline" class="section-icon"></ion-icon>
+              Actions rapides
+            </ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <div class="action-buttons">
+              <ion-button 
+                expand="block" 
+                fill="outline"
+                @click="() => router.push(`/team-availability/${team.id}`)"
+              >
+                <ion-icon :icon="calendarOutline" slot="start"></ion-icon>
+                Voir les disponibilités
+              </ion-button>
+              <ion-button 
+                expand="block" 
+                fill="outline"
+                @click="() => router.push(`/team-assignments/${team.id}`)"
+              >
+                <ion-icon :icon="checkmarkDoneOutline" slot="start"></ion-icon>
+                Voir les assignations
+              </ion-button>
+            </div>
+          </ion-card-content>
+        </ion-card>
+
         <!-- Members Section -->
         <ion-card class="members-card">
           <ion-card-header>
@@ -315,7 +345,7 @@ import {
 import {
   peopleOutline, createOutline, alertCircleOutline, calendarOutline, 
   ellipsisVerticalOutline, trashOutline, closeOutline, addOutline,
-  swapHorizontalOutline
+  swapHorizontalOutline, flashOutline, checkmarkDoneOutline
 } from 'ionicons/icons';
 import { teamsService } from '@/firebase/teams';
 import { membersService } from '@/firebase/members';
@@ -719,8 +749,20 @@ onMounted(() => {
   color: var(--ion-color-primary);
 }
 
-.members-card, .actions-card {
+.members-card, .actions-card, .quick-actions-card {
   margin-bottom: 1.5rem;
+}
+
+.quick-actions-card .action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.quick-actions-card ion-button {
+  --padding-top: 1rem;
+  --padding-bottom: 1rem;
+  font-weight: 500;
 }
 
 .card-header-with-action {

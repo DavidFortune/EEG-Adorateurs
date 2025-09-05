@@ -124,6 +124,16 @@ const routes: Array<RouteRecordRaw> = [
     path: '/availability-submission',
     component: () => import('@/views/AvailabilitySubmissionPage.vue'),
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/team-availability/:id',
+    component: () => import('@/views/TeamAvailabilityPage.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/team-assignments/:id',
+    component: () => import('@/views/TeamAssignmentsPage.vue'),
+    meta: { requiresAuth: true }
   }
 ]
 

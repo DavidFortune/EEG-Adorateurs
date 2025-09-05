@@ -171,5 +171,25 @@ export const assignmentsService = {
       console.error('Error getting member service assignments:', error);
       throw new Error('Failed to fetch member service assignments');
     }
+  },
+
+  /**
+   * Get all assignments for a team across all services
+   */
+  async getAllTeamAssignments(teamId: string): Promise<ServiceAssignment[]> {
+    try {
+      const q = query(
+        collection(db, ASSIGNMENTS_COLLECTION),
+        where('teamId', '==', teamId)
+      );
+      const querySnapshot = await getDocs(q);
+
+      return querySnapshot.docs.map(doc => 
+        convertFirestoreToAssignment({ id: doc.id, ...doc.data() } as FirestoreAssignment)
+      );
+    } catch (error) {
+      console.error('Error getting all team assignments:', error);
+      throw new Error('Failed to fetch all team assignments');
+    }
   }
 };
