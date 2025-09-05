@@ -75,10 +75,18 @@
                   </ion-card-subtitle>
                 </div>
                 <ion-badge 
+                  v-if="canViewTeamRequirements"
                   :color="service.assignments.length >= getRequiredMembers(service) ? 'success' : 'warning'"
                   class="assignment-badge"
                 >
                   {{ service.assignments.length }}/{{ getRequiredMembers(service) }}
+                </ion-badge>
+                <ion-badge 
+                  v-else
+                  color="primary"
+                  class="assignment-badge"
+                >
+                  {{ service.assignments.length }} membre{{ service.assignments.length > 1 ? 's' : '' }}
                 </ion-badge>
               </div>
             </ion-card-header>
@@ -100,26 +108,17 @@
                     <div class="member-details">
                       <span class="member-name">{{ assignment.memberName }}</span>
                       <span class="assignment-info">
-                        Assigné par {{ assignment.assignedByName || 'Admin' }}
-                        <span class="assignment-date">{{ formatAssignmentDate(assignment.createdAt) }}</span>
+                        Assigné par {{ assignment.assignedBy || 'Admin' }}
+                        <span class="assignment-date">{{ formatAssignmentDate(assignment.assignedAt) }}</span>
                       </span>
                     </div>
-                    <ion-button 
-                      v-if="canRemoveAssignment"
-                      fill="clear" 
-                      size="small" 
-                      color="danger"
-                      @click="removeAssignment(assignment)"
-                    >
-                      <ion-icon :icon="closeCircleOutline" />
-                    </ion-button>
                   </div>
                 </div>
               </div>
 
               <!-- Missing Members Alert -->
               <div 
-                v-if="service.assignments.length < getRequiredMembers(service)" 
+                v-if="canViewTeamRequirements && service.assignments.length < getRequiredMembers(service)" 
                 class="missing-alert"
               >
                 <ion-icon :icon="alertCircleOutline" />
@@ -211,25 +210,30 @@ import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
   IonBackButton, IonIcon, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle,
   IonCardContent, IonSegment, IonSegmentButton, IonLabel, IonChip, IonBadge,
-  IonLoading, toastController, alertController
+  IonLoading, toastController
 } from '@ionic/vue';
 import {
   refreshOutline, peopleOutline, calendarOutline, checkmarkDoneOutline,
-  checkmarkCircleOutline, closeCircleOutline, alertCircleOutline,
-  peopleCircleOutline
+  checkmarkCircleOutline, alertCircleOutline, peopleCircleOutline
 } from 'ionicons/icons';
 import { teamsService } from '@/firebase/teams';
 import { membersService } from '@/firebase/members';
 import { firestoreService } from '@/firebase/firestore';
-import { assignmentsService } from '@/firebase/assignments';
+import { 
+  collection, 
+  getDocs, 
+  query, 
+  where
+} from 'firebase/firestore';
+import { db } from '@/firebase/config';
 import { useUser } from '@/composables/useUser';
-import type { Team, TeamMember } from '@/types/team';
+import type { Team } from '@/types/team';
 import type { Member } from '@/types/member';
 import type { Service } from '@/types/service';
 import type { ServiceAssignment } from '@/types/assignment';
 
 const route = useRoute();
-const { isAdmin } = useUser();
+const { member: currentUser, isAdmin } = useUser();
 const teamId = route.params.id as string;
 
 // State
@@ -241,7 +245,16 @@ const assignments = ref<ServiceAssignment[]>([]);
 const viewMode = ref<'by-service' | 'by-member'>('by-service');
 
 // Computed
-const canRemoveAssignment = computed(() => isAdmin.value);
+const canViewTeamRequirements = computed(() => {
+  if (!team.value || !currentUser.value) return false;
+  
+  // Admin can always view team requirements
+  if (isAdmin.value) return true;
+  
+  // Check if user is owner or leader of this team
+  const userInTeam = team.value.members.find(m => m.memberId === currentUser.value?.id);
+  return team.value.ownerId === currentUser.value.id || userInTeam?.role === 'leader';
+});
 
 const totalAssignments = computed(() => {
   return assignments.value.filter(a => a.teamId === teamId).length;
@@ -275,11 +288,16 @@ const servicesWithAssignments = computed(() => {
       };
     })
     .filter(service => {
-      // Only show services that are relevant to this team (have requirements or assignments)
-      const hasTeamRequirement = service.teamRequirements?.some(
-        req => req.isActive && team.value && req.teamName === team.value.name
-      );
-      return hasTeamRequirement || service.assignments.length > 0;
+      // If user can view team requirements, show services with requirements or assignments
+      if (canViewTeamRequirements.value) {
+        const hasTeamRequirement = service.teamRequirements?.some(
+          req => req.isActive && team.value && req.teamName === team.value.name
+        );
+        return hasTeamRequirement || service.assignments.length > 0;
+      }
+      
+      // If user cannot view requirements, only show services where they have assignments
+      return service.assignments.length > 0;
     })
     .sort((a, b) => new Date(`${a.date}T${a.time}`).getTime() - new Date(`${b.date}T${b.time}`).getTime())
     .slice(0, 10); // Show next 10 services
@@ -341,7 +359,19 @@ const loadTeamData = async () => {
     services.value = allServices;
     
     // Load assignments for this team
-    const teamAssignments = await assignmentsService.getAllTeamAssignments(teamId);
+    const q = query(
+      collection(db, 'assignments'),
+      where('teamId', '==', teamId)
+    );
+    const querySnapshot = await getDocs(q);
+    const teamAssignments = querySnapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        assignedAt: data.assignedAt?.toDate?.()?.toISOString() || data.assignedAt
+      } as ServiceAssignment;
+    });
     assignments.value = teamAssignments;
     
   } catch (error) {
@@ -365,51 +395,6 @@ const onViewModeChange = () => {
   // View mode change is handled by reactivity
 };
 
-const removeAssignment = async (assignment: ServiceAssignment) => {
-  const alert = await alertController.create({
-    header: 'Confirmer la suppression',
-    message: `Voulez-vous vraiment retirer ${assignment.memberName} de ce service ?`,
-    buttons: [
-      {
-        text: 'Annuler',
-        role: 'cancel'
-      },
-      {
-        text: 'Supprimer',
-        role: 'destructive',
-        handler: async () => {
-          try {
-            await assignmentsService.removeAssignment(
-              assignment.serviceId,
-              assignment.teamId,
-              assignment.memberId
-            );
-            
-            // Refresh data
-            await loadTeamData();
-            
-            const toast = await toastController.create({
-              message: 'Assignation supprimée',
-              duration: 2000,
-              color: 'success'
-            });
-            await toast.present();
-          } catch (error) {
-            console.error('Error removing assignment:', error);
-            const toast = await toastController.create({
-              message: 'Erreur lors de la suppression',
-              duration: 3000,
-              color: 'danger'
-            });
-            await toast.present();
-          }
-        }
-      }
-    ]
-  });
-  
-  await alert.present();
-};
 
 const getRequiredMembers = (service: Service): number => {
   if (!service.teamRequirements || !team.value) return 0;

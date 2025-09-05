@@ -67,7 +67,7 @@
               <ion-button 
                 expand="block" 
                 fill="outline"
-                @click="() => router.push(`/team-availability/${team.id}`)"
+                @click="() => team && router.push(`/team-availability/${team.id}`)"
               >
                 <ion-icon :icon="calendarOutline" slot="start"></ion-icon>
                 Voir les disponibilités
@@ -75,7 +75,7 @@
               <ion-button 
                 expand="block" 
                 fill="outline"
-                @click="() => router.push(`/team-assignments/${team.id}`)"
+                @click="() => team && router.push(`/team-assignments/${team.id}`)"
               >
                 <ion-icon :icon="checkmarkDoneOutline" slot="start"></ion-icon>
                 Voir les assignations
@@ -373,7 +373,7 @@ const teamId = route.params.id as string;
 
 const canEdit = computed(() => {
   if (!team.value || !currentUser.value) return false;
-  return team.value.ownerId === currentUser.value.id || currentUser.value.isAdmin;
+  return currentUser.value.isAdmin;
 });
 
 const canManageMembers = computed(() => {
@@ -387,8 +387,7 @@ const canManageMembers = computed(() => {
 const canDelete = computed(() => {
   if (!team.value || !currentUser.value) return false;
   const nonOwnerMembers = team.value.members.filter(m => m.role !== 'owner');
-  return (team.value.ownerId === currentUser.value.id || currentUser.value.isAdmin) && 
-         nonOwnerMembers.length === 0;
+  return currentUser.value.isAdmin && nonOwnerMembers.length === 0;
 });
 
 const availableMembers = computed(() => {
