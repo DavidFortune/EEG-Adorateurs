@@ -352,6 +352,7 @@ import { membersService } from '@/firebase/members';
 import { useUser } from '@/composables/useUser';
 import type { Team, TeamMember } from '@/types/team';
 import type { Member } from '@/types/member';
+import { timezoneUtils } from '@/utils/timezone';
 
 const router = useRouter();
 const route = useRoute();
@@ -455,11 +456,7 @@ const getRoleDisplayName = (role: string) => {
 };
 
 const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleDateString('fr-FR', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
+  return timezoneUtils.formatDateForDisplay(dateString);
 };
 
 const loadTeam = async () => {

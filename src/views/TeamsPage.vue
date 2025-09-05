@@ -361,16 +361,20 @@ onMounted(async () => {
   
   .team-actions {
     align-self: stretch;
-    flex-direction: column;
-    gap: 0.25rem;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 0.5rem;
     width: 100%;
   }
   
-  .view-button,
   .availability-button,
   .assignments-button {
     margin-left: 0;
-    justify-content: flex-start;
+    justify-content: center;
+    flex: 1;
+    --padding-start: 0.5rem;
+    --padding-end: 0.5rem;
+    font-size: 0.8rem;
   }
 }
 

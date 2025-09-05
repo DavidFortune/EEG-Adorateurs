@@ -100,5 +100,49 @@ export const timezoneUtils = {
    */
   getMinDate(): string {
     return this.getCurrentDate();
+  },
+
+  /**
+   * Format date and time for Team section display (e.g., "Dim 7 sept 2025 à 11:00")
+   */
+  formatTeamDateTime(dateStr: string, timeStr: string): string {
+    const datetime = new Date(`${dateStr}T${timeStr}:00`);
+    const options: Intl.DateTimeFormatOptions = {
+      timeZone: TIMEZONE,
+      weekday: 'short',
+      day: 'numeric', 
+      month: 'short',
+      year: 'numeric'
+    };
+    
+    const formattedDate = datetime.toLocaleDateString('fr-CA', options);
+    // Capitalize the first letter (weekday)
+    const capitalizedDate = formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1);
+    
+    return `${capitalizedDate} à ${timeStr}`;
+  },
+
+  /**
+   * Format date and time in separate components for 3-line layout
+   */
+  formatTeamDateTimeSegments(dateStr: string, timeStr: string): { weekday: string, date: string, time: string } {
+    const datetime = new Date(`${dateStr}T${timeStr}:00`);
+    
+    const weekday = datetime.toLocaleDateString('fr-CA', {
+      timeZone: TIMEZONE,
+      weekday: 'short'
+    });
+    
+    const dateOnly = datetime.toLocaleDateString('fr-CA', {
+      timeZone: TIMEZONE,
+      day: 'numeric',
+      month: 'short'
+    });
+    
+    return {
+      weekday: weekday.charAt(0).toUpperCase() + weekday.slice(1),
+      date: dateOnly,
+      time: timeStr
+    };
   }
 };

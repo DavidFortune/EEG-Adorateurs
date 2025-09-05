@@ -47,12 +47,15 @@
       <div class="filter-section">
         <ion-segment v-model="selectedServiceId" @ionChange="onServiceChange" scrollable>
           <ion-segment-button value="all">
-            <ion-label>Tous les services</ion-label>
+            <ion-label>Tous</ion-label>
           </ion-segment-button>
           <ion-segment-button v-for="service in upcomingServices" :key="service.id" :value="service.id">
             <ion-label>
-              <div class="service-date">{{ formatServiceDate(service.date) }}</div>
-              <div class="service-time">{{ service.time }}</div>
+              <div class="service-segments">
+                <div class="service-weekday">{{ formatServiceSegments(service.date, service.time).weekday }}</div>
+                <div class="service-date">{{ formatServiceSegments(service.date, service.time).date }}</div>
+                <div class="service-time">{{ formatServiceSegments(service.date, service.time).time }}</div>
+              </div>
             </ion-label>
           </ion-segment-button>
         </ion-segment>
@@ -120,8 +123,7 @@
               <div v-else class="services-grid">
                 <div v-for="service in upcomingServices" :key="service.id" class="service-availability">
                   <div class="service-label">
-                    <div class="service-date-small">{{ formatServiceDateShort(service.date) }}</div>
-                    <div class="service-time-small">{{ service.time }}</div>
+                    <div class="service-date-time-small">{{ formatServiceDateTimeShort(service.date, service.time) }}</div>
                   </div>
                   <ion-chip 
                     :color="getAvailabilityChipColor(member.availability[service.id])"
@@ -165,6 +167,7 @@ import { firestoreService } from '@/firebase/firestore';
 import type { Team, TeamMember } from '@/types/team';
 import type { Member } from '@/types/member';
 import type { Service } from '@/types/service';
+import { timezoneUtils } from '@/utils/timezone';
 
 const route = useRoute();
 const teamId = route.params.id as string;
@@ -273,23 +276,16 @@ const onServiceChange = () => {
   // Service change is handled by reactivity
 };
 
-const formatServiceDate = (date: string): string => {
-  const d = new Date(date);
-  const options: Intl.DateTimeFormatOptions = { 
-    weekday: 'short', 
-    day: 'numeric', 
-    month: 'short' 
-  };
-  return d.toLocaleDateString('fr-FR', options);
+const formatServiceDateTime = (date: string, time: string): string => {
+  return timezoneUtils.formatTeamDateTime(date, time);
 };
 
-const formatServiceDateShort = (date: string): string => {
-  const d = new Date(date);
-  const options: Intl.DateTimeFormatOptions = { 
-    day: 'numeric', 
-    month: 'short' 
-  };
-  return d.toLocaleDateString('fr-FR', options);
+const formatServiceDateTimeShort = (date: string, time: string): string => {
+  return timezoneUtils.formatTeamDateTime(date, time);
+};
+
+const formatServiceSegments = (date: string, time: string) => {
+  return timezoneUtils.formatTeamDateTimeSegments(date, time);
 };
 
 const getInitials = (name: string): string => {
@@ -416,14 +412,37 @@ onMounted(() => {
   background: var(--ion-color-light);
 }
 
-.service-date {
-  font-size: 0.85rem;
+.filter-section ion-segment-button {
+  min-height: 60px;
+  --padding-top: 8px;
+  --padding-bottom: 8px;
+}
+
+.service-segments {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 0;
+}
+
+.service-weekday {
+  font-size: 0.75rem;
   font-weight: 600;
+  color: var(--ion-color-primary);
+  text-transform: uppercase;
+}
+
+.service-date {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--ion-color-dark);
 }
 
 .service-time {
   font-size: 0.75rem;
-  color: var(--ion-color-medium);
+  font-weight: 600;
+  color: var(--ion-color-dark);
 }
 
 .availability-container {
@@ -608,15 +627,11 @@ onMounted(() => {
   text-align: center;
 }
 
-.service-date-small {
-  font-size: 0.75rem;
+.service-date-time-small {
+  font-size: 0.7rem;
   font-weight: 600;
   color: var(--ion-color-dark);
-}
-
-.service-time-small {
-  font-size: 0.7rem;
-  color: var(--ion-color-medium);
+  text-align: center;
 }
 
 .availability-chip {

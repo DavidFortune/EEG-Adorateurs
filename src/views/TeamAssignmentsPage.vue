@@ -71,7 +71,7 @@
                   <ion-card-title class="service-title">{{ service.title }}</ion-card-title>
                   <ion-card-subtitle class="service-datetime">
                     <ion-icon :icon="calendarOutline" />
-                    {{ formatServiceDate(service.date) }} à {{ service.time }}
+                    {{ formatServiceDateTime(service.date, service.time) }}
                   </ion-card-subtitle>
                 </div>
                 <ion-badge 
@@ -107,10 +107,6 @@
                     </div>
                     <div class="member-details">
                       <span class="member-name">{{ assignment.memberName }}</span>
-                      <span class="assignment-info">
-                        Assigné par {{ assignment.assignedBy || 'Admin' }}
-                        <span class="assignment-date">{{ formatAssignmentDate(assignment.assignedAt) }}</span>
-                      </span>
                     </div>
                   </div>
                 </div>
@@ -177,7 +173,7 @@
                     <div class="assignment-details">
                       <span class="service-name">{{ assignment.service?.title }}</span>
                       <span class="service-datetime">
-                        {{ formatServiceDate(assignment.service?.date) }} à {{ assignment.service?.time }}
+                        {{ formatServiceDateTime(assignment.service?.date, assignment.service?.time) }}
                       </span>
                     </div>
                   </div>
@@ -231,6 +227,7 @@ import type { Team } from '@/types/team';
 import type { Member } from '@/types/member';
 import type { Service } from '@/types/service';
 import type { ServiceAssignment } from '@/types/assignment';
+import { timezoneUtils } from '@/utils/timezone';
 
 const route = useRoute();
 const { member: currentUser, isAdmin } = useUser();
@@ -406,26 +403,11 @@ const getRequiredMembers = (service: Service): number => {
   return requirement?.membersNeeded || 0;
 };
 
-const formatServiceDate = (date: string | undefined): string => {
-  if (!date) return '';
-  const d = new Date(date);
-  const options: Intl.DateTimeFormatOptions = { 
-    weekday: 'short', 
-    day: 'numeric', 
-    month: 'short',
-    year: 'numeric'
-  };
-  return d.toLocaleDateString('fr-FR', options);
+const formatServiceDateTime = (date: string | undefined, time: string | undefined): string => {
+  if (!date || !time) return '';
+  return timezoneUtils.formatTeamDateTime(date, time);
 };
 
-const formatAssignmentDate = (date: string): string => {
-  const d = new Date(date);
-  const options: Intl.DateTimeFormatOptions = { 
-    day: 'numeric', 
-    month: 'short'
-  };
-  return ` • ${d.toLocaleDateString('fr-FR', options)}`;
-};
 
 const getInitials = (name: string): string => {
   return name
@@ -627,15 +609,6 @@ onMounted(() => {
   margin-bottom: 2px;
 }
 
-.assignment-info {
-  display: block;
-  font-size: 0.75rem;
-  color: var(--ion-color-medium);
-}
-
-.assignment-date {
-  color: var(--ion-color-medium-shade);
-}
 
 .missing-alert {
   display: flex;
