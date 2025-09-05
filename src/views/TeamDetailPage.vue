@@ -442,7 +442,10 @@ const getMemberData = (memberId: string) => {
 const getMemberInitials = (memberId: string) => {
   const member = getMemberData(memberId);
   if (!member) return '?';
-  return member.firstName.charAt(0) + (member.lastName?.charAt(0) || '');
+  const names = member.fullName.split(' ').filter(n => n.length > 0);
+  if (names.length === 0) return '?';
+  if (names.length === 1) return names[0].charAt(0).toUpperCase();
+  return names[0].charAt(0).toUpperCase() + names[names.length - 1].charAt(0).toUpperCase();
 };
 
 const getRoleDisplayName = (role: string) => {
@@ -804,18 +807,27 @@ onMounted(() => {
 .member-avatar {
   width: 48px;
   height: 48px;
+  flex-shrink: 0;
+}
+
+.member-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .avatar-initials {
   width: 100%;
   height: 100%;
-  background: #374151;
+  background: var(--ion-color-primary);
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 600;
   font-size: 1rem;
+  border-radius: 50%;
 }
 
 .member-details h4 {
@@ -888,6 +900,14 @@ onMounted(() => {
 .member-info-header .member-avatar {
   width: 48px;
   height: 48px;
+  flex-shrink: 0;
+}
+
+.member-info-header .member-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .member-info-header h3 {

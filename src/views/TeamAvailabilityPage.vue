@@ -149,7 +149,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
@@ -158,13 +158,12 @@ import {
 } from '@ionic/vue';
 import {
   refreshOutline, peopleOutline, checkmarkCircleOutline, closeCircleOutline,
-  helpCircleOutline, alertCircleOutline, checkmarkOutline, closeOutline,
-  helpOutline, removeOutline
+  helpCircleOutline, alertCircleOutline
 } from 'ionicons/icons';
 import { teamsService } from '@/firebase/teams';
 import { membersService } from '@/firebase/members';
 import { firestoreService } from '@/firebase/firestore';
-import type { Team, TeamMember } from '@/types/team';
+import type { Team } from '@/types/team';
 import type { Member } from '@/types/member';
 import type { Service } from '@/types/service';
 import { timezoneUtils } from '@/utils/timezone';
@@ -276,9 +275,6 @@ const onServiceChange = () => {
   // Service change is handled by reactivity
 };
 
-const formatServiceDateTime = (date: string, time: string): string => {
-  return timezoneUtils.formatTeamDateTime(date, time);
-};
 
 const formatServiceDateTimeShort = (date: string, time: string): string => {
   return timezoneUtils.formatTeamDateTime(date, time);
@@ -289,11 +285,11 @@ const formatServiceSegments = (date: string, time: string) => {
 };
 
 const getInitials = (name: string): string => {
-  return name
-    .split(' ')
-    .map(n => n.charAt(0).toUpperCase())
-    .slice(0, 2)
-    .join('');
+  const names = name.split(' ').filter(n => n.length > 0);
+  if (names.length === 0) return '?';
+  if (names.length === 1) return names[0].charAt(0).toUpperCase();
+  // Return first and last name initials
+  return names[0].charAt(0).toUpperCase() + names[names.length - 1].charAt(0).toUpperCase();
 };
 
 const getRoleColor = (role: string): string => {

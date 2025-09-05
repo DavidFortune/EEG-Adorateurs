@@ -410,11 +410,11 @@ const formatServiceDateTime = (date: string | undefined, time: string | undefine
 
 
 const getInitials = (name: string): string => {
-  return name
-    .split(' ')
-    .map(n => n.charAt(0).toUpperCase())
-    .slice(0, 2)
-    .join('');
+  const names = name.split(' ').filter(n => n.length > 0);
+  if (names.length === 0) return '?';
+  if (names.length === 1) return names[0].charAt(0).toUpperCase();
+  // Return first and last name initials
+  return names[0].charAt(0).toUpperCase() + names[names.length - 1].charAt(0).toUpperCase();
 };
 
 const getRoleColor = (role: string): string => {
