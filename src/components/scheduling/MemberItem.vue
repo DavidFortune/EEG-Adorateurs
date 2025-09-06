@@ -38,7 +38,8 @@ import {
   closeCircleOutline, 
   alertCircleOutline,
   personOutline,
-  helpCircleOutline 
+  helpCircleOutline,
+  lockClosedOutline
 } from 'ionicons/icons';
 import type { MemberAssignment } from '@/types/scheduling';
 
@@ -55,11 +56,12 @@ const emit = defineEmits<{
 
 const memberItemClasses = computed(() => ({
   'member-item--assigned': props.member.isAssigned,
-  'member-item--available': props.member.availability === 'available' && !props.member.isAssigned,
+  'member-item--available': props.member.availability === 'available' && !props.member.isAssigned && !props.member.isAssignedToOtherTeam,
   'member-item--unavailable': props.member.availability === 'unavailable',
-  'member-item--maybe': props.member.availability === 'maybe' && !props.member.isAssigned,
-  'member-item--no-response': props.member.availability === null,
-  'member-item--clickable': props.isEditing && (props.member.availability === 'available' || props.member.availability === 'maybe' || props.member.availability === null),
+  'member-item--maybe': props.member.availability === 'maybe' && !props.member.isAssigned && !props.member.isAssignedToOtherTeam,
+  'member-item--no-response': props.member.availability === null && !props.member.isAssignedToOtherTeam,
+  'member-item--already-booked': props.member.isAssignedToOtherTeam && !props.member.isAssigned,
+  'member-item--clickable': props.isEditing && (props.member.availability === 'available' || props.member.availability === 'maybe' || props.member.availability === null) && !props.member.isAssignedToOtherTeam,
   'member-item--editing': props.isEditing
 }));
 
@@ -74,6 +76,10 @@ function getInitials(name: string): string {
 function getStatusText(): string {
   if (props.member.isAssigned) {
     return props.isEditing ? 'Assigné (cliquer pour retirer)' : 'Assigné';
+  }
+  
+  if (props.member.isAssignedToOtherTeam) {
+    return `Déjà assigné à ${props.member.assignedTeamName}`;
   }
   
   switch (props.member.availability) {
@@ -95,6 +101,10 @@ function getStatusIcon() {
     return personOutline;
   }
   
+  if (props.member.isAssignedToOtherTeam) {
+    return lockClosedOutline;
+  }
+  
   switch (props.member.availability) {
     case 'available':
       return checkmarkCircleOutline;
@@ -114,6 +124,10 @@ function getStatusClass(): string {
     return 'status-icon--assigned';
   }
   
+  if (props.member.isAssignedToOtherTeam) {
+    return 'status-icon--already-booked';
+  }
+  
   switch (props.member.availability) {
     case 'available':
       return 'status-icon--available';
@@ -129,7 +143,7 @@ function getStatusClass(): string {
 }
 
 function handleClick() {
-  if (props.isEditing && (props.member.availability === 'available' || props.member.availability === 'maybe' || props.member.availability === null)) {
+  if (props.isEditing && (props.member.availability === 'available' || props.member.availability === 'maybe' || props.member.availability === null) && !props.member.isAssignedToOtherTeam) {
     emit('click', props.member.id);
   }
 }
@@ -173,6 +187,12 @@ function handleClick() {
   background: var(--ion-color-light);
   border-color: var(--ion-color-medium);
   opacity: 0.6;
+}
+
+.member-item--already-booked {
+  background: #f8f0ff;
+  border-color: #d4b5ff;
+  opacity: 0.8;
 }
 
 .member-item--editing.member-item--no-response {
@@ -243,6 +263,10 @@ function handleClick() {
   background: var(--ion-color-medium);
 }
 
+.member-item--already-booked .member-avatar {
+  background: #9333ea;
+}
+
 .member-info {
   flex: 1;
   min-width: 0;
@@ -291,5 +315,9 @@ function handleClick() {
 
 .status-icon--no-response {
   color: var(--ion-color-medium);
+}
+
+.status-icon--already-booked {
+  color: #9333ea;
 }
 </style>

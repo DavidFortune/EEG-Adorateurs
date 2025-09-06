@@ -228,11 +228,23 @@ export const useSchedulingStore = defineStore('scheduling', () => {
           // The availabilities are stored as { [serviceId]: 'available' | 'unavailable' | null }
           const memberAvailability = memberDetails.availabilities?.[event.id] || null;
 
+          // Check if member is assigned to current team
+          const isAssignedToCurrentTeam = assignedMemberIds.has(teamMember.memberId);
+          
+          // Check if member is assigned to another team for this service
+          const memberOtherAssignments = assignments.filter(a => 
+            a.memberId === teamMember.memberId && a.teamId !== team.id
+          );
+          const isAssignedToOtherTeam = memberOtherAssignments.length > 0;
+          const assignedTeamName = isAssignedToOtherTeam ? memberOtherAssignments[0].teamName : undefined;
+
           members.push({
             id: teamMember.memberId,
             name: memberDetails.fullName,
             availability: memberAvailability,
-            isAssigned: assignedMemberIds.has(teamMember.memberId),
+            isAssigned: isAssignedToCurrentTeam,
+            isAssignedToOtherTeam,
+            assignedTeamName,
             avatar: memberDetails.avatar
           });
         }
@@ -264,9 +276,11 @@ export const useSchedulingStore = defineStore('scheduling', () => {
     const member = team.members.find(m => m.id === memberId);
     if (!member) return;
     
-    // Allow assignment of available, maybe, or no response members
-    // Only block unavailable members
+    // Block assignment if:
+    // - Member is unavailable, OR
+    // - Member is already assigned to another team (and not currently assigned to this team)
     if (member.availability === 'unavailable') return;
+    if (member.isAssignedToOtherTeam && !member.isAssigned) return;
 
     try {
       if (member.isAssigned) {

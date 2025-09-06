@@ -149,7 +149,7 @@ self.addEventListener('notificationclick', event => {
   event.waitUntil(
     clients.matchAll({ type: 'window' }).then(clientList => {
       // Chercher si une fenêtre de l'app est déjà ouverte
-      for (let client of clientList) {
+      for (const client of clientList) {
         if (client.url === self.location.origin + '/' && 'focus' in client) {
           return client.focus();
         }

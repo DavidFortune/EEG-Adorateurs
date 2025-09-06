@@ -12,6 +12,8 @@ export interface MemberAssignment {
   name: string;
   availability: 'available' | 'unavailable' | 'maybe' | null;
   isAssigned: boolean;
+  isAssignedToOtherTeam: boolean;
+  assignedTeamName?: string;
   avatar?: string;
 }
 

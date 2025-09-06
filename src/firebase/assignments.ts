@@ -41,6 +41,16 @@ export const assignmentsService = {
    */
   async createAssignment(request: CreateAssignmentRequest, memberName: string, teamName: string): Promise<ServiceAssignment> {
     try {
+      // First check if member already has an assignment for this service
+      const existingAssignments = await this.getMemberServiceAssignments(request.serviceId, request.memberId);
+      
+      // If member already has assignments for this service, remove them first
+      if (existingAssignments.length > 0) {
+        for (const assignment of existingAssignments) {
+          await deleteDoc(doc(db, ASSIGNMENTS_COLLECTION, assignment.id));
+        }
+      }
+
       const assignmentData: Omit<ServiceAssignment, 'id'> = {
         serviceId: request.serviceId,
         teamId: request.teamId,
@@ -67,24 +77,23 @@ export const assignmentsService = {
   },
 
   /**
-   * Remove an assignment
+   * Remove an assignment - removes ALL assignments for a member in a service
    */
-  async removeAssignment(serviceId: string, teamId: string, memberId: string): Promise<boolean> {
+  async removeAssignment(serviceId: string, _teamId: string, memberId: string): Promise<boolean> {
     try {
-      const q = query(
-        collection(db, ASSIGNMENTS_COLLECTION),
-        where('serviceId', '==', serviceId),
-        where('teamId', '==', teamId),
-        where('memberId', '==', memberId)
-      );
-      const querySnapshot = await getDocs(q);
-
-      if (!querySnapshot.empty) {
-        const assignmentDoc = querySnapshot.docs[0];
-        await deleteDoc(doc(db, ASSIGNMENTS_COLLECTION, assignmentDoc.id));
-        return true;
+      // Get all assignments for this member in this service (not just this team)
+      const memberAssignments = await this.getMemberServiceAssignments(serviceId, memberId);
+      
+      if (memberAssignments.length === 0) {
+        return false;
       }
-      return false;
+
+      // Remove all assignments for this member in this service
+      for (const assignment of memberAssignments) {
+        await deleteDoc(doc(db, ASSIGNMENTS_COLLECTION, assignment.id));
+      }
+      
+      return true;
     } catch (error) {
       console.error('Error removing assignment:', error);
       throw new Error('Failed to remove assignment');

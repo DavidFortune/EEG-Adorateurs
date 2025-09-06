@@ -42,6 +42,7 @@ export interface ServiceProgram {
   serviceId: string;
   items: ProgramItem[];
   sections: ProgramSection[];
+  conductor?: ProgramParticipant; // Dirigeant/Leader of the service
   totalDuration: number; // calculated from items
   createdAt: string;
   updatedAt: string;
