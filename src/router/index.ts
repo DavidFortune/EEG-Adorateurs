@@ -63,14 +63,23 @@ const routes: Array<RouteRecordRaw> = [
       },
       {
         path: 'teams',
-        component: () => import('@/views/TeamsPage.vue'),
-        meta: { requiresAdmin: true }
+        component: () => import('@/views/TeamsPage.vue')
       }
     ]
   },
   {
     path: '/service-detail/:id',
     component: () => import('@/views/ServiceDetailPage.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/service-members/:id',
+    component: () => import('@/views/ServiceMembersPage.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/service-program/:id',
+    component: () => import('@/views/ServiceProgramPage.vue'),
     meta: { requiresAuth: true }
   },
   {
@@ -108,7 +117,7 @@ const routes: Array<RouteRecordRaw> = [
   {
     path: '/team-detail/:id',
     component: () => import('@/views/TeamDetailPage.vue'),
-    meta: { requiresAuth: true, requiresAdmin: true }
+    meta: { requiresAuth: true }
   },
   {
     path: '/team-form/:id?',

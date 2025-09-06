@@ -65,6 +65,30 @@
                 </ion-label>
               </ion-item>
               
+              <ion-item button @click="goToMembers">
+                <ion-icon :icon="peopleOutline" slot="start" />
+                <ion-label>
+                  <h3>Membres assignés</h3>
+                  <p v-if="loadingMembers">Chargement...</p>
+                  <p v-else>
+                    {{ memberCount }} membre{{ memberCount !== 1 ? 's' : '' }} assigné{{ memberCount !== 1 ? 's' : '' }}
+                  </p>
+                </ion-label>
+                <ion-icon :icon="chevronForwardOutline" slot="end" />
+              </ion-item>
+              
+              <ion-item button @click="goToProgram">
+                <ion-icon :icon="documentTextOutline" slot="start" />
+                <ion-label>
+                  <h3>Programme du service</h3>
+                  <p v-if="loadingProgram">Chargement...</p>
+                  <p v-else>
+                    {{ programItemCount }} élément{{ programItemCount !== 1 ? 's' : '' }} au programme
+                  </p>
+                </ion-label>
+                <ion-icon :icon="chevronForwardOutline" slot="end" />
+              </ion-item>
+              
               <ion-item>
                 <ion-icon :icon="createOutline" slot="start" />
                 <ion-label>
@@ -117,25 +141,62 @@ import {
 } from '@ionic/vue';
 import {
   pencil, calendarOutline, timeOutline, informationCircleOutline, createOutline,
-  syncOutline, checkmarkCircle, trashOutline, alertCircleOutline, timerOutline
+  syncOutline, checkmarkCircle, trashOutline, alertCircleOutline, timerOutline,
+  peopleOutline, chevronForwardOutline, documentTextOutline
 } from 'ionicons/icons';
 import { Service, ServiceCategory } from '@/types/service';
 import { serviceService } from '@/services/serviceService';
+import { assignmentsService } from '@/firebase/assignments';
 import { timezoneUtils } from '@/utils/timezone';
 
 const route = useRoute();
 const router = useRouter();
 const service = ref<Service | null>(null);
 const loading = ref(true);
+const memberCount = ref(0);
+const loadingMembers = ref(false);
+const programItemCount = ref(0);
+const loadingProgram = ref(false);
 
 const loadService = async () => {
   const id = route.params.id as string;
   try {
     service.value = await serviceService.getServiceById(id);
+    // Load member count and program count in parallel
+    loadMemberCount();
+    loadProgramCount();
   } catch (error) {
     console.error('Error loading service:', error);
   } finally {
     loading.value = false;
+  }
+};
+
+const loadMemberCount = async () => {
+  const id = route.params.id as string;
+  loadingMembers.value = true;
+  try {
+    const assignments = await assignmentsService.getServiceAssignments(id);
+    memberCount.value = assignments.length;
+  } catch (error) {
+    console.error('Error loading member count:', error);
+    memberCount.value = 0;
+  } finally {
+    loadingMembers.value = false;
+  }
+};
+
+const loadProgramCount = async () => {
+  loadingProgram.value = true;
+  try {
+    // Mock program count for now - in real implementation, this would fetch from a program service
+    // For demo purposes, we'll simulate a program with 11 items
+    programItemCount.value = 11;
+  } catch (error) {
+    console.error('Error loading program count:', error);
+    programItemCount.value = 0;
+  } finally {
+    loadingProgram.value = false;
   }
 };
 
@@ -176,6 +237,14 @@ const formatDeadline = (dateStr: string) => {
 
 const goToEdit = () => {
   router.push(`/service-form/${service.value?.id}`);
+};
+
+const goToMembers = () => {
+  router.push(`/service-members/${service.value?.id}`);
+};
+
+const goToProgram = () => {
+  router.push(`/service-program/${service.value?.id}`);
 };
 
 const goBack = () => {

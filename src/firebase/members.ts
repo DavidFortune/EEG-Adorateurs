@@ -216,6 +216,25 @@ export const membersService = {
   },
 
   /**
+   * Get member by ID
+   */
+  async getMemberById(memberId: string): Promise<Member | null> {
+    try {
+      const docRef = doc(db, MEMBERS_COLLECTION, memberId);
+      const docSnap = await getDoc(docRef);
+      
+      if (!docSnap.exists()) {
+        return null;
+      }
+      
+      return convertFirestoreToMember({ id: docSnap.id, ...docSnap.data() } as FirestoreMember);
+    } catch (error) {
+      console.error('Error getting member by ID:', error);
+      throw new Error('Failed to fetch member');
+    }
+  },
+
+  /**
    * Get all members
    */
   async getAllMembers(): Promise<Member[]> {
