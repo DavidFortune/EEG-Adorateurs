@@ -86,7 +86,7 @@
           <div v-if="program.sections.length > 0" class="sections-view">
             <div v-for="section in sortedSections" :key="section.id" class="program-section" :data-section-id="section.id">
               <div class="section-header">
-                <div v-if="isEditMode" class="section-drag-handle" @mousedown="startSectionDrag($event, section)">
+                <div v-if="isEditMode" class="section-drag-handle" @mousedown="startSectionDrag($event, section)" @touchstart="startSectionDrag($event, section)">
                   <ion-icon :icon="reorderThreeOutline" />
                 </div>
                 <h3 class="section-title">{{ section.title }}</h3>
@@ -115,7 +115,7 @@
                   <div class="item-layout">
                     <!-- Column 1: Drag Handle (Edit Mode Only) -->
                     <div v-if="isEditMode" class="item-column item-handle-column">
-                      <div class="drag-handle" @mousedown="startDrag($event, item)">
+                      <div class="drag-handle" @mousedown="startDrag($event, item)" @touchstart="startDrag($event, item)">
                         <ion-icon :icon="reorderThreeOutline" />
                       </div>
                     </div>
@@ -204,7 +204,7 @@
               <div class="item-layout">
                 <!-- Column 1: Drag Handle (Edit Mode Only) -->
                 <div v-if="isEditMode" class="item-column item-handle-column">
-                  <div class="drag-handle" @mousedown="startDrag($event, item)">
+                  <div class="drag-handle" @mousedown="startDrag($event, item)" @touchstart="startDrag($event, item)">
                     <ion-icon :icon="reorderThreeOutline" />
                   </div>
                 </div>
@@ -508,47 +508,71 @@ const selectItemType = (itemType: ProgramItemType) => {
 let draggedItem: ProgramItem | null = null;
 let draggedSection: ProgramSection | null = null;
 
-const startDrag = (event: MouseEvent, item: ProgramItem) => {
+const startDrag = (event: MouseEvent | TouchEvent, item: ProgramItem) => {
   if (!isEditMode.value) return;
   draggedItem = item;
   isDragging.value = true;
   draggedItemId.value = item.id;
   event.preventDefault();
   
-  // Add global mouse events
+  // Add global events for both mouse and touch
   document.addEventListener('mousemove', handleMouseMove);
   document.addEventListener('mouseup', handleMouseUp);
+  document.addEventListener('touchmove', handleTouchMove, { passive: false });
+  document.addEventListener('touchend', handleTouchEnd);
 };
 
-const startSectionDrag = (event: MouseEvent, section: ProgramSection) => {
+const startSectionDrag = (event: MouseEvent | TouchEvent, section: ProgramSection) => {
   if (!isEditMode.value) return;
   draggedSection = section;
   event.preventDefault();
   
-  // Add global mouse events  
+  // Add global events for both mouse and touch
   document.addEventListener('mousemove', handleMouseMove);
   document.addEventListener('mouseup', handleMouseUp);
+  document.addEventListener('touchmove', handleTouchMove, { passive: false });
+  document.addEventListener('touchend', handleTouchEnd);
+};
+
+const getEventCoordinates = (event: MouseEvent | TouchEvent) => {
+  if ('touches' in event && event.touches.length > 0) {
+    return { clientX: event.touches[0].clientX, clientY: event.touches[0].clientY };
+  } else if ('clientX' in event) {
+    return { clientX: event.clientX, clientY: event.clientY };
+  }
+  return { clientX: 0, clientY: 0 };
 };
 
 const handleMouseMove = (event: MouseEvent) => {
+  handleDragMove(event);
+};
+
+const handleTouchMove = (event: TouchEvent) => {
+  event.preventDefault(); // Prevent scrolling
+  handleDragMove(event);
+};
+
+const handleDragMove = (event: MouseEvent | TouchEvent) => {
   if (!isDragging.value || !draggedItem) return;
   
-  // Find the element under the mouse
-  const elementUnderMouse = document.elementFromPoint(event.clientX, event.clientY);
+  const { clientX, clientY } = getEventCoordinates(event);
+  
+  // Find the element under the pointer
+  const elementUnderPointer = document.elementFromPoint(clientX, clientY);
   
   // Find the closest program item or section
-  const closestItem = elementUnderMouse?.closest('.program-item');
-  const closestSection = elementUnderMouse?.closest('.program-section');
+  const closestItem = elementUnderPointer?.closest('.program-item');
+  const closestSection = elementUnderPointer?.closest('.program-section');
   
   if (closestItem) {
     const itemId = closestItem.getAttribute('data-item-id');
     if (itemId && itemId !== draggedItem.id) {
-      calculateInsertionPosition(event, closestItem, itemId);
+      calculateInsertionPosition({ clientX, clientY }, closestItem, itemId);
     }
   } else if (closestSection) {
     const sectionId = closestSection.getAttribute('data-section-id');
     if (sectionId) {
-      calculateInsertionInSection(event, closestSection, sectionId);
+      calculateInsertionInSection({ clientX, clientY }, closestSection, sectionId);
     }
   } else {
     // Clear insertion indicators
@@ -557,11 +581,11 @@ const handleMouseMove = (event: MouseEvent) => {
   }
 };
 
-const calculateInsertionPosition = (event: MouseEvent, itemElement: Element, targetItemId: string) => {
+const calculateInsertionPosition = (coordinates: { clientX: number; clientY: number }, itemElement: Element, targetItemId: string) => {
   if (!program.value || !draggedItem) return;
   
   const rect = itemElement.getBoundingClientRect();
-  const mouseY = event.clientY;
+  const pointerY = coordinates.clientY;
   const itemCenterY = rect.top + rect.height / 2;
   
   // Find the target item in the program
@@ -569,14 +593,14 @@ const calculateInsertionPosition = (event: MouseEvent, itemElement: Element, tar
   if (!targetItem) return;
   
   // Determine if we should insert before or after
-  const insertBefore = mouseY < itemCenterY;
+  const insertBefore = pointerY < itemCenterY;
   const targetIndex = program.value.items.findIndex(item => item.id === targetItemId);
   
   insertionIndex.value = insertBefore ? targetIndex : targetIndex + 1;
   insertionSectionId.value = targetItem.sectionId || null;
 };
 
-const calculateInsertionInSection = (event: MouseEvent, sectionElement: Element, sectionId: string) => {
+const calculateInsertionInSection = (coordinates: { clientX: number; clientY: number }, sectionElement: Element, sectionId: string) => {
   if (!program.value) return;
   
   // Find items in this section
@@ -598,9 +622,19 @@ const calculateInsertionInSection = (event: MouseEvent, sectionElement: Element,
 };
 
 const handleMouseUp = (event: MouseEvent) => {
-  // Clean up event listeners
+  handleDragEnd(event);
+};
+
+const handleTouchEnd = (event: TouchEvent) => {
+  handleDragEnd(event);
+};
+
+const handleDragEnd = (event: MouseEvent | TouchEvent) => {
+  // Clean up event listeners for both mouse and touch
   document.removeEventListener('mousemove', handleMouseMove);
   document.removeEventListener('mouseup', handleMouseUp);
+  document.removeEventListener('touchmove', handleTouchMove);
+  document.removeEventListener('touchend', handleTouchEnd);
   
   if (draggedItem && insertionIndex.value >= 0) {
     // Handle item drop at insertion point
@@ -609,7 +643,8 @@ const handleMouseUp = (event: MouseEvent) => {
   
   if (draggedSection) {
     // Handle section drop
-    handleSectionDrop(event);
+    const { clientX, clientY } = getEventCoordinates(event);
+    handleSectionDrop({ clientX, clientY });
     draggedSection = null;
   }
   
@@ -622,10 +657,10 @@ const handleMouseUp = (event: MouseEvent) => {
 };
 
 
-const handleSectionDrop = (event: MouseEvent) => {
+const handleSectionDrop = (coordinates: { clientX: number; clientY: number }) => {
   if (!draggedSection || !program.value) return;
   
-  const target = document.elementFromPoint(event.clientX, event.clientY);
+  const target = document.elementFromPoint(coordinates.clientX, coordinates.clientY);
   const targetSection = target?.closest('.program-section');
   
   if (targetSection) {
@@ -1303,6 +1338,11 @@ onMounted(async () => {
   margin-right: 8px;
   transition: all 0.2s ease;
   flex-shrink: 0;
+  /* Touch-friendly settings */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .drag-handle:hover, .section-drag-handle:hover {
