@@ -44,8 +44,10 @@ export interface ServiceProgram {
   sections: ProgramSection[];
   conductor?: ProgramParticipant; // Dirigeant/Leader of the service
   totalDuration: number; // calculated from items
-  createdAt: string;
-  updatedAt: string;
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy?: string; // User ID who created the program
+  updatedBy?: string; // User ID who last updated the program
 }
 
 export interface CreateProgramRequest {

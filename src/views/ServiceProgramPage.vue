@@ -433,12 +433,26 @@ import {
 } from 'ionicons/icons';
 import { serviceService } from '@/services/serviceService';
 import { timezoneUtils } from '@/utils/timezone';
+import { useUser } from '@/composables/useUser';
+import {
+  getProgramByServiceId,
+  createProgram,
+  updateProgram,
+  addSectionToProgram,
+  updateSectionInProgram,
+  deleteSectionFromProgram,
+  addItemToProgram,
+  updateItemInProgram,
+  deleteItemFromProgram,
+  updateProgramOrder
+} from '@/firebase/programs';
 import type { Service } from '@/types/service';
 import type { ServiceProgram, ProgramItem, ProgramSection, ProgramParticipant } from '@/types/program';
 import { ProgramItemType } from '@/types/program';
 
 const route = useRoute();
 const router = useRouter();
+const { user } = useUser();
 
 const loading = ref(true);
 const service = ref<Service | null>(null);
@@ -568,8 +582,8 @@ const closeAddSectionModal = () => {
   insertAfterSectionId.value = null;
 };
 
-const createSection = () => {
-  if (!newSectionName.value.trim() || !program.value) return;
+const createSection = async () => {
+  if (!newSectionName.value.trim() || !program.value || !user.value?.uid) return;
   
   // Find insert position
   let insertOrder = program.value.sections.length + 1;
@@ -586,51 +600,66 @@ const createSection = () => {
     }
   }
   
-  const newSection: ProgramSection = {
-    id: `section_${Date.now()}`,
-    title: newSectionName.value.trim(),
-    order: insertOrder
-  };
-  
-  program.value.sections.push(newSection);
-  closeAddSectionModal();
-  
-  // TODO: Save to backend
-  console.log('New section created:', newSection);
+  try {
+    const newSection = await addSectionToProgram(
+      program.value.id,
+      {
+        title: newSectionName.value.trim(),
+        order: insertOrder
+      },
+      user.value.uid
+    );
+    
+    // Update local state
+    program.value.sections.push(newSection);
+    closeAddSectionModal();
+  } catch (error) {
+    console.error('Error creating section:', error);
+    // TODO: Show error message to user
+  }
 };
 
-const selectItemType = (itemType: ProgramItemType) => {
+const selectItemType = async (itemType: ProgramItemType) => {
   closeAddItemModal();
+  
+  if (!program.value || !user.value?.uid) return;
   
   const position = addItemPosition.value;
   const sectionId = addItemSectionId.value;
-  const serviceIdValue = serviceId.value;
   
-  console.log(`Creating new ${itemType} at ${position}`, sectionId ? `in section ${sectionId}` : '');
+  // Calculate order based on position
+  let order = 1;
+  if (position === 'end') {
+    order = program.value.items.length + 1;
+  } else if (position === 'section' && sectionId) {
+    const sectionItems = program.value.items.filter(item => item.sectionId === sectionId);
+    order = sectionItems.length > 0 ? Math.max(...sectionItems.map(item => item.order)) + 1 : 1;
+  }
   
-  // Build query parameters
-  const baseQuery = `service=${serviceIdValue}&position=${position}`;
-  const sectionQuery = sectionId ? `&sectionId=${sectionId}` : '';
-  const fullQuery = `${baseQuery}${sectionQuery}`;
-  
-  // Navigate to the appropriate form based on item type
-  const formRoutes = {
-    [ProgramItemType.SONG]: `/program-item-form/song?${fullQuery}`,
-    [ProgramItemType.PRAYER]: `/program-item-form/prayer?${fullQuery}`,
-    [ProgramItemType.SCRIPTURE]: `/program-item-form/scripture?${fullQuery}`,
-    [ProgramItemType.SERMON]: `/program-item-form/sermon?${fullQuery}`,
-    [ProgramItemType.TITLE]: `/program-item-form/title?${fullQuery}`,
-    [ProgramItemType.ANNOUNCEMENT]: `/program-item-form/announcement?${fullQuery}`,
-    [ProgramItemType.OFFERING]: `/program-item-form/offering?${fullQuery}`,
-    [ProgramItemType.BLESSING]: `/program-item-form/blessing?${fullQuery}`
-  };
-  
-  const targetRoute = formRoutes[itemType];
-  if (targetRoute) {
-    router.push(targetRoute);
-  } else {
-    // Fallback to generic form
-    router.push(`/program-item-form?${fullQuery}&type=${itemType}`);
+  try {
+    // Create a basic item
+    const newItem = await addItemToProgram(
+      program.value.id,
+      {
+        order,
+        type: itemType,
+        title: `Nouveau ${itemType}`,
+        duration: 5,
+        sectionId: sectionId || undefined
+      },
+      user.value.uid
+    );
+    
+    // Update local state
+    program.value.items.push(newItem);
+    
+    // Recalculate total duration
+    program.value.totalDuration = program.value.items.reduce((total, item) => total + (item.duration || 0), 0);
+    
+    console.log('New item created:', newItem);
+  } catch (error) {
+    console.error('Error creating item:', error);
+    // TODO: Show error message to user
   }
 };
 
@@ -830,8 +859,8 @@ const performItemInsertion = (draggedItem: ProgramItem, insertIndex: number, tar
   
   program.value.items = items;
   
-  // TODO: Save to backend
-  console.log('Items reordered', items.map(item => ({ id: item.id, order: item.order, title: item.title, section: item.sectionId })));
+  // Save to Firestore
+  saveProgramOrder();
 };
 
 const reorderSections = (draggedSection: ProgramSection, targetSection: ProgramSection) => {
@@ -852,8 +881,24 @@ const reorderSections = (draggedSection: ProgramSection, targetSection: ProgramS
   
   program.value.sections = sections;
   
-  // TODO: Save to backend
-  console.log('Sections reordered', sections.map(section => ({ id: section.id, order: section.order, title: section.title })));
+  // Save to Firestore
+  saveProgramOrder();
+};
+
+const saveProgramOrder = async () => {
+  if (!program.value || !user.value?.uid) return;
+  
+  try {
+    await updateProgramOrder(
+      program.value.id,
+      program.value.sections,
+      program.value.items,
+      user.value.uid
+    );
+  } catch (error) {
+    console.error('Error saving program order:', error);
+    // TODO: Show error message to user
+  }
 };
 
 // Insertion line display logic
@@ -899,6 +944,51 @@ const loadService = async () => {
 };
 
 const loadProgram = async () => {
+  try {
+    // Try to load existing program from Firestore
+    const existingProgram = await getProgramByServiceId(serviceId.value);
+    
+    if (existingProgram) {
+      program.value = existingProgram;
+    } else {
+      // Create default program if none exists
+      await createDefaultProgram();
+    }
+  } catch (error) {
+    console.error('Error loading program:', error);
+    // Fallback to creating default program
+    await createDefaultProgram();
+  }
+};
+
+const createDefaultProgram = async () => {
+  if (!user.value?.uid) {
+    console.error('No authenticated user');
+    return;
+  }
+
+  const defaultSections: ProgramSection[] = [
+    { id: `section_${Date.now()}_1`, title: 'Ouverture', order: 1, color: '#4CAF50' },
+    { id: `section_${Date.now()}_2`, title: 'Louange et Adoration', order: 2, color: '#2196F3' },
+    { id: `section_${Date.now()}_3`, title: 'Parole de Dieu', order: 3, color: '#FF9800' },
+    { id: `section_${Date.now()}_4`, title: 'Clôture', order: 4, color: '#9C27B0' }
+  ];
+
+  try {
+    const newProgram = await createProgram({
+      serviceId: serviceId.value,
+      items: [],
+      sections: defaultSections,
+      totalDuration: 0
+    }, user.value.uid);
+    
+    program.value = newProgram;
+  } catch (error) {
+    console.error('Error creating default program:', error);
+  }
+};
+
+const loadMockProgram = async () => {
   // Mock program data for now
   const mockParticipants: ProgramParticipant[] = [
     { id: '1', name: 'Jean Dupont', role: 'Pasteur', isCustom: false },
@@ -1052,16 +1142,7 @@ Mon Rédempteur est vivant`
     }
   ];
 
-  program.value = {
-    id: 'prog-' + serviceId.value,
-    serviceId: serviceId.value,
-    items: mockItems,
-    sections: mockSections,
-    conductor: mockParticipants[1], // Marie Martin, Responsable louange
-    totalDuration: mockItems.reduce((total, item) => total + (item.duration || 0), 0),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
+  // This function is no longer used but kept for reference
 };
 
 onMounted(async () => {
