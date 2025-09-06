@@ -72,11 +72,11 @@
           </ion-card>
         </div>
         
-        <!-- Add Item Button at Start -->
+        <!-- Add Section Button at Start -->
         <div v-if="isEditMode && program" class="add-item-container">
-          <ion-button @click="showAddItemModal('start')" fill="outline" size="default" class="add-item-button">
+          <ion-button @click="showAddSectionModal" fill="outline" size="default" class="add-item-button">
             <ion-icon :icon="addOutline" slot="start" />
-            Ajouter un élément au début
+            Ajouter une section
           </ion-button>
         </div>
 
@@ -279,11 +279,11 @@
           </div>
         </div>
 
-        <!-- Add Item Button at End -->
-        <div v-if="isEditMode && program && program.items.length > 0" class="add-item-container">
-          <ion-button @click="showAddItemModal('end')" fill="outline" size="default" class="add-item-button">
+        <!-- Add Section Button at End -->
+        <div v-if="isEditMode && program" class="add-item-container">
+          <ion-button @click="showAddSectionModal" fill="outline" size="default" class="add-item-button">
             <ion-icon :icon="addOutline" slot="start" />
-            Ajouter un élément à la fin
+            Ajouter une section
           </ion-button>
         </div>
         
@@ -354,6 +354,46 @@
           </div>
         </ion-content>
       </ion-modal>
+
+      <!-- Add Section Modal -->
+      <ion-modal :is-open="showAddSectionModalState" @ionModalDidDismiss="closeAddSectionModal">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>Ajouter une section</ion-title>
+            <ion-buttons slot="end">
+              <ion-button @click="closeAddSectionModal">
+                <ion-icon :icon="closeOutline" />
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="add-section-modal-content">
+          <div class="section-form">
+            <ion-item>
+              <ion-label position="stacked">Nom de la section</ion-label>
+              <ion-input 
+                v-model="newSectionName" 
+                placeholder="Ex: Louange, Prière, Prédication..."
+                @keyup.enter="createSection"
+              ></ion-input>
+            </ion-item>
+            
+            <div class="modal-actions">
+              <ion-button @click="closeAddSectionModal" fill="clear" color="medium">
+                Annuler
+              </ion-button>
+              <ion-button 
+                @click="createSection" 
+                :disabled="!newSectionName.trim()"
+                color="primary"
+              >
+                <ion-icon :icon="addOutline" slot="start" />
+                Créer la section
+              </ion-button>
+            </div>
+          </div>
+        </ion-content>
+      </ion-modal>
     </ion-content>
   </ion-page>
 </template>
@@ -394,6 +434,8 @@ const insertionSectionId = ref<string | null>(null);
 const showAddItemModalState = ref(false);
 const addItemPosition = ref<'start' | 'end' | 'section' | null>(null);
 const addItemSectionId = ref<string | null>(null);
+const showAddSectionModalState = ref(false);
+const newSectionName = ref('');
 
 const serviceId = computed(() => route.params.id as string);
 
@@ -492,6 +534,32 @@ const closeAddItemModal = () => {
   showAddItemModalState.value = false;
   addItemPosition.value = null;
   addItemSectionId.value = null;
+};
+
+const showAddSectionModal = () => {
+  showAddSectionModalState.value = true;
+  newSectionName.value = '';
+};
+
+const closeAddSectionModal = () => {
+  showAddSectionModalState.value = false;
+  newSectionName.value = '';
+};
+
+const createSection = () => {
+  if (!newSectionName.value.trim() || !program.value) return;
+  
+  const newSection: ProgramSection = {
+    id: `section_${Date.now()}`,
+    title: newSectionName.value.trim(),
+    order: program.value.sections.length + 1
+  };
+  
+  program.value.sections.push(newSection);
+  closeAddSectionModal();
+  
+  // TODO: Save to backend
+  console.log('New section created:', newSection);
 };
 
 const selectItemType = (itemType: ProgramItemType) => {
@@ -1543,6 +1611,26 @@ onMounted(async () => {
   color: var(--ion-color-medium);
   font-style: italic;
   margin: 0;
+}
+
+/* Add Section Modal */
+.add-section-modal-content {
+  padding: 20px;
+}
+
+.section-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 20px;
+  margin-top: 20px;
+  border-top: 1px solid var(--ion-color-light);
 }
 
 /* Mobile Responsive */
