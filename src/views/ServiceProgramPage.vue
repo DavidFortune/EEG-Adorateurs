@@ -378,6 +378,24 @@
               ></ion-input>
             </ion-item>
             
+            <ion-item>
+              <ion-label position="stacked">Insérer après</ion-label>
+              <ion-select 
+                v-model="insertAfterSectionId" 
+                placeholder="Choisir une section (optionnel)"
+                interface="popover"
+              >
+                <ion-select-option :value="null">Au début du programme</ion-select-option>
+                <ion-select-option 
+                  v-for="section in sortedSections" 
+                  :key="section.id" 
+                  :value="section.id"
+                >
+                  Après "{{ section.title }}"
+                </ion-select-option>
+              </ion-select>
+            </ion-item>
+            
             <div class="modal-actions">
               <ion-button @click="closeAddSectionModal" fill="clear" color="medium">
                 Annuler
@@ -403,7 +421,8 @@ import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonBackButton,
-  IonButton, IonIcon, IonCard, IonCardContent, IonLoading, IonModal
+  IonButton, IonIcon, IonCard, IonCardContent, IonLoading, IonModal, IonSelect, IonSelectOption,
+  IonItem, IonLabel, IonInput
 } from '@ionic/vue';
 import {
   calendarOutline, createOutline, listOutline, timeOutline, layersOutline,
@@ -436,6 +455,7 @@ const addItemPosition = ref<'start' | 'end' | 'section' | null>(null);
 const addItemSectionId = ref<string | null>(null);
 const showAddSectionModalState = ref(false);
 const newSectionName = ref('');
+const insertAfterSectionId = ref<string | null>(null);
 
 const serviceId = computed(() => route.params.id as string);
 
@@ -539,20 +559,37 @@ const closeAddItemModal = () => {
 const showAddSectionModal = () => {
   showAddSectionModalState.value = true;
   newSectionName.value = '';
+  insertAfterSectionId.value = null;
 };
 
 const closeAddSectionModal = () => {
   showAddSectionModalState.value = false;
   newSectionName.value = '';
+  insertAfterSectionId.value = null;
 };
 
 const createSection = () => {
   if (!newSectionName.value.trim() || !program.value) return;
   
+  // Find insert position
+  let insertOrder = program.value.sections.length + 1;
+  if (insertAfterSectionId.value) {
+    const afterSection = program.value.sections.find(s => s.id === insertAfterSectionId.value);
+    if (afterSection) {
+      insertOrder = afterSection.order + 1;
+      // Update order of sections that come after
+      program.value.sections.forEach(section => {
+        if (section.order >= insertOrder) {
+          section.order += 1;
+        }
+      });
+    }
+  }
+  
   const newSection: ProgramSection = {
     id: `section_${Date.now()}`,
     title: newSectionName.value.trim(),
-    order: program.value.sections.length + 1
+    order: insertOrder
   };
   
   program.value.sections.push(newSection);
