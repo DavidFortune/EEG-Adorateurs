@@ -180,6 +180,14 @@
                     class="insertion-indicator"
                   ></div>
                 </template>
+                
+                <!-- Add Item Button at End of Section (Edit Mode Only) -->
+                <div v-if="isEditMode" class="add-item-container">
+                  <ion-button @click="showAddItemModal('section', section.id)" fill="outline" size="small" class="add-item-button">
+                    <ion-icon :icon="addOutline" slot="start" />
+                    Ajouter un élément
+                  </ion-button>
+                </div>
               </div>
             </div>
           </div>
@@ -314,7 +322,7 @@
       <ion-modal :is-open="showAddItemModalState" @ionModalDidDismiss="closeAddItemModal">
         <ion-header>
           <ion-toolbar>
-            <ion-title>Sélectionner un type d'élément</ion-title>
+            <ion-title>{{ addItemModalTitle }}</ion-title>
             <ion-buttons slot="end">
               <ion-button @click="closeAddItemModal">
                 <ion-icon :icon="closeOutline" />
@@ -384,11 +392,20 @@ const draggedItemId = ref<string | null>(null);
 const insertionIndex = ref<number>(-1);
 const insertionSectionId = ref<string | null>(null);
 const showAddItemModalState = ref(false);
-const addItemPosition = ref<'start' | 'end' | null>(null);
+const addItemPosition = ref<'start' | 'end' | 'section' | null>(null);
+const addItemSectionId = ref<string | null>(null);
 
 const serviceId = computed(() => route.params.id as string);
 
 const programItemTypes = computed(() => Object.values(ProgramItemType));
+
+const addItemModalTitle = computed(() => {
+  if (addItemPosition.value === 'section' && addItemSectionId.value) {
+    const section = program.value?.sections.find(s => s.id === addItemSectionId.value);
+    return section ? `Ajouter un élément à "${section.title}"` : 'Sélectionner un type d\'élément';
+  }
+  return 'Sélectionner un type d\'élément';
+});
 
 const formatDateTime = (dateStr: string, timeStr: string) => {
   return timezoneUtils.formatDateTimeForDisplay(dateStr, timeStr);
@@ -465,34 +482,42 @@ const toggleEditMode = () => {
   isEditMode.value = !isEditMode.value;
 };
 
-const showAddItemModal = (position: 'start' | 'end') => {
+const showAddItemModal = (position: 'start' | 'end' | 'section', sectionId?: string) => {
   addItemPosition.value = position;
+  addItemSectionId.value = sectionId || null;
   showAddItemModalState.value = true;
 };
 
 const closeAddItemModal = () => {
   showAddItemModalState.value = false;
   addItemPosition.value = null;
+  addItemSectionId.value = null;
 };
 
 const selectItemType = (itemType: ProgramItemType) => {
   closeAddItemModal();
   
   const position = addItemPosition.value;
+  const sectionId = addItemSectionId.value;
   const serviceIdValue = serviceId.value;
   
-  console.log(`Creating new ${itemType} at ${position}`);
+  console.log(`Creating new ${itemType} at ${position}`, sectionId ? `in section ${sectionId}` : '');
+  
+  // Build query parameters
+  const baseQuery = `service=${serviceIdValue}&position=${position}`;
+  const sectionQuery = sectionId ? `&sectionId=${sectionId}` : '';
+  const fullQuery = `${baseQuery}${sectionQuery}`;
   
   // Navigate to the appropriate form based on item type
   const formRoutes = {
-    [ProgramItemType.SONG]: `/program-item-form/song?service=${serviceIdValue}&position=${position}`,
-    [ProgramItemType.PRAYER]: `/program-item-form/prayer?service=${serviceIdValue}&position=${position}`,
-    [ProgramItemType.SCRIPTURE]: `/program-item-form/scripture?service=${serviceIdValue}&position=${position}`,
-    [ProgramItemType.SERMON]: `/program-item-form/sermon?service=${serviceIdValue}&position=${position}`,
-    [ProgramItemType.TITLE]: `/program-item-form/title?service=${serviceIdValue}&position=${position}`,
-    [ProgramItemType.ANNOUNCEMENT]: `/program-item-form/announcement?service=${serviceIdValue}&position=${position}`,
-    [ProgramItemType.OFFERING]: `/program-item-form/offering?service=${serviceIdValue}&position=${position}`,
-    [ProgramItemType.BLESSING]: `/program-item-form/blessing?service=${serviceIdValue}&position=${position}`
+    [ProgramItemType.SONG]: `/program-item-form/song?${fullQuery}`,
+    [ProgramItemType.PRAYER]: `/program-item-form/prayer?${fullQuery}`,
+    [ProgramItemType.SCRIPTURE]: `/program-item-form/scripture?${fullQuery}`,
+    [ProgramItemType.SERMON]: `/program-item-form/sermon?${fullQuery}`,
+    [ProgramItemType.TITLE]: `/program-item-form/title?${fullQuery}`,
+    [ProgramItemType.ANNOUNCEMENT]: `/program-item-form/announcement?${fullQuery}`,
+    [ProgramItemType.OFFERING]: `/program-item-form/offering?${fullQuery}`,
+    [ProgramItemType.BLESSING]: `/program-item-form/blessing?${fullQuery}`
   };
   
   const targetRoute = formRoutes[itemType];
@@ -500,7 +525,7 @@ const selectItemType = (itemType: ProgramItemType) => {
     router.push(targetRoute);
   } else {
     // Fallback to generic form
-    router.push(`/program-item-form?service=${serviceIdValue}&type=${itemType}&position=${position}`);
+    router.push(`/program-item-form?${fullQuery}&type=${itemType}`);
   }
 };
 
