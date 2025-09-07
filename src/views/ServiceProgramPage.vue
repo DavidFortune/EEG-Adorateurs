@@ -30,9 +30,15 @@
       
       <div class="content-container">
         <!-- Program Summary -->
-        <div v-if="program && program.items.length > 0" class="program-summary">
+        <div v-if="program" class="program-summary">
           <ion-card>
             <ion-card-content>
+              <div class="program-header">
+                <h3>Résumé du programme</h3>
+                <ion-button @click="showEditModal" fill="clear" size="small" color="primary">
+                  <ion-icon :icon="createOutline" slot="icon-only" />
+                </ion-button>
+              </div>
               <div class="summary-stats">
                 <div class="stat-item">
                   <ion-icon :icon="listOutline" class="stat-icon" />
@@ -44,8 +50,8 @@
                 <div class="stat-item">
                   <ion-icon :icon="timeOutline" class="stat-icon" />
                   <div class="stat-details">
-                    <span class="stat-value">{{ formatDuration(program.totalDuration) }}</span>
-                    <span class="stat-label">Durée estimée</span>
+                    <span class="stat-value">{{ program.totalDuration || 0 }}</span>
+                    <span class="stat-label">Minutes</span>
                   </div>
                 </div>
                 <div class="stat-item">
@@ -81,7 +87,7 @@
         </div>
 
         <!-- Program Items -->
-        <div v-if="program && program.items.length > 0" class="program-content">
+        <div v-if="program && (program.items.length > 0 || program.sections.length > 0)" class="program-content">
           <!-- Render by sections if they exist -->
           <div v-if="program.sections.length > 0" class="sections-view">
             <div v-for="section in sortedSections" :key="section.id" class="program-section" :data-section-id="section.id">
@@ -92,7 +98,23 @@
                 <h3 class="section-title">{{ section.title }}</h3>
                 <div class="section-stats">
                   {{ getSectionItemsCount(section.id) }} éléments
-                  • {{ formatDuration(getSectionDuration(section.id)) }}
+                  • {{ getSectionDuration(section.id) }} min
+                </div>
+                
+                <!-- Section Actions (Edit Mode Only) -->
+                <div v-if="isEditMode" class="section-actions">
+                  <ion-button @click="showEditSectionModal(section)" fill="clear" size="small" color="primary">
+                    <ion-icon :icon="createOutline" slot="icon-only" />
+                  </ion-button>
+                  <ion-button 
+                    @click="deleteSection(section.id)" 
+                    fill="clear" 
+                    size="small" 
+                    color="danger"
+                    :disabled="!canDeleteSection(section.id)"
+                  >
+                    <ion-icon :icon="trashOutline" slot="icon-only" />
+                  </ion-button>
                 </div>
               </div>
               
@@ -170,6 +192,18 @@
                         <span v-if="item.participant.role" class="participant-role">({{ item.participant.role }})</span>
                       </div>
                     </div>
+                    
+                    <!-- Column 5: Edit/Delete Actions (Edit Mode Only) -->
+                    <div v-if="isEditMode" class="item-column item-actions-column">
+                      <div class="item-actions">
+                        <ion-button @click="showEditItemModal(item)" fill="clear" size="small" color="primary">
+                          <ion-icon :icon="createOutline" slot="icon-only" />
+                        </ion-button>
+                        <ion-button @click="deleteItem(item.id)" fill="clear" size="small" color="danger">
+                          <ion-icon :icon="trashOutline" slot="icon-only" />
+                        </ion-button>
+                      </div>
+                    </div>
                   </div>
                   
                   </div>
@@ -244,6 +278,18 @@
                     <span v-if="item.participant.role" class="participant-role">({{ item.participant.role }})</span>
                   </div>
                 </div>
+                
+                <!-- Column 5: Edit/Delete Actions (Edit Mode Only) -->
+                <div v-if="isEditMode" class="item-column item-actions-column">
+                  <div class="item-actions">
+                    <ion-button @click="showEditItemModal(item)" fill="clear" size="small" color="primary">
+                      <ion-icon :icon="createOutline" slot="icon-only" />
+                    </ion-button>
+                    <ion-button @click="deleteItem(item.id)" fill="clear" size="small" color="danger">
+                      <ion-icon :icon="trashOutline" slot="icon-only" />
+                    </ion-button>
+                  </div>
+                </div>
               </div>
               
               <div v-if="item.reference || item.notes" class="item-details">
@@ -288,7 +334,7 @@
         </div>
         
         <!-- Empty State -->
-        <div v-else class="empty-state">
+        <div v-else-if="!program" class="empty-state">
           <ion-icon :icon="documentTextOutline" size="large" color="medium"></ion-icon>
           <h3>Aucun programme</h3>
           <p>Aucun programme n'a encore été créé pour ce service.</p>
@@ -412,6 +458,306 @@
           </div>
         </ion-content>
       </ion-modal>
+
+      <!-- Edit Section Modal -->
+      <ion-modal :is-open="showEditSectionModalState" @ionModalDidDismiss="closeEditSectionModal">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>Modifier la section</ion-title>
+            <ion-buttons slot="end">
+              <ion-button @click="closeEditSectionModal">
+                <ion-icon :icon="closeOutline" />
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="edit-section-modal-content">
+          <div class="section-form">
+            <ion-item>
+              <ion-label position="stacked">Nom de la section</ion-label>
+              <ion-input 
+                v-model="editSectionForm.title" 
+                placeholder="Ex: Louange, Prière, Prédication..."
+                @keyup.enter="saveEditSection"
+              ></ion-input>
+            </ion-item>
+            
+            <div class="modal-actions">
+              <ion-button @click="closeEditSectionModal" fill="clear" color="medium">
+                Annuler
+              </ion-button>
+              <ion-button 
+                @click="saveEditSection" 
+                :disabled="!editSectionForm.title.trim()"
+                color="primary"
+              >
+                <ion-icon :icon="checkmarkOutline" slot="start" />
+                Enregistrer
+              </ion-button>
+            </div>
+          </div>
+        </ion-content>
+      </ion-modal>
+
+      <!-- Edit Program Modal -->
+      <ion-modal :is-open="showEditProgramModalState" @ionModalDidDismiss="closeEditProgramModal">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>Modifier le programme</ion-title>
+            <ion-buttons slot="end">
+              <ion-button @click="closeEditProgramModal">
+                <ion-icon :icon="closeOutline" />
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="edit-program-modal-content">
+          <div class="modal-form">
+            
+            <ion-item>
+              <ion-label position="stacked">Dirigeant du service</ion-label>
+              <ion-input 
+                v-model="editProgramForm.conductorName" 
+                placeholder="Nom du dirigeant/pasteur"
+              ></ion-input>
+            </ion-item>
+            
+            <ion-item>
+              <ion-label position="stacked">Rôle du dirigeant</ion-label>
+              <ion-input 
+                v-model="editProgramForm.conductorRole" 
+                placeholder="Ex: Pasteur, Dirigeant, etc."
+              ></ion-input>
+            </ion-item>
+            
+            <!-- Duration is calculated automatically from items, so we just display it -->
+            <ion-item>
+              <ion-label position="stacked">Durée totale (minutes)</ion-label>
+              <ion-input 
+                :value="program?.totalDuration || 0" 
+                readonly
+                placeholder="Calculée automatiquement"
+                type="number"
+              ></ion-input>
+            </ion-item>
+            
+            <div class="modal-actions">
+              <ion-button @click="closeEditProgramModal" fill="clear" color="medium">
+                Annuler
+              </ion-button>
+              <ion-button 
+                @click="saveEditProgram" 
+                color="primary"
+              >
+                <ion-icon :icon="checkmarkOutline" slot="start" />
+                Enregistrer
+              </ion-button>
+            </div>
+          </div>
+        </ion-content>
+      </ion-modal>
+      
+      <!-- Add Item Form Modal -->
+      <ion-modal :is-open="showAddItemFormModal" @ionModalDidDismiss="closeAddItemForm">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>Ajouter {{ addItemForm.type }}</ion-title>
+            <ion-buttons slot="end">
+              <ion-button @click="closeAddItemForm">
+                <ion-icon :icon="closeOutline" />
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="add-item-form-modal-content">
+          <div class="modal-form">
+            
+            <ion-item>
+              <ion-label position="stacked">Titre *</ion-label>
+              <ion-input 
+                v-model="addItemForm.title" 
+                placeholder="Titre de l'élément"
+                required
+              ></ion-input>
+            </ion-item>
+            
+            <ion-item>
+              <ion-label position="stacked">Sous-titre</ion-label>
+              <ion-input 
+                v-model="addItemForm.subtitle" 
+                placeholder="Sous-titre optionnel"
+              ></ion-input>
+            </ion-item>
+            
+            <ion-item>
+              <ion-label position="stacked">Participant</ion-label>
+              <ion-input 
+                v-model="addItemForm.participantName" 
+                placeholder="Nom du participant"
+              ></ion-input>
+            </ion-item>
+            
+            <ion-item>
+              <ion-label position="stacked">Rôle du participant</ion-label>
+              <ion-input 
+                v-model="addItemForm.participantRole" 
+                placeholder="Ex: Pasteur, Dirigeant, etc."
+              ></ion-input>
+            </ion-item>
+            
+            <ion-item>
+              <ion-label position="stacked">Durée (minutes) *</ion-label>
+              <ion-input 
+                v-model="addItemForm.duration" 
+                type="number"
+                placeholder="5"
+                required
+              ></ion-input>
+            </ion-item>
+            
+            <ion-item>
+              <ion-label position="stacked">Référence</ion-label>
+              <ion-input 
+                v-model="addItemForm.reference" 
+                placeholder="Ex: Jean 3:16, Chant #123"
+              ></ion-input>
+            </ion-item>
+            
+            <ion-item>
+              <ion-label position="stacked">Notes</ion-label>
+              <ion-textarea 
+                v-model="addItemForm.notes" 
+                placeholder="Notes ou instructions spéciales"
+                :rows="3"
+              ></ion-textarea>
+            </ion-item>
+            
+            <ion-item v-if="addItemForm.type === 'Chant'">
+              <ion-label position="stacked">Paroles</ion-label>
+              <ion-textarea 
+                v-model="addItemForm.lyrics" 
+                placeholder="Paroles du chant (optionnel)"
+                :rows="5"
+              ></ion-textarea>
+            </ion-item>
+            
+            <div class="modal-actions">
+              <ion-button @click="closeAddItemForm" fill="clear" color="medium">
+                Annuler
+              </ion-button>
+              <ion-button 
+                @click="saveNewItem" 
+                color="primary"
+                :disabled="!addItemForm.title || !Number(addItemForm.duration)"
+              >
+                <ion-icon :icon="checkmarkOutline" slot="start" />
+                Ajouter
+              </ion-button>
+            </div>
+          </div>
+        </ion-content>
+      </ion-modal>
+
+      <!-- Edit Item Form Modal -->
+      <ion-modal :is-open="showEditItemFormModal" @ionModalDidDismiss="closeEditItemForm">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>Modifier {{ editItemForm.type }}</ion-title>
+            <ion-buttons slot="end">
+              <ion-button @click="closeEditItemForm">
+                <ion-icon :icon="closeOutline" />
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="edit-item-form-modal-content">
+          <div class="modal-form">
+            
+            <ion-item>
+              <ion-label position="stacked">Titre *</ion-label>
+              <ion-input 
+                v-model="editItemForm.title" 
+                placeholder="Titre de l'élément"
+                required
+              ></ion-input>
+            </ion-item>
+            
+            <ion-item>
+              <ion-label position="stacked">Sous-titre</ion-label>
+              <ion-input 
+                v-model="editItemForm.subtitle" 
+                placeholder="Sous-titre optionnel"
+              ></ion-input>
+            </ion-item>
+            
+            <ion-item>
+              <ion-label position="stacked">Participant</ion-label>
+              <ion-input 
+                v-model="editItemForm.participantName" 
+                placeholder="Nom du participant"
+              ></ion-input>
+            </ion-item>
+            
+            <ion-item>
+              <ion-label position="stacked">Rôle du participant</ion-label>
+              <ion-input 
+                v-model="editItemForm.participantRole" 
+                placeholder="Ex: Pasteur, Dirigeant, etc."
+              ></ion-input>
+            </ion-item>
+            
+            <ion-item>
+              <ion-label position="stacked">Durée (minutes) *</ion-label>
+              <ion-input 
+                v-model="editItemForm.duration" 
+                type="number"
+                placeholder="5"
+                required
+              ></ion-input>
+            </ion-item>
+            
+            <ion-item>
+              <ion-label position="stacked">Référence</ion-label>
+              <ion-input 
+                v-model="editItemForm.reference" 
+                placeholder="Ex: Jean 3:16, Chant #123"
+              ></ion-input>
+            </ion-item>
+            
+            <ion-item>
+              <ion-label position="stacked">Notes</ion-label>
+              <ion-textarea 
+                v-model="editItemForm.notes" 
+                placeholder="Notes ou instructions spéciales"
+                :rows="3"
+              ></ion-textarea>
+            </ion-item>
+            
+            <ion-item v-if="editItemForm.type === 'Chant'">
+              <ion-label position="stacked">Paroles</ion-label>
+              <ion-textarea 
+                v-model="editItemForm.lyrics" 
+                placeholder="Paroles du chant (optionnel)"
+                :rows="5"
+              ></ion-textarea>
+            </ion-item>
+            
+            <div class="modal-actions">
+              <ion-button @click="closeEditItemForm" fill="clear" color="medium">
+                Annuler
+              </ion-button>
+              <ion-button 
+                @click="saveEditItem" 
+                color="primary"
+                :disabled="!editItemForm.title || !Number(editItemForm.duration)"
+              >
+                <ion-icon :icon="checkmarkOutline" slot="start" />
+                Enregistrer
+              </ion-button>
+            </div>
+          </div>
+        </ion-content>
+      </ion-modal>
     </ion-content>
   </ion-page>
 </template>
@@ -422,14 +768,14 @@ import { useRoute, useRouter } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonBackButton,
   IonButton, IonIcon, IonCard, IonCardContent, IonLoading, IonModal, IonSelect, IonSelectOption,
-  IonItem, IonLabel, IonInput
+  IonItem, IonLabel, IonInput, IonTextarea
 } from '@ionic/vue';
 import {
   calendarOutline, createOutline, listOutline, timeOutline, layersOutline,
   personOutline, bookOutline, documentTextOutline, musicalNotesOutline,
   closeOutline, musicalNoteOutline, libraryOutline, micOutline,
   megaphoneOutline, giftOutline, handLeftOutline, personCircleOutline,
-  checkmarkOutline, reorderThreeOutline, addOutline
+  checkmarkOutline, reorderThreeOutline, addOutline, trashOutline
 } from 'ionicons/icons';
 import { serviceService } from '@/services/serviceService';
 import { timezoneUtils } from '@/utils/timezone';
@@ -467,9 +813,44 @@ const insertionSectionId = ref<string | null>(null);
 const showAddItemModalState = ref(false);
 const addItemPosition = ref<'start' | 'end' | 'section' | null>(null);
 const addItemSectionId = ref<string | null>(null);
+const showAddItemFormModal = ref(false);
+const addItemForm = ref({
+  type: '' as ProgramItemType,
+  title: '',
+  subtitle: '',
+  participantName: '',
+  participantRole: '',
+  duration: 5,
+  reference: '',
+  notes: '',
+  lyrics: ''
+});
 const showAddSectionModalState = ref(false);
 const newSectionName = ref('');
 const insertAfterSectionId = ref<string | null>(null);
+const showEditSectionModalState = ref(false);
+const editSectionForm = ref({
+  id: '',
+  title: ''
+});
+const showEditProgramModalState = ref(false);
+const editProgramForm = ref({
+  conductorName: '',
+  conductorRole: ''
+});
+const showEditItemFormModal = ref(false);
+const editItemForm = ref({
+  id: '',
+  type: '' as ProgramItemType,
+  title: '',
+  subtitle: '',
+  participantName: '',
+  participantRole: '',
+  duration: 5,
+  reference: '',
+  notes: '',
+  lyrics: ''
+});
 
 const serviceId = computed(() => route.params.id as string);
 
@@ -539,6 +920,28 @@ const getSectionDuration = (sectionId: string) => {
     .reduce((total, item) => total + (item.duration || 0), 0);
 };
 
+const calculateTotalDuration = () => {
+  if (!program.value) return 0;
+  return program.value.items.reduce((total, item) => total + (item.duration || 0), 0);
+};
+
+const updateProgramDuration = async () => {
+  if (!program.value || !user.value?.uid) return;
+  
+  const newTotalDuration = calculateTotalDuration();
+  
+  // Only update if duration has changed
+  if (newTotalDuration !== program.value.totalDuration) {
+    try {
+      await updateProgram(program.value.id, { totalDuration: newTotalDuration }, user.value.uid);
+      program.value.totalDuration = newTotalDuration;
+      console.log('Program duration updated:', newTotalDuration);
+    } catch (error) {
+      console.error('Error updating program duration:', error);
+    }
+  }
+};
+
 const showLyrics = (item: ProgramItem) => {
   selectedItem.value = item;
   showLyricsModal.value = true;
@@ -550,8 +953,63 @@ const closeLyricsModal = () => {
 };
 
 const showEditModal = () => {
-  // TODO: Implement edit functionality
-  console.log('Edit program modal - to be implemented');
+  if (program.value) {
+    // Pre-populate form with current program data
+    editProgramForm.value.conductorName = program.value.conductor?.name || '';
+    editProgramForm.value.conductorRole = program.value.conductor?.role || '';
+    
+    showEditProgramModalState.value = true;
+  }
+};
+
+const closeEditProgramModal = () => {
+  showEditProgramModalState.value = false;
+  editProgramForm.value = {
+    conductorName: '',
+    conductorRole: ''
+  };
+};
+
+const saveEditProgram = async () => {
+  if (!program.value || !user.value?.uid) return;
+  
+  try {
+    // Create or update conductor
+    const conductor: ProgramParticipant | undefined = editProgramForm.value.conductorName.trim() ? {
+      id: `conductor_${Date.now()}`,
+      name: editProgramForm.value.conductorName.trim(),
+      role: editProgramForm.value.conductorRole.trim() || 'Dirigeant',
+      isCustom: true
+    } : undefined;
+    
+    // Update program with new metadata
+    const updates: any = {};
+    
+    // Only add conductor if it has changed
+    if (conductor) {
+      updates.conductor = conductor;
+    } else if (!editProgramForm.value.conductorName && program.value.conductor) {
+      updates.conductor = null;
+    }
+    
+    await updateProgram(program.value.id, updates, user.value.uid);
+    
+    // Update local state
+    if (conductor) {
+      program.value.conductor = conductor;
+    } else if (!editProgramForm.value.conductorName) {
+      program.value.conductor = undefined;
+    }
+    
+    // Recalculate total duration after saving program summary
+    await updateProgramDuration();
+    
+    closeEditProgramModal();
+    console.log('Program updated successfully');
+  } catch (error) {
+    console.error('Error updating program:', error);
+    // TODO: Show error message to user
+  }
 };
 
 const toggleEditMode = () => {
@@ -619,10 +1077,126 @@ const createSection = async () => {
   }
 };
 
-const selectItemType = async (itemType: ProgramItemType) => {
+// Edit Section functionality
+const showEditSectionModal = (section: ProgramSection) => {
+  editSectionForm.value = {
+    id: section.id,
+    title: section.title
+  };
+  
+  showEditSectionModalState.value = true;
+};
+
+const closeEditSectionModal = () => {
+  showEditSectionModalState.value = false;
+  editSectionForm.value = {
+    id: '',
+    title: ''
+  };
+};
+
+const saveEditSection = async () => {
+  if (!program.value || !user.value?.uid || !editSectionForm.value.title.trim() || !editSectionForm.value.id) return;
+  
+  try {
+    await updateSectionInProgram(
+      program.value.id,
+      editSectionForm.value.id,
+      {
+        title: editSectionForm.value.title.trim()
+      },
+      user.value.uid
+    );
+    
+    // Update local state
+    const sectionIndex = program.value.sections.findIndex(section => section.id === editSectionForm.value.id);
+    if (sectionIndex !== -1) {
+      program.value.sections[sectionIndex].title = editSectionForm.value.title.trim();
+    }
+    
+    console.log('Section updated:', editSectionForm.value.id);
+    closeEditSectionModal();
+  } catch (error) {
+    console.error('Error updating section:', error);
+    // TODO: Show error message to user
+  }
+};
+
+// Delete Section functionality (only when empty)
+const canDeleteSection = (sectionId: string) => {
+  if (!program.value) return false;
+  const sectionItems = program.value.items.filter(item => item.sectionId === sectionId);
+  return sectionItems.length === 0;
+};
+
+const deleteSection = async (sectionId: string) => {
+  if (!program.value || !user.value?.uid || !canDeleteSection(sectionId)) return;
+  
+  try {
+    await deleteSectionFromProgram(program.value.id, sectionId, user.value.uid);
+    
+    // Update local state
+    const sectionIndex = program.value.sections.findIndex(section => section.id === sectionId);
+    if (sectionIndex !== -1) {
+      program.value.sections.splice(sectionIndex, 1);
+    }
+    
+    console.log('Section deleted:', sectionId);
+  } catch (error) {
+    console.error('Error deleting section:', error);
+    // TODO: Show error message to user
+  }
+};
+
+const selectItemType = (itemType: ProgramItemType) => {
+  // Store the position and sectionId before closing the modal
+  const position = addItemPosition.value;
+  const sectionId = addItemSectionId.value;
+  
   closeAddItemModal();
   
-  if (!program.value || !user.value?.uid) return;
+  // Restore the position and sectionId after closing
+  addItemPosition.value = position;
+  addItemSectionId.value = sectionId;
+  
+  // Reset form
+  addItemForm.value = {
+    type: itemType,
+    title: '',
+    subtitle: '',
+    participantName: '',
+    participantRole: '',
+    duration: 5,
+    reference: '',
+    notes: '',
+    lyrics: ''
+  };
+  
+  // Show the form modal
+  showAddItemFormModal.value = true;
+};
+
+const closeAddItemForm = () => {
+  showAddItemFormModal.value = false;
+  // Reset form
+  addItemForm.value = {
+    type: '' as ProgramItemType,
+    title: '',
+    subtitle: '',
+    participantName: '',
+    participantRole: '',
+    duration: 5,
+    reference: '',
+    notes: '',
+    lyrics: ''
+  };
+  // Reset position values
+  addItemPosition.value = null;
+  addItemSectionId.value = null;
+};
+
+const saveNewItem = async () => {
+  if (!program.value || !user.value?.uid || !addItemForm.value.title || !Number(addItemForm.value.duration)) return;
   
   const position = addItemPosition.value;
   const sectionId = addItemSectionId.value;
@@ -637,28 +1211,173 @@ const selectItemType = async (itemType: ProgramItemType) => {
   }
   
   try {
-    // Create a basic item
+    // Create the item with form data
+    const itemData: any = {
+      order,
+      type: addItemForm.value.type,
+      title: addItemForm.value.title,
+      duration: Number(addItemForm.value.duration) || 0
+    };
+    
+    // Add sectionId only if it exists
+    if (sectionId) {
+      itemData.sectionId = sectionId;
+    }
+    
+    // Add optional fields if provided
+    if (addItemForm.value.subtitle) itemData.subtitle = addItemForm.value.subtitle;
+    if (addItemForm.value.reference) itemData.reference = addItemForm.value.reference;
+    if (addItemForm.value.notes) itemData.notes = addItemForm.value.notes;
+    if (addItemForm.value.type === 'Chant') {
+      if (addItemForm.value.lyrics && addItemForm.value.lyrics.trim()) {
+        itemData.lyrics = addItemForm.value.lyrics.trim();
+      } else {
+        itemData.lyrics = '';
+      }
+    }
+    
+    // Add participant if provided
+    if (addItemForm.value.participantName) {
+      itemData.participant = {
+        name: addItemForm.value.participantName,
+        role: addItemForm.value.participantRole || ''
+      };
+    }
+    
     const newItem = await addItemToProgram(
       program.value.id,
-      {
-        order,
-        type: itemType,
-        title: `Nouveau ${itemType}`,
-        duration: 5,
-        sectionId: sectionId || undefined
-      },
+      itemData,
       user.value.uid
     );
     
     // Update local state
     program.value.items.push(newItem);
     
-    // Recalculate total duration
-    program.value.totalDuration = program.value.items.reduce((total, item) => total + (item.duration || 0), 0);
-    
     console.log('New item created:', newItem);
+    
+    // Update total duration in Firestore
+    await updateProgramDuration();
+    
+    // Close the form
+    closeAddItemForm();
   } catch (error) {
     console.error('Error creating item:', error);
+    // TODO: Show error message to user
+  }
+};
+
+// Edit Item functionality
+const showEditItemModal = (item: ProgramItem) => {
+  // Pre-populate form with current item data
+  editItemForm.value = {
+    id: item.id,
+    type: item.type,
+    title: item.title,
+    subtitle: item.subtitle || '',
+    participantName: item.participant?.name || '',
+    participantRole: item.participant?.role || '',
+    duration: item.duration || 5,
+    reference: item.reference || '',
+    notes: item.notes || '',
+    lyrics: item.lyrics || ''
+  };
+  
+  showEditItemFormModal.value = true;
+};
+
+const closeEditItemForm = () => {
+  showEditItemFormModal.value = false;
+  editItemForm.value = {
+    id: '',
+    type: '' as ProgramItemType,
+    title: '',
+    subtitle: '',
+    participantName: '',
+    participantRole: '',
+    duration: 5,
+    reference: '',
+    notes: '',
+    lyrics: ''
+  };
+};
+
+const saveEditItem = async () => {
+  if (!program.value || !user.value?.uid || !editItemForm.value.title || !Number(editItemForm.value.duration) || !editItemForm.value.id) return;
+  
+  try {
+    // Create the updated item data
+    const itemData: any = {
+      type: editItemForm.value.type,
+      title: editItemForm.value.title,
+      duration: Number(editItemForm.value.duration) || 0
+    };
+    
+    // Add optional fields if provided
+    if (editItemForm.value.subtitle) itemData.subtitle = editItemForm.value.subtitle;
+    if (editItemForm.value.reference) itemData.reference = editItemForm.value.reference;
+    if (editItemForm.value.notes) itemData.notes = editItemForm.value.notes;
+    // Handle lyrics field for songs
+    if (editItemForm.value.type === 'Chant') {
+      if (editItemForm.value.lyrics && editItemForm.value.lyrics.trim()) {
+        itemData.lyrics = editItemForm.value.lyrics.trim();
+      } else {
+        itemData.lyrics = '';
+      }
+    }
+    
+    // Add participant if provided
+    if (editItemForm.value.participantName) {
+      itemData.participant = {
+        name: editItemForm.value.participantName,
+        role: editItemForm.value.participantRole || ''
+      };
+    }
+    
+    await updateItemInProgram(
+      program.value.id,
+      editItemForm.value.id,
+      itemData,
+      user.value.uid
+    );
+    
+    // Update local state
+    const itemIndex = program.value.items.findIndex(item => item.id === editItemForm.value.id);
+    if (itemIndex !== -1) {
+      program.value.items[itemIndex] = { ...program.value.items[itemIndex], ...itemData };
+    }
+    
+    console.log('Item updated:', editItemForm.value.id);
+    
+    // Update total duration in Firestore
+    await updateProgramDuration();
+    
+    // Close the form
+    closeEditItemForm();
+  } catch (error) {
+    console.error('Error updating item:', error);
+    // TODO: Show error message to user
+  }
+};
+
+// Delete Item functionality
+const deleteItem = async (itemId: string) => {
+  if (!program.value || !user.value?.uid) return;
+  
+  try {
+    await deleteItemFromProgram(program.value.id, itemId, user.value.uid);
+    
+    // Update local state
+    const itemIndex = program.value.items.findIndex(item => item.id === itemId);
+    if (itemIndex !== -1) {
+      program.value.items.splice(itemIndex, 1);
+    }
+    
+    console.log('Item deleted:', itemId);
+    
+    // Update total duration in Firestore
+    await updateProgramDuration();
+  } catch (error) {
+    console.error('Error deleting item:', error);
     // TODO: Show error message to user
   }
 };
@@ -895,6 +1614,9 @@ const saveProgramOrder = async () => {
       program.value.items,
       user.value.uid
     );
+    
+    // Update total duration after reordering
+    await updateProgramDuration();
   } catch (error) {
     console.error('Error saving program order:', error);
     // TODO: Show error message to user
@@ -944,13 +1666,34 @@ const loadService = async () => {
 };
 
 const loadProgram = async () => {
+  console.log('loadProgram called');
+  
+  // Wait for user to be loaded if not available yet
+  let attempts = 0;
+  while (!user.value && attempts < 10) {
+    console.log('Waiting for user to load...', attempts);
+    await new Promise(resolve => setTimeout(resolve, 100));
+    attempts++;
+  }
+  
+  if (!user.value) {
+    console.error('User not loaded after waiting');
+    return;
+  }
+  
   try {
+    console.log('Trying to load existing program for service:', serviceId.value);
     // Try to load existing program from Firestore
     const existingProgram = await getProgramByServiceId(serviceId.value);
     
     if (existingProgram) {
+      console.log('Existing program found:', existingProgram);
       program.value = existingProgram;
+      
+      // Recalculate and update duration if needed
+      await updateProgramDuration();
     } else {
+      console.log('No existing program found, creating default');
       // Create default program if none exists
       await createDefaultProgram();
     }
@@ -962,6 +1705,10 @@ const loadProgram = async () => {
 };
 
 const createDefaultProgram = async () => {
+  console.log('createDefaultProgram called');
+  console.log('User:', user.value);
+  console.log('Service ID:', serviceId.value);
+  
   if (!user.value?.uid) {
     console.error('No authenticated user');
     return;
@@ -974,7 +1721,16 @@ const createDefaultProgram = async () => {
     { id: `section_${Date.now()}_4`, title: 'Clôture', order: 4, color: '#9C27B0' }
   ];
 
+  console.log('Default sections:', defaultSections);
+
   try {
+    console.log('Calling createProgram with:', {
+      serviceId: serviceId.value,
+      items: [],
+      sections: defaultSections,
+      totalDuration: 0
+    });
+    
     const newProgram = await createProgram({
       serviceId: serviceId.value,
       items: [],
@@ -982,9 +1738,11 @@ const createDefaultProgram = async () => {
       totalDuration: 0
     }, user.value.uid);
     
+    console.log('Program created successfully:', newProgram);
     program.value = newProgram;
   } catch (error) {
     console.error('Error creating default program:', error);
+    console.error('Error details:', error);
   }
 };
 
@@ -1192,6 +1950,20 @@ onMounted(async () => {
   margin-bottom: 24px;
 }
 
+.program-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.program-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--ion-color-dark);
+}
+
 .summary-stats {
   display: flex;
   justify-content: space-around;
@@ -1327,9 +2099,9 @@ onMounted(async () => {
   min-width: 0; /* Prevent grid blowout */
 }
 
-/* Edit Mode: Show drag handle column */
+/* Edit Mode: Show drag handle column and actions column */
 .edit-mode .item-layout {
-  grid-template-columns: 40px 30px 1fr 140px;
+  grid-template-columns: 40px 30px 1fr 140px 100px;
   min-width: 0; /* Prevent grid blowout */
   align-items: start;
 }
@@ -1361,6 +2133,24 @@ onMounted(async () => {
   align-items: flex-end;
   text-align: right;
   font-size: 0.85rem;
+}
+
+.item-actions-column {
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.item-actions {
+  display: flex;
+  gap: 4px;
+  flex-direction: column;
+}
+
+.item-actions ion-button {
+  --padding-start: 8px;
+  --padding-end: 8px;
+  --min-height: 32px;
+  width: 40px;
 }
 
 .item-order {
@@ -1589,6 +2379,18 @@ onMounted(async () => {
 
 .section-title {
   flex: 1;
+}
+
+.section-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.section-actions ion-button {
+  --padding-start: 8px;
+  --padding-end: 8px;
+  --min-height: 32px;
+  width: 40px;
 }
 
 /* Edit Mode Content Styling */
@@ -1825,5 +2627,183 @@ onMounted(async () => {
   .item-type-label {
     font-size: 0.8rem;
   }
+}
+
+/* Edit Program Modal */
+.edit-program-modal-content {
+  --ion-background-color: var(--ion-color-light);
+}
+
+.edit-program-modal-content .modal-form {
+  padding: 16px;
+}
+
+.edit-program-modal-content .modal-form ion-item {
+  margin-bottom: 16px;
+  --background: white;
+  --border-radius: 8px;
+  --border-color: var(--ion-color-light-shade);
+  --min-height: 56px;
+}
+
+.edit-program-modal-content .modal-form ion-label {
+  font-weight: 600;
+  color: var(--ion-color-dark);
+  margin-bottom: 8px;
+}
+
+.edit-program-modal-content .modal-form ion-input {
+  --padding-start: 12px;
+  --color: var(--ion-color-dark);
+}
+
+.edit-program-modal-content .modal-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 0;
+  margin-top: 20px;
+  border-top: 1px solid var(--ion-color-light-shade);
+}
+
+.edit-program-modal-content .modal-actions ion-button {
+  --border-radius: 8px;
+  font-weight: 600;
+}
+
+/* Add Item Form Modal */
+.add-item-form-modal-content {
+  --ion-background-color: var(--ion-color-light);
+}
+
+.add-item-form-modal-content .modal-form {
+  padding: 16px;
+}
+
+.add-item-form-modal-content .modal-form ion-item {
+  margin-bottom: 16px;
+  --background: white;
+  --border-radius: 8px;
+  --border-color: var(--ion-color-light-shade);
+  --min-height: 56px;
+}
+
+.add-item-form-modal-content .modal-form ion-label {
+  font-weight: 600;
+  color: var(--ion-color-dark);
+  margin-bottom: 8px;
+}
+
+.add-item-form-modal-content .modal-form ion-input,
+.add-item-form-modal-content .modal-form ion-textarea {
+  --padding-start: 12px;
+  --color: var(--ion-color-dark);
+}
+
+.add-item-form-modal-content .modal-form ion-textarea {
+  --padding-top: 12px;
+}
+
+.add-item-form-modal-content .modal-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 0;
+  margin-top: 20px;
+  border-top: 1px solid var(--ion-color-light-shade);
+}
+
+.add-item-form-modal-content .modal-actions ion-button {
+  --border-radius: 8px;
+  font-weight: 600;
+}
+
+/* Edit Item Form Modal */
+.edit-item-form-modal-content {
+  --ion-background-color: var(--ion-color-light);
+}
+
+.edit-item-form-modal-content .modal-form {
+  padding: 16px;
+}
+
+.edit-item-form-modal-content .modal-form ion-item {
+  margin-bottom: 16px;
+  --background: white;
+  --border-radius: 8px;
+  --border-color: var(--ion-color-light-shade);
+  --min-height: 56px;
+}
+
+.edit-item-form-modal-content .modal-form ion-label {
+  font-weight: 600;
+  color: var(--ion-color-dark);
+  margin-bottom: 8px;
+}
+
+.edit-item-form-modal-content .modal-form ion-input,
+.edit-item-form-modal-content .modal-form ion-textarea {
+  --padding-start: 12px;
+  --color: var(--ion-color-dark);
+}
+
+.edit-item-form-modal-content .modal-form ion-textarea {
+  --padding-top: 12px;
+}
+
+.edit-item-form-modal-content .modal-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 0;
+  margin-top: 20px;
+  border-top: 1px solid var(--ion-color-light-shade);
+}
+
+.edit-item-form-modal-content .modal-actions ion-button {
+  --border-radius: 8px;
+  font-weight: 600;
+}
+
+/* Edit Section Modal */
+.edit-section-modal-content {
+  --ion-background-color: var(--ion-color-light);
+}
+
+.edit-section-modal-content .section-form {
+  padding: 20px;
+}
+
+.edit-section-modal-content .section-form ion-item {
+  margin-bottom: 20px;
+  --background: white;
+  --border-radius: 8px;
+  --border-color: var(--ion-color-light-shade);
+  --min-height: 56px;
+}
+
+.edit-section-modal-content .section-form ion-label {
+  font-weight: 600;
+  color: var(--ion-color-dark);
+  margin-bottom: 8px;
+}
+
+.edit-section-modal-content .section-form ion-input {
+  --padding-start: 12px;
+  --color: var(--ion-color-dark);
+}
+
+.edit-section-modal-content .modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 20px;
+  margin-top: 20px;
+  border-top: 1px solid var(--ion-color-light-shade);
+}
+
+.edit-section-modal-content .modal-actions ion-button {
+  --border-radius: 8px;
+  font-weight: 600;
 }
 </style>

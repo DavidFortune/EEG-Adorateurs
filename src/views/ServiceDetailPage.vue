@@ -78,15 +78,14 @@
               </ion-item>
               
               <ion-item button @click="goToProgram">
-                <ion-icon :icon="documentTextOutline" slot="start" />
+                <ion-icon :icon="documentTextOutline" slot="start" :color="canCreateProgram ? 'warning' : undefined" />
                 <ion-label>
                   <h3>Programme du service</h3>
-                  <p v-if="loadingProgram">Chargement...</p>
-                  <p v-else>
-                    {{ programItemCount }} élément{{ programItemCount !== 1 ? 's' : '' }} au programme
+                  <p :class="{ 'create-program-text': canCreateProgram }">
+                    {{ programDescription }}
                   </p>
                 </ion-label>
-                <ion-icon :icon="chevronForwardOutline" slot="end" />
+                <ion-icon :icon="canCreateProgram ? createOutline : chevronForwardOutline" slot="end" :color="canCreateProgram ? 'warning' : undefined" />
               </ion-item>
               
               <ion-item>
@@ -148,23 +147,27 @@ import { Service, ServiceCategory } from '@/types/service';
 import { serviceService } from '@/services/serviceService';
 import { assignmentsService } from '@/firebase/assignments';
 import { timezoneUtils } from '@/utils/timezone';
+import { getProgramByServiceId } from '@/firebase/programs';
+import { useUser } from '@/composables/useUser';
+import type { ServiceProgram } from '@/types/program';
 
 const route = useRoute();
 const router = useRouter();
+const { isAdmin } = useUser();
 const service = ref<Service | null>(null);
 const loading = ref(true);
 const memberCount = ref(0);
 const loadingMembers = ref(false);
-const programItemCount = ref(0);
+const program = ref<ServiceProgram | null>(null);
 const loadingProgram = ref(false);
 
 const loadService = async () => {
   const id = route.params.id as string;
   try {
     service.value = await serviceService.getServiceById(id);
-    // Load member count and program count in parallel
+    // Load member count and program in parallel
     loadMemberCount();
-    loadProgramCount();
+    loadProgram();
   } catch (error) {
     console.error('Error loading service:', error);
   } finally {
@@ -186,15 +189,14 @@ const loadMemberCount = async () => {
   }
 };
 
-const loadProgramCount = async () => {
+const loadProgram = async () => {
+  const id = route.params.id as string;
   loadingProgram.value = true;
   try {
-    // Mock program count for now - in real implementation, this would fetch from a program service
-    // For demo purposes, we'll simulate a program with 11 items
-    programItemCount.value = 11;
+    program.value = await getProgramByServiceId(id);
   } catch (error) {
-    console.error('Error loading program count:', error);
-    programItemCount.value = 0;
+    console.error('Error loading program:', error);
+    program.value = null;
   } finally {
     loadingProgram.value = false;
   }
@@ -235,6 +237,22 @@ const formatDeadline = (dateStr: string) => {
   });
 };
 
+const programItemCount = computed(() => {
+  return program.value?.items.length || 0;
+});
+
+const programDescription = computed(() => {
+  if (loadingProgram.value) return 'Chargement...';
+  if (!program.value) {
+    return isAdmin.value ? 'Aucun programme - Cliquez pour en créer un' : 'Aucun programme disponible';
+  }
+  return `${programItemCount.value} élément${programItemCount.value !== 1 ? 's' : ''} au programme`;
+});
+
+const canCreateProgram = computed(() => {
+  return isAdmin.value && !program.value;
+});
+
 const goToEdit = () => {
   router.push(`/service-form/${service.value?.id}`);
 };
@@ -244,7 +262,12 @@ const goToMembers = () => {
 };
 
 const goToProgram = () => {
-  router.push(`/service-program/${service.value?.id}`);
+  if (canCreateProgram.value) {
+    // Navigate to program page which will handle program creation
+    router.push(`/service-program/${service.value?.id}`);
+  } else {
+    router.push(`/service-program/${service.value?.id}`);
+  }
 };
 
 const goBack = () => {
@@ -285,5 +308,11 @@ onMounted(() => {
 .deadline-passed {
   color: var(--ion-color-danger);
   font-weight: 600;
+}
+
+.create-program-text {
+  color: var(--ion-color-warning);
+  font-weight: 500;
+  font-style: italic;
 }
 </style>
