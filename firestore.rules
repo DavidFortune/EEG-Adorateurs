@@ -65,6 +65,38 @@ service cloud.firestore {
       allow delete: if request.auth != null;
     }
     
+    // Resources collection - everyone can read, only authenticated users can manage
+    match /resources/{resourceId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if request.auth != null;
+    }
+    
+    // Resource Collections collection - everyone can read, only authenticated users can manage
+    match /resource_collections/{collectionId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null &&
+        request.resource.data.keys().hasAll(['name', 'symbol', 'color', 'createdAt', 'updatedAt']) &&
+        request.resource.data.name is string &&
+        request.resource.data.name.size() > 0 &&
+        request.resource.data.symbol is string &&
+        request.resource.data.symbol.size() >= 2 &&
+        request.resource.data.symbol.size() <= 3 &&
+        request.resource.data.symbol.matches('[A-Z]+') &&
+        request.resource.data.color is string &&
+        request.resource.data.color.matches('^#[0-9a-fA-F]{6}$');
+      allow update: if request.auth != null &&
+        request.resource.data.keys().hasAll(['name', 'symbol', 'color', 'updatedAt']) &&
+        request.resource.data.name is string &&
+        request.resource.data.name.size() > 0 &&
+        request.resource.data.symbol is string &&
+        request.resource.data.symbol.size() >= 2 &&
+        request.resource.data.symbol.size() <= 3 &&
+        request.resource.data.symbol.matches('[A-Z]+') &&
+        request.resource.data.color is string &&
+        request.resource.data.color.matches('^#[0-9a-fA-F]{6}$');
+      allow delete: if request.auth != null;
+    }
+    
     // Default deny all other access
     match /{document=**} {
       allow read, write: if false;

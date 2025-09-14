@@ -58,6 +58,10 @@ const routes: Array<RouteRecordRaw> = [
         component: () => import('@/views/ServicesPage.vue')
       },
       {
+        path: 'resources',
+        component: () => import('@/views/ResourcesPage.vue')
+      },
+      {
         path: 'disponibilites',
         component: () => import('@/views/DisponibilitesPage.vue')
       },
@@ -85,6 +89,21 @@ const routes: Array<RouteRecordRaw> = [
   {
     path: '/service-form/:id?',
     component: () => import('@/views/ServiceFormPage.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/resource-detail/:id',
+    component: () => import('@/views/ResourceDetailPage.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/resource-form/:id?',
+    component: () => import('@/views/ResourceFormPage.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/collections',
+    component: () => import('@/views/ResourceCollectionsPage.vue'),
     meta: { requiresAuth: true }
   },
   {
