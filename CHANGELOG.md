@@ -2,6 +2,62 @@
 
 All notable changes to EEG Adorateurs will be documented in this file.
 
+## [1.4.0] - 2025-09-14
+
+### Added
+- **Service Program Management**: Complete program creation and management system for services
+  - Create, edit, and delete program items (songs, prayers, reading, annonces, etc.)
+  - Create, edit, and delete program sections with customizable positioning
+  - Support for lyrics storage and display for songs
+  - Drag-and-drop reordering of program items within sections
+  - Edit mode toggle for admins with comprehensive CRUD operations
+  - Visual program flow display with time-based section organization
+
+- **Service Members Management**: Dedicated interface for managing service assignments
+  - View all assigned members for a service
+  - Add/remove member assignments through intuitive interface  
+  - Visual team grouping with member counts
+  - Role-based access control (admin-only modifications)
+
+- **Enhanced Service Details**: Dynamic service information display
+  - Real-time program status with item counts
+  - Member assignment count display
+  - Visual indicators for program availability
+  - Direct navigation to program and member management
+
+### Enhanced
+- **Permissions System**: Refined access control across services
+  - All users can view services and programs
+  - Admin-only access for creating and modifying services
+  - Admin-only access for program and member management
+  - Scheduling restricted to administrators
+
+- **UI/UX Improvements**:
+  - Improved service filters ("À venir" and "Passés")
+  - Default to upcoming services view
+  - Removed unnecessary padding from filter segments
+  - Mobile-responsive layouts for all new features
+  - Consistent styling with existing design system
+
+### Fixed
+- Fixed edit mode toggle visibility issue in ServiceProgramPage
+- Corrected isAdmin destructuring from useUser composable
+- Resolved lyrics storage and display issues for songs
+- Fixed empty section deletion restrictions
+
+### Technical
+- **Firestore Integration**:
+  - New programs collection for service programs
+  - Complete CRUD operations for programs, sections, and items
+  - Optimized data structure for efficient queries
+  - Updated security rules for program access
+
+- **Component Architecture**:
+  - New ServiceProgramPage component with comprehensive editing
+  - New ServiceMembersPage for assignment management
+  - Modular edit modals for items and sections
+  - TypeScript interfaces for program data structures
+
 ## [1.3.1] - 2025-09-05
 
 ### Fixed
