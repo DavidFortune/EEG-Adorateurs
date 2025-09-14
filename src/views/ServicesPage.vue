@@ -7,7 +7,7 @@
           <ion-button v-if="isAdmin" @click="goToScheduling" fill="clear" color="dark">
             <ion-icon :icon="calendarOutline" />
           </ion-button>
-          <ion-button @click="goToCreateService" fill="clear" color="dark">
+          <ion-button v-if="isAdmin" @click="goToCreateService" fill="clear" color="dark">
             <ion-icon :icon="addOutline" />
           </ion-button>
         </ion-buttons>
@@ -29,14 +29,11 @@
       <div class="ion-padding">
         <div class="filter-section">
           <ion-segment v-model="filterMode" @ionChange="onFilterChange">
-            <ion-segment-button value="all">
-              <ion-label>Tous</ion-label>
+            <ion-segment-button value="upcoming">
+              <ion-label>À venir</ion-label>
             </ion-segment-button>
-            <ion-segment-button value="published">
-              <ion-label>Publiés</ion-label>
-            </ion-segment-button>
-            <ion-segment-button value="draft">
-              <ion-label>Brouillons</ion-label>
+            <ion-segment-button value="past">
+              <ion-label>Passés</ion-label>
             </ion-segment-button>
           </ion-segment>
         </div>
@@ -45,7 +42,7 @@
           <ion-icon :icon="calendarOutline" size="large" color="medium" />
           <h2>Aucun service</h2>
           <p>{{ getEmptyStateMessage() }}</p>
-          <ion-button @click="goToCreateService" fill="outline">
+          <ion-button v-if="isAdmin" @click="goToCreateService" fill="outline">
             <ion-icon :icon="addOutline" slot="start" />
             Créer un service
           </ion-button>
@@ -117,14 +114,22 @@ const router = useRouter();
 const { isAdmin } = useUser();
 const services = ref<Service[]>([]);
 const loading = ref(false);
-const filterMode = ref('all');
+const filterMode = ref('upcoming');
 
 const filteredServices = computed(() => {
+  const now = new Date();
+  
   switch (filterMode.value) {
-    case 'published':
-      return services.value.filter(service => service.isPublished);
-    case 'draft':
-      return services.value.filter(service => !service.isPublished);
+    case 'upcoming':
+      return services.value.filter(service => {
+        const serviceDate = new Date(`${service.date}T${service.time}`);
+        return serviceDate >= now;
+      });
+    case 'past':
+      return services.value.filter(service => {
+        const serviceDate = new Date(`${service.date}T${service.time}`);
+        return serviceDate < now;
+      });
     default:
       return services.value;
   }
@@ -171,12 +176,12 @@ const getCategoryLabel = (category: ServiceCategory) => {
 
 const getEmptyStateMessage = () => {
   switch (filterMode.value) {
-    case 'published':
-      return 'Aucun service publié pour le moment.';
-    case 'draft':
-      return 'Aucun brouillon disponible.';
+    case 'upcoming':
+      return 'Aucun service à venir pour le moment.';
+    case 'past':
+      return 'Aucun service passé.';
     default:
-      return 'Commencez par créer votre premier service.';
+      return 'Aucun service disponible.';
   }
 };
 
@@ -236,9 +241,6 @@ onMounted(() => {
 }
 
 .filter-section {
-  background: var(--ion-color-light);
-  border-radius: 8px;
-  padding: 12px;
   margin-bottom: 1.5rem;
 }
 

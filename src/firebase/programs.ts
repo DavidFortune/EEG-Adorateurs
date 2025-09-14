@@ -60,15 +60,22 @@ export const createProgram = async (
   program: Omit<ServiceProgram, 'id' | 'createdAt' | 'updatedAt'>, 
   userId: string
 ): Promise<ServiceProgram> => {
+  console.log('Firebase createProgram called with:', { program, userId });
+  
   try {
     const programRef = doc(collection(db, PROGRAMS_COLLECTION));
     const now = serverTimestamp();
     
+    console.log('Program ref created:', programRef.id);
+    console.log('Program sections:', program.sections);
+    
     // Generate IDs for sections that don't have them
-    const sectionsWithIds = program.sections.map(section => ({
+    const sectionsWithIds = (program.sections || []).map(section => ({
       ...section,
       id: section.id || `section_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
     }));
+    
+    console.log('Sections with IDs:', sectionsWithIds);
     
     const programData: any = {
       ...program,
@@ -79,11 +86,21 @@ export const createProgram = async (
       updatedBy: userId
     };
     
+    console.log('Program data to save:', programData);
+    
     await setDoc(programRef, programData);
+    console.log('Document saved successfully');
     
     // Get the created document to return with proper timestamps
     const createdDoc = await getDoc(programRef);
+    console.log('Document retrieved, exists:', createdDoc.exists());
+    
+    if (!createdDoc.exists()) {
+      throw new Error('Program document was not created');
+    }
+    
     const createdData = createdDoc.data() as FirestoreProgram;
+    console.log('Created data:', createdData);
     
     return {
       ...createdData,

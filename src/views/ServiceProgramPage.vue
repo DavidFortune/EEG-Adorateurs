@@ -7,7 +7,7 @@
         </ion-buttons>
         <ion-title>{{ isEditMode ? 'Édition du programme' : 'Programme du service' }}</ion-title>
         <ion-buttons slot="end">
-          <ion-button @click="toggleEditMode" fill="clear" :color="isEditMode ? 'primary' : undefined">
+          <ion-button v-if="isAdmin" @click="toggleEditMode" fill="clear" :color="isEditMode ? 'primary' : undefined">
             <ion-icon :icon="isEditMode ? checkmarkOutline : createOutline" />
           </ion-button>
         </ion-buttons>
@@ -35,7 +35,7 @@
             <ion-card-content>
               <div class="program-header">
                 <h3>Résumé du programme</h3>
-                <ion-button @click="showEditModal" fill="clear" size="small" color="primary">
+                <ion-button v-if="isAdmin" @click="showEditModal" fill="clear" size="small" color="primary">
                   <ion-icon :icon="createOutline" slot="icon-only" />
                 </ion-button>
               </div>
@@ -337,8 +337,8 @@
         <div v-else-if="!program" class="empty-state">
           <ion-icon :icon="documentTextOutline" size="large" color="medium"></ion-icon>
           <h3>Aucun programme</h3>
-          <p>Aucun programme n'a encore été créé pour ce service.</p>
-          <ion-button @click="showEditModal" fill="outline" size="small">
+          <p>{{ isAdmin ? "Aucun programme n'a encore été créé pour ce service." : "Le programme n'est pas encore disponible." }}</p>
+          <ion-button v-if="isAdmin" @click="showEditModal" fill="outline" size="small">
             <ion-icon :icon="createOutline" slot="start" />
             Créer un programme
           </ion-button>
@@ -798,7 +798,7 @@ import { ProgramItemType } from '@/types/program';
 
 const route = useRoute();
 const router = useRouter();
-const { user } = useUser();
+const { user, isAdmin } = useUser();
 
 const loading = ref(true);
 const service = ref<Service | null>(null);
@@ -1013,6 +1013,10 @@ const saveEditProgram = async () => {
 };
 
 const toggleEditMode = () => {
+  if (!isAdmin.value) {
+    console.warn('Only admins can edit programs');
+    return;
+  }
   isEditMode.value = !isEditMode.value;
 };
 

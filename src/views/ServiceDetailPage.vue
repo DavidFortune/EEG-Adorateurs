@@ -7,7 +7,7 @@
         </ion-buttons>
         <ion-title>Détail du Service</ion-title>
         <ion-buttons slot="end">
-          <ion-button @click="goToEdit" fill="clear">
+          <ion-button v-if="isAdmin" @click="goToEdit" fill="clear">
             <ion-icon :icon="pencil" />
           </ion-button>
         </ion-buttons>
@@ -107,12 +107,12 @@
           </ion-card-content>
         </ion-card>
         
-        <ion-button expand="block" color="primary" @click="goToEdit" class="ion-margin-top">
+        <ion-button v-if="isAdmin" expand="block" color="primary" @click="goToEdit" class="ion-margin-top">
           <ion-icon :icon="pencil" slot="start" />
           Modifier ce service
         </ion-button>
         
-        <ion-button expand="block" color="danger" fill="outline" @click="confirmDelete" class="ion-margin-top">
+        <ion-button v-if="isAdmin" expand="block" color="danger" fill="outline" @click="confirmDelete" class="ion-margin-top">
           <ion-icon :icon="trashOutline" slot="start" />
           Supprimer ce service
         </ion-button>
