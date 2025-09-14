@@ -146,8 +146,11 @@ export const getResourceCollectionById = async (collectionId: string): Promise<R
 
 export const createResourceCollection = async (collectionData: Omit<ResourceCollection, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
   try {
+    // Recursively filter out undefined fields to prevent Firebase errors
+    const cleanData = removeUndefinedFields(collectionData);
+    
     const docRef = await addDoc(collection(db, COLLECTIONS_COLLECTION), {
-      ...collectionData,
+      ...cleanData,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
@@ -160,9 +163,12 @@ export const createResourceCollection = async (collectionData: Omit<ResourceColl
 
 export const updateResourceCollection = async (collectionId: string, updates: Partial<ResourceCollection>): Promise<void> => {
   try {
+    // Recursively filter out undefined fields to prevent Firebase errors
+    const cleanUpdates = removeUndefinedFields(updates);
+    
     const docRef = doc(db, COLLECTIONS_COLLECTION, collectionId);
     await updateDoc(docRef, {
-      ...updates,
+      ...cleanUpdates,
       updatedAt: serverTimestamp()
     });
   } catch (error) {
@@ -274,21 +280,51 @@ export const getResourceById = async (resourceId: string): Promise<Resource | nu
   }
 };
 
+// Helper function to recursively remove undefined values from objects
+const removeUndefinedFields = (obj: any): any => {
+  if (Array.isArray(obj)) {
+    return obj.map(item => removeUndefinedFields(item));
+  } else if (obj !== null && typeof obj === 'object') {
+    const cleaned: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        cleaned[key] = removeUndefinedFields(value);
+      }
+    }
+    return cleaned;
+  }
+  return obj;
+};
+
 export const createResource = async (resourceData: Omit<Resource, 'id' | 'createdAt' | 'updatedAt' | 'viewCount'>): Promise<string> => {
   try {
+    console.log('[Firebase] Creating resource with data:', resourceData);
+    
     // Generate search text for better full-text search
     const searchText = `${resourceData.title} ${resourceData.description || ''} ${resourceData.tags?.join(' ') || ''}`.toLowerCase();
     
-    const docRef = await addDoc(collection(db, RESOURCES_COLLECTION), {
-      ...resourceData,
+    // Recursively filter out undefined fields to prevent Firebase errors
+    const cleanData = removeUndefinedFields(resourceData);
+    console.log('[Firebase] Cleaned data:', cleanData);
+    
+    const dataToSave = {
+      ...cleanData,
       searchText,
       viewCount: 0,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
-    });
+    };
+    console.log('[Firebase] Final data to save:', dataToSave);
+    
+    const docRef = await addDoc(collection(db, RESOURCES_COLLECTION), dataToSave);
+    console.log('[Firebase] Resource created successfully with ID:', docRef.id);
     return docRef.id;
   } catch (error) {
-    console.error('Error creating resource:', error);
+    console.error('[Firebase] Error creating resource:', error);
+    if (error instanceof Error) {
+      console.error('[Firebase] Error message:', error.message);
+      console.error('[Firebase] Error stack:', error.stack);
+    }
     throw error;
   }
 };
@@ -307,9 +343,12 @@ export const updateResource = async (resourceId: string, updates: Partial<Resour
       }
     }
     
+    // Recursively filter out undefined fields to prevent Firebase errors
+    const cleanUpdates = removeUndefinedFields(updates);
+    
     const docRef = doc(db, RESOURCES_COLLECTION, resourceId);
     await updateDoc(docRef, {
-      ...updates,
+      ...cleanUpdates,
       ...(searchText && { searchText }),
       updatedAt: serverTimestamp()
     });

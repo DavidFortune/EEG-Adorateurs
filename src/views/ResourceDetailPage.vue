@@ -80,8 +80,18 @@
             
             <!-- Video Display -->
             <div v-if="selectedContent.type === ResourceTypeEnum.VIDEO" class="video-content">
+              <!-- YouTube video embedded as iframe -->
+              <iframe
+                v-if="selectedContent.url && isYouTubeUrl(selectedContent.url)"
+                :src="getYouTubeEmbedUrl(selectedContent.url) || ''"
+                frameborder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen
+                class="video-player"
+              ></iframe>
+              <!-- Regular video file -->
               <video 
-                v-if="selectedContent.url" 
+                v-else-if="selectedContent.url" 
                 :src="selectedContent.url" 
                 controls 
                 class="video-player"
@@ -290,6 +300,15 @@ const getContentLabel = (type: ResourceType) => {
   }
 };
 
+const isYouTubeUrl = (url?: string): boolean => {
+  if (!url) return false;
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)/,
+    /^[a-zA-Z0-9_-]{11}$/ // Just a YouTube video ID
+  ];
+  return patterns.some(pattern => pattern.test(url));
+};
+
 const getYouTubeEmbedUrl = (url?: string) => {
   if (!url) return null;
   
@@ -303,6 +322,11 @@ const getYouTubeEmbedUrl = (url?: string) => {
     if (match && match[1]) {
       return `https://www.youtube.com/embed/${match[1]}`;
     }
+  }
+  
+  // Check if it's already just a video ID
+  if (/^[a-zA-Z0-9_-]{11}$/.test(url)) {
+    return `https://www.youtube.com/embed/${url}`;
   }
   
   return null;
@@ -420,6 +444,11 @@ onMounted(() => {
   width: 100%;
   max-width: 100%;
   border-radius: 8px;
+}
+
+.video-player[src*="youtube.com"] {
+  aspect-ratio: 16/9;
+  height: auto;
 }
 
 .youtube-player {

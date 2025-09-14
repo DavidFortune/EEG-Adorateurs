@@ -60,7 +60,7 @@
             </ion-buttons>
           </ion-toolbar>
         </ion-header>
-        <ion-content>
+        <ion-content class="ion-padding">
           <ion-list>
             <ion-item>
               <ion-label position="stacked">Nom *</ion-label>
@@ -77,7 +77,7 @@
               <ion-input 
                 v-model="form.symbol" 
                 placeholder="ABC"
-                maxlength="3"
+                :maxlength="3"
                 style="text-transform: uppercase"
                 required
               ></ion-input>
@@ -226,19 +226,31 @@ const saveCollection = async () => {
   
   try {
     if (editingCollection.value) {
-      await updateResourceCollection(editingCollection.value.id, {
+      const updateData: any = {
         name: form.value.name.trim(),
         symbol: form.value.symbol.trim(),
-        color: form.value.color,
-        description: form.value.description?.trim() || undefined
-      });
+        color: form.value.color
+      };
+      
+      // Only add description if it has a value
+      if (form.value.description?.trim()) {
+        updateData.description = form.value.description.trim();
+      }
+      
+      await updateResourceCollection(editingCollection.value.id, updateData);
     } else {
-      await createCollectionService({
+      const collectionData: any = {
         name: form.value.name.trim(),
         symbol: form.value.symbol.trim(),
-        color: form.value.color,
-        description: form.value.description?.trim() || undefined
-      });
+        color: form.value.color
+      };
+      
+      // Only add description if it has a value
+      if (form.value.description?.trim()) {
+        collectionData.description = form.value.description.trim();
+      }
+      
+      await createCollectionService(collectionData);
     }
     
     const toast = await toastController.create({

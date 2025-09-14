@@ -14,7 +14,7 @@
       </ion-toolbar>
     </ion-header>
     
-    <ion-content :fullscreen="true">
+    <ion-content :fullscreen="true" class="ion-padding">
       <ion-loading :is-open="loading" message="Chargement..."></ion-loading>
       
       <div class="form-container">
@@ -53,19 +53,17 @@
                 Créer une collection
               </ion-button>
             </ion-label>
-            <ion-select 
-              v-model="form.collectionIds" 
-              multiple
-              placeholder="Sélectionner les collections"
+            <ion-button 
+              @click="showCollectionSelector = true" 
+              fill="outline" 
+              expand="block"
+              class="collection-selector-btn"
             >
-              <ion-select-option 
-                v-for="collection in collections" 
-                :key="collection.id" 
-                :value="collection.id"
-              >
-                {{ collection.name }}
-              </ion-select-option>
-            </ion-select>
+              <ion-icon :icon="folderOutline" slot="start" />
+              <span v-if="form.collectionIds.length === 0">Sélectionner les collections</span>
+              <span v-else-if="form.collectionIds.length === 1">{{ getCollectionName(form.collectionIds[0]) }}</span>
+              <span v-else>{{ form.collectionIds.length }} collections sélectionnées</span>
+            </ion-button>
           </ion-item>
           
           <ion-item>
@@ -92,8 +90,81 @@
               <ion-item>
                 <ion-label>
                   <h3>{{ getContentLabel(content.type) }}</h3>
-                  <p v-if="content.url">{{ content.url }}</p>
-                  <p v-else-if="content.content">{{ content.content.substring(0, 50) }}...</p>
+                  
+                  <!-- Video Preview -->
+                  <div v-if="content.type === ResourceTypeEnum.VIDEO && content.url" class="media-preview">
+                    <!-- YouTube video -->
+                    <iframe 
+                      v-if="isYouTubeUrl(content.url)"
+                      :src="getYouTubeEmbedUrl(content.url) || ''"
+                      frameborder="0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowfullscreen
+                      class="preview-video"
+                    ></iframe>
+                    <!-- Regular video file -->
+                    <video 
+                      v-else
+                      :src="content.url" 
+                      controls 
+                      class="preview-video" 
+                      :poster="content.thumbnailUrl"
+                    ></video>
+                  </div>
+                  
+                  <!-- Audio Preview -->
+                  <div v-if="content.type === ResourceTypeEnum.AUDIO && content.url" class="media-preview">
+                    <audio :src="content.url" controls class="preview-audio"></audio>
+                  </div>
+                  
+                  <!-- File Preview -->
+                  <div v-if="content.type === ResourceTypeEnum.FILE && content.url" class="media-preview">
+                    <div class="file-preview">
+                      <ion-icon :icon="documentOutline" />
+                      <span class="file-name">{{ getFileName(content.url) }}</span>
+                      <ion-button size="small" fill="clear" @click="editContent(index)">
+                        <ion-icon :icon="pencilOutline" slot="icon-only" />
+                      </ion-button>
+                    </div>
+                  </div>
+                  
+                  <!-- Music Sheet Preview -->
+                  <div v-if="content.type === ResourceTypeEnum.MUSIC_SHEET && content.url" class="media-preview">
+                    <div class="file-preview">
+                      <ion-icon :icon="musicalNotesOutline" />
+                      <span class="file-name">{{ getFileName(content.url) }}</span>
+                      <ion-button size="small" fill="clear" @click="editContent(index)">
+                        <ion-icon :icon="pencilOutline" slot="icon-only" />
+                      </ion-button>
+                    </div>
+                  </div>
+                  
+                  <!-- Lyrics Preview -->
+                  <div v-if="content.type === ResourceTypeEnum.LYRICS && content.content" class="media-preview">
+                    <div class="lyrics-preview">
+                      <span class="lyrics-text">{{ getPreviewText(content.content) }}</span>
+                      <ion-button size="small" fill="clear" @click="editContent(index)">
+                        <ion-icon :icon="pencilOutline" slot="icon-only" />
+                      </ion-button>
+                    </div>
+                  </div>
+                  
+                  <!-- Fallback for content without preview -->
+                  <div v-if="!hasPreview(content)" class="media-preview">
+                    <div v-if="content.url" class="fallback-preview">
+                      <span class="fallback-url">{{ content.url }}</span>
+                      <ion-button size="small" fill="clear" @click="editContent(index)">
+                        <ion-icon :icon="pencilOutline" slot="icon-only" />
+                      </ion-button>
+                    </div>
+                    <div v-else-if="content.content" class="fallback-preview">
+                      <span class="fallback-content">{{ content.content.substring(0, 50) }}...</span>
+                      <ion-button size="small" fill="clear" @click="editContent(index)">
+                        <ion-icon :icon="pencilOutline" slot="icon-only" />
+                      </ion-button>
+                    </div>
+                  </div>
+                  
                   <p v-if="content.notes" class="content-notes">
                     <ion-icon :icon="documentTextOutline" /> {{ content.notes }}
                   </p>
@@ -128,26 +199,80 @@
             </ion-buttons>
           </ion-toolbar>
         </ion-header>
-        <ion-content>
+        <ion-content class="ion-padding">
           <ion-list>
             <ion-item>
               <ion-label position="stacked">Type de média</ion-label>
-              <ion-select v-model="contentForm.type" placeholder="Sélectionner le type">
-                <ion-select-option :value="ResourceTypeEnum.LYRICS">Paroles</ion-select-option>
-                <ion-select-option :value="ResourceTypeEnum.VIDEO">Vidéo</ion-select-option>
-                <ion-select-option :value="ResourceTypeEnum.AUDIO">Audio</ion-select-option>
-                <ion-select-option :value="ResourceTypeEnum.MUSIC_SHEET">Partition</ion-select-option>
-                <ion-select-option :value="ResourceTypeEnum.FILE">Fichier</ion-select-option>
-              </ion-select>
+              <div class="media-type-buttons">
+                <ion-button 
+                  @click="contentForm.type = ResourceTypeEnum.LYRICS"
+                  :fill="contentForm.type === ResourceTypeEnum.LYRICS ? 'solid' : 'outline'"
+                  :color="contentForm.type === ResourceTypeEnum.LYRICS ? 'primary' : 'medium'"
+                  class="media-type-button"
+                >
+                  <div class="button-content">
+                    <ion-icon :icon="documentTextOutline" />
+                    <span>Paroles</span>
+                  </div>
+                </ion-button>
+                
+                <ion-button 
+                  @click="contentForm.type = ResourceTypeEnum.VIDEO"
+                  :fill="contentForm.type === ResourceTypeEnum.VIDEO ? 'solid' : 'outline'"
+                  :color="contentForm.type === ResourceTypeEnum.VIDEO ? 'primary' : 'medium'"
+                  class="media-type-button"
+                >
+                  <div class="button-content">
+                    <ion-icon :icon="videocamOutline" />
+                    <span>Vidéo</span>
+                  </div>
+                </ion-button>
+                
+                <ion-button 
+                  @click="contentForm.type = ResourceTypeEnum.AUDIO"
+                  :fill="contentForm.type === ResourceTypeEnum.AUDIO ? 'solid' : 'outline'"
+                  :color="contentForm.type === ResourceTypeEnum.AUDIO ? 'primary' : 'medium'"
+                  class="media-type-button"
+                >
+                  <div class="button-content">
+                    <ion-icon :icon="volumeHighOutline" />
+                    <span>Audio</span>
+                  </div>
+                </ion-button>
+                
+                <ion-button 
+                  @click="contentForm.type = ResourceTypeEnum.MUSIC_SHEET"
+                  :fill="contentForm.type === ResourceTypeEnum.MUSIC_SHEET ? 'solid' : 'outline'"
+                  :color="contentForm.type === ResourceTypeEnum.MUSIC_SHEET ? 'primary' : 'medium'"
+                  class="media-type-button"
+                >
+                  <div class="button-content">
+                    <ion-icon :icon="musicalNotesOutline" />
+                    <span>Partition</span>
+                  </div>
+                </ion-button>
+                
+                <ion-button 
+                  @click="contentForm.type = ResourceTypeEnum.FILE"
+                  :fill="contentForm.type === ResourceTypeEnum.FILE ? 'solid' : 'outline'"
+                  :color="contentForm.type === ResourceTypeEnum.FILE ? 'primary' : 'medium'"
+                  class="media-type-button"
+                >
+                  <div class="button-content">
+                    <ion-icon :icon="documentOutline" />
+                    <span>Fichier</span>
+                  </div>
+                </ion-button>
+              </div>
             </ion-item>
             
             <!-- Audio File Upload -->
             <div v-if="contentForm.type === ResourceTypeEnum.AUDIO">
               <ion-item>
-                <ion-label position="stacked">Fichier Audio/Vidéo</ion-label>
+                <ion-label position="stacked">Fichier Audio</ion-label>
                 <input 
                   type="file" 
-                  accept="audio/*,video/*" 
+                  accept="audio/*" 
                   @change="onFileSelected" 
                   style="margin-top: 8px;"
                 />
@@ -168,6 +293,38 @@
                 <ion-input 
                   v-model="contentForm.url" 
                   placeholder="URL du fichier audio"
+                  :disabled="!!selectedFile"
+                ></ion-input>
+              </ion-item>
+            </div>
+            
+            <!-- Video File Upload -->
+            <div v-if="contentForm.type === ResourceTypeEnum.VIDEO">
+              <ion-item>
+                <ion-label position="stacked">Fichier Vidéo</ion-label>
+                <input 
+                  type="file" 
+                  accept="video/*" 
+                  @change="onFileSelected" 
+                  style="margin-top: 8px;"
+                />
+              </ion-item>
+              
+              <ion-item v-if="selectedFile">
+                <ion-label>
+                  <h3>{{ selectedFile.name }}</h3>
+                  <p>{{ formatFileSize(selectedFile.size) }}</p>
+                </ion-label>
+                <ion-button slot="end" fill="clear" color="danger" @click="clearFile">
+                  <ion-icon :icon="trashOutline" />
+                </ion-button>
+              </ion-item>
+              
+              <ion-item>
+                <ion-label position="stacked">ou URL Vidéo</ion-label>
+                <ion-input 
+                  v-model="contentForm.url" 
+                  placeholder="URL du fichier vidéo"
                   :disabled="!!selectedFile"
                 ></ion-input>
               </ion-item>
@@ -205,32 +362,47 @@
               </ion-item>
             </div>
             
-            <!-- URL Input for other media types -->
-            <ion-item v-if="contentForm.type && [ResourceTypeEnum.VIDEO, ResourceTypeEnum.MUSIC_SHEET].includes(contentForm.type)">
-              <ion-label position="stacked">URL</ion-label>
-              <ion-input 
-                v-model="contentForm.url" 
-                :placeholder="getUrlPlaceholder()"
-              ></ion-input>
-            </ion-item>
+            <!-- Music Sheet File Upload -->
+            <div v-if="contentForm.type === ResourceTypeEnum.MUSIC_SHEET">
+              <ion-item>
+                <ion-label position="stacked">Fichier Partition</ion-label>
+                <input 
+                  type="file" 
+                  accept="application/pdf,image/*" 
+                  @change="onFileSelected" 
+                  style="margin-top: 8px;"
+                />
+              </ion-item>
+              
+              <ion-item v-if="selectedFile">
+                <ion-label>
+                  <h3>{{ selectedFile.name }}</h3>
+                  <p>{{ formatFileSize(selectedFile.size) }}</p>
+                </ion-label>
+                <ion-button slot="end" fill="clear" color="danger" @click="clearFile">
+                  <ion-icon :icon="trashOutline" />
+                </ion-button>
+              </ion-item>
+              
+              <ion-item>
+                <ion-label position="stacked">ou URL Partition</ion-label>
+                <ion-input 
+                  v-model="contentForm.url" 
+                  placeholder="URL du fichier PDF ou image"
+                  :disabled="!!selectedFile"
+                ></ion-input>
+              </ion-item>
+            </div>
             
-            <!-- Text Content for lyrics and music sheets -->
-            <ion-item v-if="contentForm.type && [ResourceTypeEnum.LYRICS, ResourceTypeEnum.MUSIC_SHEET].includes(contentForm.type)">
+            
+            <!-- Text Content for lyrics -->
+            <ion-item v-if="contentForm.type === ResourceTypeEnum.LYRICS">
               <ion-label position="stacked">Contenu</ion-label>
               <ion-textarea 
                 v-model="contentForm.content" 
                 :placeholder="getContentPlaceholder()"
                 :rows="10"
               ></ion-textarea>
-            </ion-item>
-            
-            <!-- Thumbnail URL for videos -->
-            <ion-item v-if="contentForm.type === ResourceTypeEnum.VIDEO">
-              <ion-label position="stacked">URL de la vignette (optionnel)</ion-label>
-              <ion-input 
-                v-model="contentForm.thumbnailUrl" 
-                placeholder="URL de l'image de prévisualisation"
-              ></ion-input>
             </ion-item>
             
             <!-- Notes field for all content types -->
@@ -263,7 +435,7 @@
             </ion-buttons>
           </ion-toolbar>
         </ion-header>
-        <ion-content>
+        <ion-content class="ion-padding">
           <ion-list>
             <ion-item>
               <ion-label position="stacked">Nom de la collection *</ion-label>
@@ -280,7 +452,7 @@
               <ion-input 
                 v-model="collectionForm.symbol" 
                 placeholder="ABC"
-                maxlength="3"
+                :maxlength="3"
                 style="text-transform: uppercase"
                 required
               ></ion-input>
@@ -320,6 +492,45 @@
           </div>
         </ion-content>
       </ion-modal>
+      
+      <!-- Collection Selector Modal -->
+      <ion-modal :is-open="showCollectionSelector" @didDismiss="showCollectionSelector = false">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>Sélectionner les collections</ion-title>
+            <ion-buttons slot="end">
+              <ion-button @click="showCollectionSelector = false">Fermer</ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="ion-padding">
+          <ion-list>
+            <ion-item v-for="collection in collections" :key="collection.id">
+              <ion-checkbox
+                :checked="form.collectionIds.includes(collection.id)"
+                @ionChange="toggleCollection(collection.id)"
+              ></ion-checkbox>
+              <ion-label class="ion-margin-start">
+                <h3>{{ collection.name }}</h3>
+                <p v-if="collection.description">{{ collection.description }}</p>
+              </ion-label>
+              <div slot="end" class="collection-badge" :style="{ backgroundColor: collection.color }">
+                {{ collection.symbol }}
+              </div>
+            </ion-item>
+          </ion-list>
+          
+          <div v-if="collections.length === 0" class="empty-state ion-text-center">
+            <ion-icon :icon="folderOutline" size="large" color="medium" />
+            <h2>Aucune collection</h2>
+            <p>Créez votre première collection pour organiser vos ressources.</p>
+            <ion-button v-if="isAdmin" @click="showCreateCollectionModal = true; showCollectionSelector = false" fill="outline">
+              <ion-icon :icon="addOutline" slot="start" />
+              Créer une collection
+            </ion-button>
+          </div>
+        </ion-content>
+      </ion-modal>
     </ion-content>
   </ion-page>
 </template>
@@ -330,13 +541,13 @@ import { useRoute, useRouter } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonBackButton,
   IonButton, IonIcon, IonList, IonItem, IonLabel, IonInput, IonTextarea,
-  IonSelect, IonSelectOption, IonItemSliding, IonItemOptions, IonItemOption,
+  IonItemSliding, IonItemOptions, IonItemOption, IonCheckbox,
   IonModal, IonLoading, IonNote, IonSpinner, toastController
 } from '@ionic/vue';
 import {
   checkmarkOutline, addOutline, pencilOutline, trashOutline,
   documentTextOutline, videocamOutline, volumeHighOutline,
-  musicalNotesOutline, logoYoutube
+  musicalNotesOutline, logoYoutube, documentOutline, folderOutline
 } from 'ionicons/icons';
 import { Resource, ResourceMedia, ResourceType, ResourceCollection } from '@/types/resource';
 import { 
@@ -360,6 +571,7 @@ const loading = ref(false);
 const collections = ref<ResourceCollection[]>([]);
 const showContentModal = ref(false);
 const showCreateCollectionModal = ref(false);
+const showCollectionSelector = ref(false);
 const editingContentIndex = ref(-1);
 const uploading = ref(false);
 const selectedFile = ref<File | null>(null);
@@ -401,22 +613,13 @@ const isContentValid = computed(() => {
   const type = contentForm.value.type;
   if (!type) return false;
   
-  if (type === ResourceTypeEnum.AUDIO || type === ResourceTypeEnum.FILE) {
-    // For audio and files, either a file is selected or a URL is provided
+  if (type === ResourceTypeEnum.AUDIO || type === ResourceTypeEnum.VIDEO || type === ResourceTypeEnum.MUSIC_SHEET || type === ResourceTypeEnum.FILE) {
+    // For audio, video, music sheet and files, either a file is selected or a URL is provided
     return !!selectedFile.value || (!!contentForm.value.url && contentForm.value.url.trim().length > 0);
-  }
-  
-  if (type === ResourceTypeEnum.VIDEO) {
-    return !!contentForm.value.url && contentForm.value.url.trim().length > 0;
   }
   
   if (type === ResourceTypeEnum.LYRICS) {
     return !!contentForm.value.content && contentForm.value.content.trim().length > 0;
-  }
-  
-  if (type === ResourceTypeEnum.MUSIC_SHEET) {
-    return (!!contentForm.value.url && contentForm.value.url.trim().length > 0) ||
-           (!!contentForm.value.content && contentForm.value.content.trim().length > 0);
   }
   
   return false;
@@ -485,29 +688,43 @@ const saveContent = async () => {
   uploading.value = true;
   
   try {
-    let audioUrl = contentForm.value.url;
+    let mediaUrl = contentForm.value.url;
     
     console.log('Starting save content process');
     console.log('User authenticated:', !!user.value?.uid, user.value?.uid);
     console.log('Content type:', contentForm.value.type);
     console.log('Selected file:', selectedFile.value?.name, selectedFile.value?.type);
     
-    // Handle file upload for audio and file content
-    if ((contentForm.value.type === ResourceType.AUDIO || contentForm.value.type === ResourceType.FILE) && selectedFile.value) {
+    // Handle file upload for audio, video, music sheet and file content
+    if ((contentForm.value.type === ResourceType.AUDIO || contentForm.value.type === ResourceType.VIDEO || contentForm.value.type === ResourceType.MUSIC_SHEET || contentForm.value.type === ResourceType.FILE) && selectedFile.value) {
       console.log('Starting file upload...');
-      audioUrl = await uploadFileToStorage(selectedFile.value, contentForm.value.type);
-      console.log('File upload completed, URL:', audioUrl);
+      mediaUrl = await uploadFileToStorage(selectedFile.value, contentForm.value.type);
+      console.log('File upload completed, URL:', mediaUrl);
     }
     
     const newContent: ResourceMedia = {
-      type: contentForm.value.type!,
-      content: contentForm.value.content || undefined,
-      url: audioUrl || undefined,
-      thumbnailUrl: contentForm.value.thumbnailUrl || undefined,
-      fileSize: selectedFile.value?.size,
-      mimeType: selectedFile.value?.type,
-      notes: contentForm.value.notes || undefined
+      type: contentForm.value.type!
     };
+    
+    // Only add properties that have values to avoid undefined fields
+    if (contentForm.value.content && contentForm.value.content.trim()) {
+      newContent.content = contentForm.value.content.trim();
+    }
+    if (mediaUrl) {
+      newContent.url = mediaUrl;
+    }
+    if (contentForm.value.thumbnailUrl && contentForm.value.thumbnailUrl.trim()) {
+      newContent.thumbnailUrl = contentForm.value.thumbnailUrl.trim();
+    }
+    if (selectedFile.value?.size) {
+      newContent.fileSize = selectedFile.value.size;
+    }
+    if (selectedFile.value?.type) {
+      newContent.mimeType = selectedFile.value.type;
+    }
+    if (contentForm.value.notes && contentForm.value.notes.trim()) {
+      newContent.notes = contentForm.value.notes.trim();
+    }
     
     if (editingContentIndex.value >= 0) {
       form.value.contents[editingContentIndex.value] = newContent;
@@ -553,24 +770,41 @@ const saveResource = async () => {
   loading.value = true;
   
   try {
+    console.log('Starting saveResource...');
+    console.log('User:', user.value?.uid, user.value?.email);
+    console.log('Form data:', JSON.parse(JSON.stringify(form.value)));
+    
     // Process tags
     const tags = tagsInput.value
       .split(',')
       .map(tag => tag.trim())
       .filter(tag => tag.length > 0);
     
-    const resourceData = {
-      ...form.value,
+    // Build resource data, filtering out undefined values
+    const resourceData: any = {
+      title: form.value.title,
+      collectionIds: form.value.collectionIds,
+      contents: form.value.contents,
       tags,
       createdBy: user.value?.uid || '',
       updatedBy: user.value?.uid || ''
     };
     
+    // Only add description if it has a value
+    if (form.value.description && form.value.description.trim()) {
+      resourceData.description = form.value.description.trim();
+    }
+    
+    console.log('Resource data to save:', JSON.parse(JSON.stringify(resourceData)));
+    
     if (isEditMode.value) {
       const id = route.params.id as string;
+      console.log('Updating resource with ID:', id);
       await updateResource(id, resourceData);
     } else {
-      await createResource(resourceData as Omit<Resource, 'id' | 'createdAt' | 'updatedAt' | 'viewCount'>);
+      console.log('Creating new resource...');
+      const resourceId = await createResource(resourceData as Omit<Resource, 'id' | 'createdAt' | 'updatedAt' | 'viewCount'>);
+      console.log('Resource created with ID:', resourceId);
     }
     
     const toast = await toastController.create({
@@ -633,6 +867,38 @@ const formatFileSize = (bytes: number): string => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
+const isYouTubeUrl = (url: string): boolean => {
+  if (!url) return false;
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)/,
+    /^[a-zA-Z0-9_-]{11}$/ // Just a YouTube video ID
+  ];
+  return patterns.some(pattern => pattern.test(url));
+};
+
+const getYouTubeEmbedUrl = (url: string): string | null => {
+  if (!url) return null;
+  
+  // Extract video ID from various YouTube URL formats
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+  ];
+  
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match && match[1]) {
+      return `https://www.youtube.com/embed/${match[1]}`;
+    }
+  }
+  
+  // Check if it's already just a video ID
+  if (/^[a-zA-Z0-9_-]{11}$/.test(url)) {
+    return `https://www.youtube.com/embed/${url}`;
+  }
+  
+  return null;
+};
+
 const uploadFileToStorage = async (file: File, contentType?: ResourceType): Promise<string> => {
   // Check if user is authenticated
   if (!user.value?.uid) {
@@ -641,7 +907,16 @@ const uploadFileToStorage = async (file: File, contentType?: ResourceType): Prom
   
   const storage = getStorage();
   // Determine folder based on content type
-  const folder = contentType === ResourceType.FILE ? 'files' : 'audio';
+  let folder = 'files'; // default
+  if (contentType === ResourceType.AUDIO) {
+    folder = 'audio';
+  } else if (contentType === ResourceType.VIDEO) {
+    folder = 'media'; // videos go to media folder
+  } else if (contentType === ResourceType.MUSIC_SHEET) {
+    folder = 'files'; // music sheets go to files folder
+  } else if (contentType === ResourceType.FILE) {
+    folder = 'files';
+  }
   const filename = `${folder}/${Date.now()}_${file.name}`;
   const fileRef = storageRef(storage, filename);
   
@@ -750,17 +1025,6 @@ const getContentLabel = (type: ResourceType) => {
   }
 };
 
-const getUrlPlaceholder = () => {
-  switch (contentForm.value.type) {
-    case ResourceType.VIDEO:
-    case ResourceType.AUDIO:
-      return 'URL du fichier média';
-    case ResourceType.MUSIC_SHEET:
-      return 'URL du fichier PDF ou image';
-    default:
-      return 'https://...';
-  }
-};
 
 const getContentPlaceholder = () => {
   switch (contentForm.value.type) {
@@ -770,6 +1034,72 @@ const getContentPlaceholder = () => {
       return 'Entrez les accords ou la notation (optionnel si URL fournie)';
     default:
       return 'Entrez le contenu...';
+  }
+};
+
+const getFileName = (url: string): string => {
+  if (!url) return '';
+  
+  // Extract filename from URL, handling Firebase URLs and regular URLs
+  try {
+    const urlObj = new URL(url);
+    const pathName = urlObj.pathname;
+    const segments = pathName.split('/');
+    let filename = segments[segments.length - 1];
+    
+    // For Firebase URLs, remove query parameters and decode
+    if (filename.includes('?')) {
+      filename = filename.split('?')[0];
+    }
+    
+    // Decode URI component
+    filename = decodeURIComponent(filename);
+    
+    // Remove timestamp prefix if present (e.g., "1234567890_filename.pdf")
+    if (filename.includes('_')) {
+      const parts = filename.split('_');
+      if (parts.length > 1 && /^\d+$/.test(parts[0])) {
+        filename = parts.slice(1).join('_');
+      }
+    }
+    
+    return filename || 'Fichier';
+  } catch (error) {
+    // Fallback for invalid URLs
+    const lastSlash = url.lastIndexOf('/');
+    return lastSlash >= 0 ? url.substring(lastSlash + 1) : 'Fichier';
+  }
+};
+
+const getPreviewText = (content: string): string => {
+  if (!content) return '';
+  
+  // Get first few words (up to 50 characters)
+  const preview = content.trim().substring(0, 50);
+  return preview + (content.length > 50 ? '...' : '');
+};
+
+const hasPreview = (content: any): boolean => {
+  const hasVideoPreview = content.type === ResourceType.VIDEO && content.url;
+  const hasAudioPreview = content.type === ResourceType.AUDIO && content.url;
+  const hasFilePreview = content.type === ResourceType.FILE && content.url;
+  const hasMusicSheetPreview = content.type === ResourceType.MUSIC_SHEET && content.url;
+  const hasLyricsPreview = content.type === ResourceType.LYRICS && content.content;
+  
+  return hasVideoPreview || hasAudioPreview || hasFilePreview || hasMusicSheetPreview || hasLyricsPreview;
+};
+
+const getCollectionName = (collectionId: string): string => {
+  const collection = collections.value.find(c => c.id === collectionId);
+  return collection ? collection.name : 'Collection inconnue';
+};
+
+const toggleCollection = (collectionId: string) => {
+  const index = form.value.collectionIds.indexOf(collectionId);
+  if (index > -1) {
+    form.value.collectionIds.splice(index, 1);
+  } else {
+    form.value.collectionIds.push(collectionId);
   }
 };
 
@@ -899,5 +1229,238 @@ input[type="file"]:hover {
   font-size: 0.875rem;
   vertical-align: middle;
   margin-right: 0.25rem;
+}
+
+/* Media type buttons */
+.media-type-buttons {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.media-type-button {
+  --border-radius: 8px;
+  font-size: 0.75rem;
+  height: 60px;
+  min-width: 0;
+  flex: 1;
+}
+
+.button-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  pointer-events: none;
+}
+
+.button-content ion-icon {
+  font-size: 1.5rem;
+}
+
+.button-content span {
+  font-size: 0.7rem;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .media-type-buttons {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 3px;
+  }
+  
+  .media-type-button {
+    font-size: 0.6rem;
+    height: 50px;
+    min-width: 0;
+  }
+  
+  .button-content span {
+    font-size: 0.6rem;
+  }
+  
+  .button-content ion-icon {
+    font-size: 1.3rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .media-type-buttons {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 2px;
+  }
+  
+  .media-type-button {
+    height: 45px;
+    font-size: 0.55rem;
+    min-width: 0;
+  }
+  
+  .button-content {
+    gap: 2px;
+  }
+  
+  .button-content span {
+    font-size: 0.55rem;
+    line-height: 0.9;
+  }
+  
+  .button-content ion-icon {
+    font-size: 1.1rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .media-type-buttons {
+    gap: 1px;
+  }
+  
+  .media-type-button {
+    height: 42px;
+    font-size: 0.5rem;
+  }
+  
+  .button-content span {
+    font-size: 0.5rem;
+    line-height: 0.8;
+  }
+  
+  .button-content ion-icon {
+    font-size: 1rem;
+  }
+}
+
+/* Media preview styles */
+.media-preview {
+  margin: 8px 0;
+  max-width: 100%;
+}
+
+.preview-video {
+  width: 100%;
+  max-width: 300px;
+  height: auto;
+  border-radius: 8px;
+  background: var(--ion-color-light);
+}
+
+.preview-video[src*="youtube.com"] {
+  aspect-ratio: 16/9;
+  height: auto;
+}
+
+.preview-audio {
+  width: 100%;
+  max-width: 300px;
+  height: 40px;
+}
+
+.file-preview, .lyrics-preview, .fallback-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: var(--ion-color-light);
+  border-radius: 8px;
+}
+
+.file-name {
+  flex: 1;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--ion-color-dark);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lyrics-text {
+  flex: 1;
+  font-size: 0.9rem;
+  color: var(--ion-color-medium);
+  font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fallback-url, .fallback-content {
+  flex: 1;
+  font-size: 0.85rem;
+  color: var(--ion-color-medium);
+  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-preview ion-icon {
+  font-size: 1.2rem;
+  color: var(--ion-color-primary);
+  flex-shrink: 0;
+}
+
+.lyrics-preview ion-icon {
+  font-size: 1rem;
+  color: var(--ion-color-medium);
+}
+
+@media (max-width: 480px) {
+  .preview-video {
+    max-width: 250px;
+  }
+  
+  .preview-audio {
+    max-width: 250px;
+  }
+  
+  .file-name, .lyrics-text {
+    font-size: 0.8rem;
+  }
+}
+
+/* Collection selector styles */
+.collection-selector-btn {
+  margin-top: 8px;
+  --border-radius: 8px;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.collection-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: white;
+  font-weight: bold;
+  font-size: 0.75rem;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.empty-state {
+  padding: 2rem;
+  margin: 2rem 0;
+}
+
+.empty-state ion-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.empty-state h2 {
+  margin-bottom: 0.5rem;
+  color: var(--ion-color-medium);
+}
+
+.empty-state p {
+  color: var(--ion-color-medium);
+  margin-bottom: 1.5rem;
 }
 </style>

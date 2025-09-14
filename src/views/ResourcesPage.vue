@@ -156,7 +156,7 @@
             </ion-buttons>
           </ion-toolbar>
         </ion-header>
-        <ion-content>
+        <ion-content class="ion-padding">
           <ion-list>
             <ion-item v-for="collection in collections" :key="collection.id">
               <ion-checkbox
@@ -180,7 +180,7 @@
             </ion-buttons>
           </ion-toolbar>
         </ion-header>
-        <ion-content>
+        <ion-content class="ion-padding">
           <ion-list>
             <ion-item v-for="type in resourceTypes" :key="type.value">
               <ion-checkbox

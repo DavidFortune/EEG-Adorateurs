@@ -59,7 +59,8 @@ const routes: Array<RouteRecordRaw> = [
       },
       {
         path: 'resources',
-        component: () => import('@/views/ResourcesPage.vue')
+        component: () => import('@/views/ResourcesPage.vue'),
+        meta: { requiresAdmin: true }
       },
       {
         path: 'disponibilites',
@@ -94,17 +95,17 @@ const routes: Array<RouteRecordRaw> = [
   {
     path: '/resource-detail/:id',
     component: () => import('@/views/ResourceDetailPage.vue'),
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true, requiresAdmin: true }
   },
   {
     path: '/resource-form/:id?',
     component: () => import('@/views/ResourceFormPage.vue'),
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true, requiresAdmin: true }
   },
   {
     path: '/collections',
     component: () => import('@/views/ResourceCollectionsPage.vue'),
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true, requiresAdmin: true }
   },
   {
     path: '/my-account',
