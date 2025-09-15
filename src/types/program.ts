@@ -28,6 +28,7 @@ export interface ProgramItem {
   reference?: string; // Bible reference, song number, etc.
   lyrics?: string; // For songs
   sectionId?: string; // Optional grouping
+  resourceId?: string; // Link to a single resource (1:1 relationship)
 }
 
 export interface ProgramSection {

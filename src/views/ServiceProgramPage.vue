@@ -178,6 +178,28 @@
                           Voir les paroles
                         </ion-button>
                       </div>
+                      
+                      <div v-if="item.resourceId && getLinkedResource(item.resourceId)" class="item-resources">
+                        <div class="resource-media-links">
+                          <div class="resource-title" @click="showResourceDetails(item)">
+                            <ion-icon :icon="libraryOutline" />
+                            {{ getLinkedResource(item.resourceId)?.title }}
+                          </div>
+                          <div class="media-buttons">
+                            <ion-button 
+                              v-for="content in getLinkedResource(item.resourceId)?.contents" 
+                              :key="content.type"
+                              @click="content.url ? openUrl(content.url) : showResourceDetails(item)"
+                              fill="clear"
+                              size="small"
+                              class="media-button"
+                            >
+                              <ion-icon :icon="getMediaTypeIcon(content.type)" slot="icon-only" />
+                              <span class="media-label">{{ content.type === 'lyrics' ? 'Paroles' : content.type === 'video' ? 'Vidéo' : content.type === 'audio' ? 'Audio' : content.type === 'music_sheet' ? 'Partition' : content.type }}</span>
+                            </ion-button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                     
                     <!-- Column 4: Duration and Participant -->
@@ -314,6 +336,28 @@
                   Voir les paroles
                 </ion-button>
               </div>
+              
+              <div v-if="item.resourceId && getLinkedResource(item.resourceId)" class="item-resources">
+                <div class="resource-media-links">
+                  <div class="resource-title" @click="showResourceDetails(item)">
+                    <ion-icon :icon="libraryOutline" />
+                    {{ getLinkedResource(item.resourceId)?.title }}
+                  </div>
+                  <div class="media-buttons">
+                    <ion-button 
+                      v-for="content in getLinkedResource(item.resourceId)?.contents" 
+                      :key="content.type"
+                      @click="content.url ? openUrl(content.url) : showResourceDetails(item)"
+                      fill="clear"
+                      size="small"
+                      class="media-button"
+                    >
+                      <ion-icon :icon="getMediaTypeIcon(content.type)" slot="icon-only" />
+                      <span class="media-label">{{ content.type === 'lyrics' ? 'Paroles' : content.type === 'video' ? 'Vidéo' : content.type === 'audio' ? 'Audio' : content.type === 'music_sheet' ? 'Partition' : content.type }}</span>
+                    </ion-button>
+                  </div>
+                </div>
+              </div>
               </div>
               
               <!-- Insertion indicator after last item -->
@@ -360,6 +404,79 @@
         <ion-content class="lyrics-content">
           <div class="lyrics-text">
             <pre>{{ selectedItem?.lyrics }}</pre>
+          </div>
+        </ion-content>
+      </ion-modal>
+      
+      <!-- Resource Detail Modal -->
+      <ion-modal :is-open="showResourceModal" @ionModalDidDismiss="closeResourceModal">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>{{ selectedResource?.title }}</ion-title>
+            <ion-buttons slot="end">
+              <ion-button @click="closeResourceModal">
+                <ion-icon :icon="closeOutline" />
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="resource-detail-content">
+          <div class="resource-details" v-if="selectedResource">
+            <div class="resource-info">
+              <p v-if="selectedResource.description" class="resource-description">
+                {{ selectedResource.description }}
+              </p>
+              
+              <div class="resource-media-list">
+                <h4>Contenus disponibles</h4>
+                <div 
+                  v-for="(content, index) in selectedResource.contents" 
+                  :key="index"
+                  class="media-item"
+                >
+                  <div class="media-info">
+                    <ion-icon :icon="getMediaTypeIcon(content.type)" class="media-icon" />
+                    <div class="media-details">
+                      <span class="media-type">
+                        {{ content.type === 'lyrics' ? 'Paroles' : content.type === 'video' ? 'Vidéo' : content.type === 'audio' ? 'Audio' : content.type === 'music_sheet' ? 'Partition' : content.type }}
+                      </span>
+                      <span v-if="content.notes" class="media-notes">{{ content.notes }}</span>
+                    </div>
+                  </div>
+                  <div class="media-actions">
+                    <ion-button 
+                      v-if="content.url" 
+                      @click="openUrl(content.url)"
+                      fill="outline"
+                      size="small"
+                    >
+                      <ion-icon :icon="linkOutline" slot="start" />
+                      Ouvrir
+                    </ion-button>
+                    <ion-button 
+                      v-else-if="content.content && content.type === 'lyrics'"
+                      @click="showLyricsContent(content.content)"
+                      fill="outline"
+                      size="small"
+                    >
+                      <ion-icon :icon="musicalNotesOutline" slot="start" />
+                      Voir
+                    </ion-button>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="resource-actions">
+                <ion-button 
+                  @click="navigateToResource(selectedResource.id)"
+                  fill="solid"
+                  color="primary"
+                >
+                  <ion-icon :icon="libraryOutline" slot="start" />
+                  Voir la ressource complète
+                </ion-button>
+              </div>
+            </div>
           </div>
         </ion-content>
       </ion-modal>
@@ -641,6 +758,11 @@
               ></ion-textarea>
             </ion-item>
             
+            <!-- Resource Selector -->
+            <div class="resource-selector-container">
+              <ResourceSelector v-model="addItemForm.resourceId" />
+            </div>
+            
             <div class="modal-actions">
               <ion-button @click="closeAddItemForm" fill="clear" color="medium">
                 Annuler
@@ -742,6 +864,11 @@
               ></ion-textarea>
             </ion-item>
             
+            <!-- Resource Selector -->
+            <div class="resource-selector-container">
+              <ResourceSelector v-model="editItemForm.resourceId" />
+            </div>
+            
             <div class="modal-actions">
               <ion-button @click="closeEditItemForm" fill="clear" color="medium">
                 Annuler
@@ -775,8 +902,10 @@ import {
   personOutline, bookOutline, documentTextOutline, musicalNotesOutline,
   closeOutline, musicalNoteOutline, libraryOutline, micOutline,
   megaphoneOutline, giftOutline, handLeftOutline, personCircleOutline,
-  checkmarkOutline, reorderThreeOutline, addOutline, trashOutline
+  checkmarkOutline, reorderThreeOutline, addOutline, trashOutline,
+  playCircleOutline, volumeHighOutline, documentOutline, linkOutline
 } from 'ionicons/icons';
+import ResourceSelector from '@/components/ResourceSelector.vue';
 import { serviceService } from '@/services/serviceService';
 import { timezoneUtils } from '@/utils/timezone';
 import { useUser } from '@/composables/useUser';
@@ -795,6 +924,8 @@ import {
 import type { Service } from '@/types/service';
 import type { ServiceProgram, ProgramItem, ProgramSection, ProgramParticipant } from '@/types/program';
 import { ProgramItemType } from '@/types/program';
+import type { Resource } from '@/types/resource';
+import { getResourceById } from '@/firebase/resources';
 
 const route = useRoute();
 const router = useRouter();
@@ -803,8 +934,11 @@ const { user, isAdmin } = useUser();
 const loading = ref(true);
 const service = ref<Service | null>(null);
 const program = ref<ServiceProgram | null>(null);
+const linkedResources = ref<Map<string, Resource>>(new Map());
 const showLyricsModal = ref(false);
 const selectedItem = ref<ProgramItem | null>(null);
+const showResourceModal = ref(false);
+const selectedResource = ref<Resource | null>(null);
 const isEditMode = ref(false);
 const isDragging = ref(false);
 const draggedItemId = ref<string | null>(null);
@@ -823,7 +957,8 @@ const addItemForm = ref({
   duration: 5,
   reference: '',
   notes: '',
-  lyrics: ''
+  lyrics: '',
+  resourceId: null as string | null
 });
 const showAddSectionModalState = ref(false);
 const newSectionName = ref('');
@@ -849,7 +984,8 @@ const editItemForm = ref({
   duration: 5,
   reference: '',
   notes: '',
-  lyrics: ''
+  lyrics: '',
+  resourceId: null as string | null
 });
 
 const serviceId = computed(() => route.params.id as string);
@@ -947,9 +1083,60 @@ const showLyrics = (item: ProgramItem) => {
   showLyricsModal.value = true;
 };
 
+const getLinkedResource = (resourceId: string | undefined): Resource | null => {
+  if (!resourceId) return null;
+  return linkedResources.value.get(resourceId) || null;
+};
+
+const showResourceDetails = (item: ProgramItem) => {
+  if (!item.resourceId) return;
+  const resource = getLinkedResource(item.resourceId);
+  if (resource) {
+    selectedResource.value = resource;
+    showResourceModal.value = true;
+  }
+};
+
+const navigateToResource = (resourceId: string) => {
+  router.push(`/resources/${resourceId}`);
+};
+
+const openUrl = (url: string) => {
+  window.open(url, '_blank');
+};
+
+const getMediaTypeIcon = (type: string) => {
+  switch(type) {
+    case 'lyrics': return musicalNotesOutline;
+    case 'video': return playCircleOutline;
+    case 'youtube': return playCircleOutline;
+    case 'audio': return volumeHighOutline;
+    case 'music_sheet': return musicalNoteOutline;
+    default: return documentOutline;
+  }
+};
+
 const closeLyricsModal = () => {
   showLyricsModal.value = false;
   selectedItem.value = null;
+};
+
+const closeResourceModal = () => {
+  showResourceModal.value = false;
+  selectedResource.value = null;
+};
+
+const showLyricsContent = (lyricsContent: string) => {
+  // Create a temporary item to show lyrics in the existing lyrics modal
+  selectedItem.value = {
+    id: 'temp',
+    title: 'Paroles',
+    lyrics: lyricsContent,
+    order: 0,
+    type: ProgramItemType.SONG
+  } as ProgramItem;
+  closeResourceModal();
+  showLyricsModal.value = true;
 };
 
 const showEditModal = () => {
@@ -1173,7 +1360,8 @@ const selectItemType = (itemType: ProgramItemType) => {
     duration: 5,
     reference: '',
     notes: '',
-    lyrics: ''
+    lyrics: '',
+    resourceId: null
   };
   
   // Show the form modal
@@ -1192,7 +1380,8 @@ const closeAddItemForm = () => {
     duration: 5,
     reference: '',
     notes: '',
-    lyrics: ''
+    lyrics: '',
+    resourceId: null
   };
   // Reset position values
   addItemPosition.value = null;
@@ -1248,6 +1437,11 @@ const saveNewItem = async () => {
       };
     }
     
+    // Add resource link if provided
+    if (addItemForm.value.resourceId) {
+      itemData.resourceId = addItemForm.value.resourceId;
+    }
+    
     const newItem = await addItemToProgram(
       program.value.id,
       itemData,
@@ -1283,7 +1477,8 @@ const showEditItemModal = (item: ProgramItem) => {
     duration: item.duration || 5,
     reference: item.reference || '',
     notes: item.notes || '',
-    lyrics: item.lyrics || ''
+    lyrics: item.lyrics || '',
+    resourceId: item.resourceId || null
   };
   
   showEditItemFormModal.value = true;
@@ -1301,7 +1496,8 @@ const closeEditItemForm = () => {
     duration: 5,
     reference: '',
     notes: '',
-    lyrics: ''
+    lyrics: '',
+    resourceId: null
   };
 };
 
@@ -1335,6 +1531,11 @@ const saveEditItem = async () => {
         name: editItemForm.value.participantName,
         role: editItemForm.value.participantRole || ''
       };
+    }
+    
+    // Add resource link if provided
+    if (editItemForm.value.resourceId) {
+      itemData.resourceId = editItemForm.value.resourceId;
     }
     
     await updateItemInProgram(
@@ -1669,6 +1870,35 @@ const loadService = async () => {
   }
 };
 
+const loadLinkedResources = async () => {
+  if (!program.value) return;
+  
+  const newResourcesMap = new Map<string, Resource>();
+  
+  // Get all unique resource IDs from program items
+  const resourceIds = new Set<string>();
+  for (const item of program.value.items) {
+    if (item.resourceId) {
+      resourceIds.add(item.resourceId);
+    }
+  }
+  
+  // Fetch all resources in parallel
+  const promises = Array.from(resourceIds).map(async (resourceId) => {
+    try {
+      const resource = await getResourceById(resourceId);
+      if (resource) {
+        newResourcesMap.set(resourceId, resource);
+      }
+    } catch (error) {
+      console.error(`Error fetching resource ${resourceId}:`, error);
+    }
+  });
+  
+  await Promise.all(promises);
+  linkedResources.value = newResourcesMap;
+};
+
 const loadProgram = async () => {
   console.log('loadProgram called');
   
@@ -1693,6 +1923,9 @@ const loadProgram = async () => {
     if (existingProgram) {
       console.log('Existing program found:', existingProgram);
       program.value = existingProgram;
+      
+      // Load linked resources
+      await loadLinkedResources();
       
       // Recalculate and update duration if needed
       await updateProgramDuration();
@@ -1744,6 +1977,9 @@ const createDefaultProgram = async () => {
     
     console.log('Program created successfully:', newProgram);
     program.value = newProgram;
+    
+    // Load linked resources
+    await loadLinkedResources();
   } catch (error) {
     console.error('Error creating default program:', error);
     console.error('Error details:', error);
@@ -2809,5 +3045,150 @@ onMounted(async () => {
 .edit-section-modal-content .modal-actions ion-button {
   --border-radius: 8px;
   font-weight: 600;
+}
+
+/* Resource Selector */
+.resource-selector-container {
+  margin: 16px 0;
+  padding: 0 4px;
+}
+
+/* Resource Display in Items */
+.item-resources {
+  margin-top: 4px;
+}
+
+.resource-count {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ion-color-primary);
+  font-weight: 500;
+}
+
+.resource-count ion-icon {
+  font-size: 14px;
+}
+
+/* Resource Media Links */
+.resource-media-links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.resource-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ion-color-primary);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.resource-title:hover {
+  color: var(--ion-color-primary-shade);
+}
+
+.media-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.media-button {
+  --padding-start: 8px;
+  --padding-end: 8px;
+  --height: 28px;
+  font-size: 11px;
+  --color: var(--ion-color-primary);
+}
+
+.media-button ion-icon {
+  font-size: 14px;
+  margin-right: 4px;
+}
+
+.media-label {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* Resource Detail Modal */
+.resource-detail-content {
+  --background: var(--ion-color-light);
+}
+
+.resource-details {
+  padding: 16px;
+}
+
+.resource-description {
+  font-size: 14px;
+  color: var(--ion-color-dark);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.resource-media-list h4 {
+  margin: 20px 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ion-color-dark);
+}
+
+.media-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  background: white;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  border: 1px solid var(--ion-color-light-shade);
+}
+
+.media-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.media-icon {
+  font-size: 20px;
+  color: var(--ion-color-primary);
+}
+
+.media-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.media-type {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--ion-color-dark);
+}
+
+.media-notes {
+  font-size: 12px;
+  color: var(--ion-color-medium);
+}
+
+.media-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.resource-actions {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ion-color-light-shade);
 }
 </style>
