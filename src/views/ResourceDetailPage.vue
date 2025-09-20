@@ -156,16 +156,27 @@
                     </ion-card-content>
                   </ion-card>
                 </div>
-                <ion-button
-                  v-if="content.url"
-                  :href="content.url"
-                  target="_blank"
-                  expand="block"
-                  download=""
-                >
-                  <ion-icon :icon="downloadOutline" slot="start" />
-                  Télécharger la partition
-                </ion-button>
+                <div v-if="content.url" class="music-sheet-actions">
+                  <ion-button
+                    v-if="isPdfFile(content.url)"
+                    @click="openPdfViewer(content.url)"
+                    expand="block"
+                    color="primary"
+                  >
+                    <ion-icon :icon="viewOutline" slot="start" />
+                    Voir la partition
+                  </ion-button>
+                  <ion-button
+                    :href="content.url"
+                    target="_blank"
+                    expand="block"
+                    fill="outline"
+                    download=""
+                  >
+                    <ion-icon :icon="downloadOutline" slot="start" />
+                    Télécharger
+                  </ion-button>
+                </div>
                 <div v-if="content.content" class="chart-preview">
                   <pre>{{ content.content }}</pre>
                 </div>
@@ -228,6 +239,14 @@
         </ion-button>
       </div>
     </ion-content>
+
+    <!-- Enhanced PDF Viewer -->
+    <PdfViewer
+      :is-open="!!currentPdfUrl"
+      :pdf-url="currentPdfUrl"
+      :title="resource?.title || 'Partition PDF'"
+      @close="closePdfViewer"
+    />
   </ion-page>
 </template>
 
@@ -240,10 +259,11 @@ import {
   IonCard, IonCardHeader, IonCardSubtitle, IonCardContent,
   alertController
 } from '@ionic/vue';
+import PdfViewer from '@/components/PdfViewer.vue';
 import {
   pencilOutline, folderOutline, calendarOutline, eyeOutline, documentTextOutline,
   videocamOutline, volumeHighOutline, musicalNotesOutline, logoYoutube,
-  downloadOutline, trashOutline, alertCircleOutline
+  downloadOutline, trashOutline, alertCircleOutline, eyeOutline as viewOutline
 } from 'ionicons/icons';
 import { Resource, ResourceCollection, ResourceType } from '@/types/resource';
 import { getResourceById, deleteResource, getResourceCollections } from '@/firebase/resources';
@@ -257,6 +277,7 @@ const resource = ref<Resource | null>(null);
 const collections = ref<ResourceCollection[]>([]);
 const loading = ref(true);
 const selectedContentType = ref<ResourceType | undefined>(undefined);
+const currentPdfUrl = ref<string>('');
 
 // Make enum available in template
 const ResourceTypeEnum = ResourceType;
@@ -439,6 +460,18 @@ const formatFileSize = (bytes: number): string => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
+const isPdfFile = (url: string): boolean => {
+  return url.toLowerCase().includes('.pdf') || url.toLowerCase().includes('pdf');
+};
+
+const openPdfViewer = (url: string) => {
+  currentPdfUrl.value = url;
+};
+
+const closePdfViewer = () => {
+  currentPdfUrl.value = '';
+};
+
 const goBack = () => {
   router.push('/tabs/resources');
 };
@@ -582,6 +615,12 @@ computed(() => {
   border-bottom: none;
   margin-bottom: 0;
   padding-bottom: 0;
+}
+
+.music-sheet-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 @media (max-width: 768px) {
