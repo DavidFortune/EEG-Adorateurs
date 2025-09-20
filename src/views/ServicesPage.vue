@@ -296,8 +296,9 @@ onMounted(() => {
 
 .header-actions {
   display: flex;
-  gap: 4px;
-  align-items: flex-start;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
   flex-shrink: 0;
   margin-left: 12px;
 }

@@ -562,6 +562,7 @@ onMounted(() => {
   flex-direction: column;
   gap: 0.25rem;
   margin-left: 1rem;
+  align-items: flex-start;
 }
 
 .action-button {
