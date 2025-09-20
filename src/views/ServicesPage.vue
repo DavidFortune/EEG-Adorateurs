@@ -48,38 +48,62 @@
           </ion-button>
         </div>
 
-        <ion-card 
-          v-for="service in filteredServices" 
-          :key="service.id" 
-          button 
+        <ion-card
+          v-for="service in filteredServices"
+          :key="service.id"
+          button
           @click="goToServiceDetail(service.id)"
+          class="service-card"
         >
           <ion-card-header>
             <div class="card-header-content">
-              <div>
+              <div class="service-info">
                 <ion-card-title>{{ service.title }}</ion-card-title>
-                <ion-card-subtitle>
+                <ion-card-subtitle class="service-datetime">
                   {{ formatDateTime(service.date, service.time) }}
                 </ion-card-subtitle>
+                <!-- Status and Category moved below date -->
+                <div class="service-badges">
+                  <ion-chip :color="getCategoryColor(service.category)" size="small">
+                    {{ getCategoryLabel(service.category) }}
+                  </ion-chip>
+                  <ion-chip v-if="service.isPublished" color="success" size="small">
+                    <ion-icon :icon="checkmarkCircle" />
+                    <ion-label>Publié</ion-label>
+                  </ion-chip>
+                  <ion-chip v-else color="warning" size="small">
+                    <ion-icon :icon="timeOutline" />
+                    <ion-label>Brouillon</ion-label>
+                  </ion-chip>
+                </div>
               </div>
-              <div class="card-badges">
-                <ion-chip :color="getCategoryColor(service.category)" size="small">
-                  {{ getCategoryLabel(service.category) }}
-                </ion-chip>
-                <ion-chip v-if="service.isPublished" color="success" size="small">
-                  <ion-icon :icon="checkmarkCircle" />
-                  <ion-label>Publié</ion-label>
-                </ion-chip>
-                <ion-chip v-else color="warning" size="small">
-                  <ion-icon :icon="timeOutline" />
-                  <ion-label>Brouillon</ion-label>
-                </ion-chip>
+
+              <!-- Quick Action Buttons moved to the right -->
+              <div class="header-actions" v-if="hasTeamRequirements(service) || hasServiceProgram(service)">
+                <ion-button
+                  v-if="hasTeamRequirements(service)"
+                  @click.stop="goToServiceMembers(service.id)"
+                  fill="clear"
+                  size="small"
+                  class="header-action-button"
+                >
+                  <ion-icon :icon="peopleOutline" slot="icon-only" />
+                </ion-button>
+                <ion-button
+                  v-if="hasServiceProgram(service)"
+                  @click.stop="goToServiceProgram(service.id)"
+                  fill="clear"
+                  size="small"
+                  class="header-action-button"
+                >
+                  <ion-icon :icon="documentTextOutline" slot="icon-only" />
+                </ion-button>
               </div>
             </div>
           </ion-card-header>
-          
-          <ion-card-content>
-            <div v-if="service.availabilityDeadline" class="deadline-info">
+
+          <ion-card-content v-if="service.availabilityDeadline">
+            <div class="deadline-info">
               <ion-icon :icon="timerOutline" :color="isDeadlinePassed(service.availabilityDeadline) ? 'danger' : 'warning'"></ion-icon>
               <span :class="{ 'deadline-passed': isDeadlinePassed(service.availabilityDeadline) }">
                 Date limite: {{ formatDeadlineShort(service.availabilityDeadline) }}
@@ -103,7 +127,8 @@ import {
   IonLabel, IonChip
 } from '@ionic/vue';
 import {
-  addOutline, calendarOutline, checkmarkCircle, timeOutline, timerOutline
+  addOutline, calendarOutline, checkmarkCircle, timeOutline, timerOutline,
+  peopleOutline, documentTextOutline
 } from 'ionicons/icons';
 import { Service, ServiceCategory } from '@/types/service';
 import { serviceService } from '@/services/serviceService';
@@ -118,7 +143,7 @@ const filterMode = ref('upcoming');
 
 const filteredServices = computed(() => {
   const now = new Date();
-  
+
   switch (filterMode.value) {
     case 'upcoming':
       return services.value.filter(service => {
@@ -126,10 +151,17 @@ const filteredServices = computed(() => {
         return serviceDate >= now;
       });
     case 'past':
-      return services.value.filter(service => {
-        const serviceDate = new Date(`${service.date}T${service.time}`);
-        return serviceDate < now;
-      });
+      return services.value
+        .filter(service => {
+          const serviceDate = new Date(`${service.date}T${service.time}`);
+          return serviceDate < now;
+        })
+        .sort((a, b) => {
+          // Sort past services from most recent to oldest
+          const dateA = new Date(`${a.date}T${a.time}`);
+          const dateB = new Date(`${b.date}T${b.time}`);
+          return dateB.getTime() - dateA.getTime();
+        });
     default:
       return services.value;
   }
@@ -197,6 +229,23 @@ const goToScheduling = () => {
   router.push('/scheduling');
 };
 
+const goToServiceMembers = (serviceId: string) => {
+  router.push(`/service-members/${serviceId}`);
+};
+
+const goToServiceProgram = (serviceId: string) => {
+  router.push(`/service-program/${serviceId}`);
+};
+
+const hasTeamRequirements = (service: Service) => {
+  return service.isPublished && service.teamRequirements && service.teamRequirements.length > 0;
+};
+
+const hasServiceProgram = (service: Service) => {
+  // Only show program button if service is published
+  return service.isPublished;
+};
+
 const isDeadlinePassed = (deadlineStr: string) => {
   const deadline = new Date(deadlineStr);
   const now = new Date();
@@ -228,13 +277,41 @@ onMounted(() => {
   width: 100%;
 }
 
-.card-badges {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  align-items: flex-end;
+.service-info {
+  flex: 1;
 }
 
+.service-datetime {
+  margin-bottom: 8px !important;
+}
+
+.service-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 4px;
+  align-items: flex-start;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
+.header-action-button {
+  --border-radius: 50%;
+  --padding-start: 8px;
+  --padding-end: 8px;
+  --height: 36px;
+  --width: 36px;
+  min-width: 36px;
+}
+
+.header-action-button ion-icon {
+  font-size: 1.2rem;
+}
 
 .empty-state {
   margin-top: 2rem;
@@ -246,6 +323,10 @@ onMounted(() => {
 
 .create-service-fab {
   margin-bottom: 80px;
+}
+
+.service-card {
+  margin-bottom: 1rem;
 }
 
 .deadline-info {

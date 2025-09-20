@@ -128,6 +128,7 @@ export const membersService = {
         firstName,
         lastName,
         fullName: trimmedFullName,
+        phone: onboardingData.phone || '',
         ministries: allMinistries,
         availabilities: onboardingData.availabilities,
         isOnboardingCompleted: true,

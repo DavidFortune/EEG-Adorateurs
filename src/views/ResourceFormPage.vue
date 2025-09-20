@@ -117,17 +117,6 @@
                     <audio :src="content.url" controls class="preview-audio"></audio>
                   </div>
                   
-                  <!-- File Preview -->
-                  <div v-if="content.type === ResourceTypeEnum.FILE && content.url" class="media-preview">
-                    <div class="file-preview">
-                      <ion-icon :icon="documentOutline" />
-                      <span class="file-name">{{ getFileName(content.url) }}</span>
-                      <ion-button size="small" fill="clear" @click="editContent(index)">
-                        <ion-icon :icon="pencilOutline" slot="icon-only" />
-                      </ion-button>
-                    </div>
-                  </div>
-                  
                   <!-- Music Sheet Preview -->
                   <div v-if="content.type === ResourceTypeEnum.MUSIC_SHEET && content.url" class="media-preview">
                     <div class="file-preview">
@@ -252,17 +241,6 @@
                   </div>
                 </ion-button>
                 
-                <ion-button 
-                  @click="contentForm.type = ResourceTypeEnum.FILE"
-                  :fill="contentForm.type === ResourceTypeEnum.FILE ? 'solid' : 'outline'"
-                  :color="contentForm.type === ResourceTypeEnum.FILE ? 'primary' : 'medium'"
-                  class="media-type-button"
-                >
-                  <div class="button-content">
-                    <ion-icon :icon="documentOutline" />
-                    <span>Fichier</span>
-                  </div>
-                </ion-button>
               </div>
             </ion-item>
             
@@ -325,38 +303,6 @@
                 <ion-input 
                   v-model="contentForm.url" 
                   placeholder="URL du fichier vidéo"
-                  :disabled="!!selectedFile"
-                ></ion-input>
-              </ion-item>
-            </div>
-            
-            <!-- File Upload -->
-            <div v-if="contentForm.type === ResourceTypeEnum.FILE">
-              <ion-item>
-                <ion-label position="stacked">Fichier</ion-label>
-                <input 
-                  type="file" 
-                  accept="*/*" 
-                  @change="onFileSelected" 
-                  style="margin-top: 8px;"
-                />
-              </ion-item>
-              
-              <ion-item v-if="selectedFile">
-                <ion-label>
-                  <h3>{{ selectedFile.name }}</h3>
-                  <p>{{ formatFileSize(selectedFile.size) }}</p>
-                </ion-label>
-                <ion-button slot="end" fill="clear" color="danger" @click="clearFile">
-                  <ion-icon :icon="trashOutline" />
-                </ion-button>
-              </ion-item>
-              
-              <ion-item>
-                <ion-label position="stacked">ou URL du fichier</ion-label>
-                <ion-input 
-                  v-model="contentForm.url" 
-                  placeholder="URL du fichier"
                   :disabled="!!selectedFile"
                 ></ion-input>
               </ion-item>
@@ -547,7 +493,7 @@ import {
 import {
   checkmarkOutline, addOutline, pencilOutline, trashOutline,
   documentTextOutline, videocamOutline, volumeHighOutline,
-  musicalNotesOutline, logoYoutube, documentOutline, folderOutline
+  musicalNotesOutline, logoYoutube, folderOutline
 } from 'ionicons/icons';
 import { Resource, ResourceMedia, ResourceType, ResourceCollection } from '@/types/resource';
 import { 
@@ -613,8 +559,8 @@ const isContentValid = computed(() => {
   const type = contentForm.value.type;
   if (!type) return false;
   
-  if (type === ResourceTypeEnum.AUDIO || type === ResourceTypeEnum.VIDEO || type === ResourceTypeEnum.MUSIC_SHEET || type === ResourceTypeEnum.FILE) {
-    // For audio, video, music sheet and files, either a file is selected or a URL is provided
+  if (type === ResourceTypeEnum.AUDIO || type === ResourceTypeEnum.VIDEO || type === ResourceTypeEnum.MUSIC_SHEET) {
+    // For audio, video, and music sheet, either a file is selected or a URL is provided
     return !!selectedFile.value || (!!contentForm.value.url && contentForm.value.url.trim().length > 0);
   }
   
@@ -695,8 +641,8 @@ const saveContent = async () => {
     console.log('Content type:', contentForm.value.type);
     console.log('Selected file:', selectedFile.value?.name, selectedFile.value?.type);
     
-    // Handle file upload for audio, video, music sheet and file content
-    if ((contentForm.value.type === ResourceType.AUDIO || contentForm.value.type === ResourceType.VIDEO || contentForm.value.type === ResourceType.MUSIC_SHEET || contentForm.value.type === ResourceType.FILE) && selectedFile.value) {
+    // Handle file upload for audio, video, and music sheet content
+    if ((contentForm.value.type === ResourceType.AUDIO || contentForm.value.type === ResourceType.VIDEO || contentForm.value.type === ResourceType.MUSIC_SHEET) && selectedFile.value) {
       console.log('Starting file upload...');
       mediaUrl = await uploadFileToStorage(selectedFile.value, contentForm.value.type);
       console.log('File upload completed, URL:', mediaUrl);
@@ -806,14 +752,27 @@ const saveResource = async () => {
       const resourceId = await createResource(resourceData as Omit<Resource, 'id' | 'createdAt' | 'updatedAt' | 'viewCount'>);
       console.log('Resource created with ID:', resourceId);
     }
-    
+
     const toast = await toastController.create({
       message: isEditMode.value ? 'Ressource modifiée' : 'Ressource créée',
       duration: 2000,
       color: 'success'
     });
     await toast.present();
-    
+
+    // Clear form after creating a new resource
+    if (!isEditMode.value) {
+      form.value = {
+        title: '',
+        description: '',
+        collectionIds: [],
+        contents: [],
+        tags: []
+      };
+      tagsInput.value = '';
+      selectedFile.value = null;
+    }
+
     router.push('/tabs/resources');
   } catch (error) {
     console.error('Error saving resource:', error);
@@ -914,8 +873,6 @@ const uploadFileToStorage = async (file: File, contentType?: ResourceType): Prom
     folder = 'media'; // videos go to media folder
   } else if (contentType === ResourceType.MUSIC_SHEET) {
     folder = 'files'; // music sheets go to files folder
-  } else if (contentType === ResourceType.FILE) {
-    folder = 'files';
   }
   const filename = `${folder}/${Date.now()}_${file.name}`;
   const fileRef = storageRef(storage, filename);
@@ -999,8 +956,6 @@ const getContentIcon = (type: ResourceType) => {
       return musicalNotesOutline;
     case ResourceType.YOUTUBE:
       return logoYoutube;
-    case ResourceType.FILE:
-      return documentTextOutline;
     default:
       return documentTextOutline;
   }
@@ -1018,8 +973,6 @@ const getContentLabel = (type: ResourceType) => {
       return 'Partition';
     case ResourceType.YOUTUBE:
       return 'YouTube';
-    case ResourceType.FILE:
-      return 'Fichier';
     default:
       return type;
   }
@@ -1082,11 +1035,10 @@ const getPreviewText = (content: string): string => {
 const hasPreview = (content: any): boolean => {
   const hasVideoPreview = content.type === ResourceType.VIDEO && content.url;
   const hasAudioPreview = content.type === ResourceType.AUDIO && content.url;
-  const hasFilePreview = content.type === ResourceType.FILE && content.url;
   const hasMusicSheetPreview = content.type === ResourceType.MUSIC_SHEET && content.url;
   const hasLyricsPreview = content.type === ResourceType.LYRICS && content.content;
   
-  return hasVideoPreview || hasAudioPreview || hasFilePreview || hasMusicSheetPreview || hasLyricsPreview;
+  return hasVideoPreview || hasAudioPreview || hasMusicSheetPreview || hasLyricsPreview;
 };
 
 const getCollectionName = (collectionId: string): string => {
@@ -1234,7 +1186,7 @@ input[type="file"]:hover {
 /* Media type buttons */
 .media-type-buttons {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 6px;
   margin-top: 8px;
 }
@@ -1269,7 +1221,7 @@ input[type="file"]:hover {
 
 @media (max-width: 600px) {
   .media-type-buttons {
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 3px;
   }
   
@@ -1290,7 +1242,7 @@ input[type="file"]:hover {
 
 @media (max-width: 480px) {
   .media-type-buttons {
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 2px;
   }
   

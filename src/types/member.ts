@@ -6,6 +6,7 @@ export interface Member {
   firstName: string;
   lastName: string;
   fullName: string;
+  phone?: string;
   ministries: string[];
   availabilities: {
     [serviceId: string]: 'available' | 'unavailable' | null;
@@ -19,6 +20,7 @@ export interface Member {
 export interface OnboardingFormData {
   email: string;
   fullName: string;
+  phone: string;
   ministries: string[];
   customMinistry: string;
   availabilities: {

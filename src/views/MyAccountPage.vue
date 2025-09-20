@@ -47,6 +47,22 @@
             </ion-item>
           </div>
 
+          <!-- Phone Section -->
+          <div class="form-section">
+            <ion-item>
+              <ion-label position="stacked">Numéro de téléphone</ion-label>
+              <ion-input
+                v-model="formData.phone"
+                type="tel"
+                placeholder="(438) 123-4567"
+                :class="{ 'ion-invalid': !isPhoneValid && formData.phone.trim() }"
+                @ionInput="handlePhoneInput"
+              ></ion-input>
+              <ion-note slot="error" v-if="!isPhoneValid && formData.phone.trim()">Veuillez entrer un numéro de téléphone valide</ion-note>
+              <ion-note>Format: +1 (438) 123-4567 ou 438-123-4567</ion-note>
+            </ion-item>
+          </div>
+
           <!-- Ministries Section -->
           <div class="form-section">
             <div class="section-header">
@@ -129,6 +145,7 @@ const availableMinistries = ref<Ministry[]>([]);
 // Form Data
 const formData = ref({
   fullName: '',
+  phone: '',
   customMinistry: ''
 });
 
@@ -146,6 +163,15 @@ const isFullNameValid = computed(() => {
   return formData.value.fullName.trim().length > 0;
 });
 
+const isPhoneValid = computed(() => {
+  const trimmed = formData.value.phone.trim();
+  if (trimmed === '') return true; // Phone is optional
+
+  // Basic phone validation - accepts various formats
+  const phoneRegex = /^(\+?1[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})$/;
+  return phoneRegex.test(trimmed);
+});
+
 const selectedMinistriesCount = computed(() => {
   const ministries = selectedMinistries.value.length;
   const customMinistryName = formData.value.customMinistry.trim();
@@ -154,7 +180,7 @@ const selectedMinistriesCount = computed(() => {
 });
 
 const canSave = computed(() => {
-  return isFullNameValid.value && selectedMinistriesCount.value > 0;
+  return isFullNameValid.value && selectedMinistriesCount.value > 0 && isPhoneValid.value;
 });
 
 const hasChanges = computed(() => {
@@ -162,6 +188,9 @@ const hasChanges = computed(() => {
   
   // Check if full name changed
   const fullNameChanged = formData.value.fullName.trim() !== member.value.fullName;
+
+  // Check if phone changed
+  const phoneChanged = formData.value.phone.trim() !== (member.value.phone || '');
   
   // Check if ministries changed
   const currentMinistries = [...selectedMinistries.value];
@@ -178,7 +207,7 @@ const hasChanges = computed(() => {
     currentMinistries.some(ministry => !originalMinistries.includes(ministry)) ||
     originalMinistries.some(ministry => !currentMinistries.includes(ministry));
   
-  return fullNameChanged || ministriesChanged;
+  return fullNameChanged || phoneChanged || ministriesChanged;
 });
 
 // Methods
@@ -190,6 +219,46 @@ const showToast = async (message: string, color: 'success' | 'danger' = 'success
     color
   });
   await toast.present();
+};
+
+const applyPhoneMask = (value: string): string => {
+  // Remove all non-digit characters
+  const digits = value.replace(/\D/g, '');
+
+  // Apply mask based on number of digits
+  if (digits.length <= 3) {
+    return digits;
+  } else if (digits.length <= 6) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  } else if (digits.length <= 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  } else if (digits.length === 11 && digits.startsWith('1')) {
+    return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7, 11)}`;
+  } else {
+    // Limit to 10 digits for local format
+    const limitedDigits = digits.slice(0, 10);
+    return `(${limitedDigits.slice(0, 3)}) ${limitedDigits.slice(3, 6)}-${limitedDigits.slice(6)}`;
+  }
+};
+
+const handlePhoneInput = (event: any) => {
+  const inputValue = event.target.value;
+  const maskedValue = applyPhoneMask(inputValue);
+  formData.value.phone = maskedValue;
+};
+
+const formatPhoneNumber = (phoneNumber: string): string => {
+  // Remove all non-digit characters
+  const digits = phoneNumber.replace(/\D/g, '');
+
+  // Handle different cases
+  if (digits.length === 10) {
+    return `+1 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  } else if (digits.length === 11 && digits.startsWith('1')) {
+    return `+${digits.slice(0, 1)} (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+
+  return phoneNumber; // Return as-is if it doesn't match expected patterns
 };
 
 const toggleMinistry = (ministryName: string) => {
@@ -220,6 +289,7 @@ const loadUserData = async () => {
     
     // Populate form
     formData.value.fullName = memberData.fullName || '';
+    formData.value.phone = memberData.phone ? applyPhoneMask(memberData.phone) : '';
     selectedMinistries.value = [...(memberData.ministries || [])];
 
     // Load available ministries
@@ -258,11 +328,15 @@ const saveChanges = async () => {
     const firstName = nameParts[0] || '';
     const lastName = nameParts.slice(1).join(' ') || '';
 
+    // Format phone number if provided
+    const formattedPhone = formData.value.phone.trim() ? formatPhoneNumber(formData.value.phone.trim()) : '';
+
     // Update member
     await membersService.updateMember(member.value.id, {
       firstName,
       lastName,
       fullName: formData.value.fullName.trim(),
+      phone: formattedPhone,
       ministries
     });
 
@@ -272,8 +346,12 @@ const saveChanges = async () => {
       firstName,
       lastName,
       fullName: formData.value.fullName.trim(),
+      phone: formattedPhone,
       ministries
     };
+
+    // Update form data with formatted phone
+    formData.value.phone = formattedPhone;
 
     // Clear custom ministry field after saving
     formData.value.customMinistry = '';

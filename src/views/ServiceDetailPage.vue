@@ -7,6 +7,14 @@
         </ion-buttons>
         <ion-title>Détail du Service</ion-title>
         <ion-buttons slot="end">
+          <ion-button
+            v-if="isAdmin"
+            @click="togglePublishStatus"
+            fill="clear"
+            :disabled="updating"
+          >
+            <ion-icon :icon="service?.isPublished ? eyeOffOutline : eyeOutline" />
+          </ion-button>
           <ion-button v-if="isAdmin" @click="goToEdit" fill="clear">
             <ion-icon :icon="pencil" />
           </ion-button>
@@ -65,27 +73,35 @@
                 </ion-label>
               </ion-item>
               
-              <ion-item button @click="goToMembers">
-                <ion-icon :icon="peopleOutline" slot="start" />
+              <ion-item :button="service.isPublished" @click="service.isPublished ? goToMembers() : null">
+                <ion-icon :icon="peopleOutline" slot="start" :color="service.isPublished ? undefined : 'medium'" />
                 <ion-label>
-                  <h3>Membres assignés</h3>
+                  <h3 :class="{ 'disabled-text': !service.isPublished }">Membres assignés</h3>
                   <p v-if="loadingMembers">Chargement...</p>
-                  <p v-else>
+                  <p v-else-if="service.isPublished">
                     {{ memberCount }} membre{{ memberCount !== 1 ? 's' : '' }} assigné{{ memberCount !== 1 ? 's' : '' }}
                   </p>
-                </ion-label>
-                <ion-icon :icon="chevronForwardOutline" slot="end" />
-              </ion-item>
-              
-              <ion-item button @click="goToProgram">
-                <ion-icon :icon="documentTextOutline" slot="start" :color="canCreateProgram ? 'warning' : undefined" />
-                <ion-label>
-                  <h3>Programme du service</h3>
-                  <p :class="{ 'create-program-text': canCreateProgram }">
-                    {{ programDescription }}
+                  <p v-else class="disabled-text">
+                    Disponible une fois publié
                   </p>
                 </ion-label>
-                <ion-icon :icon="canCreateProgram ? createOutline : chevronForwardOutline" slot="end" :color="canCreateProgram ? 'warning' : undefined" />
+                <ion-icon v-if="service.isPublished" :icon="chevronForwardOutline" slot="end" />
+                <ion-icon v-else :icon="lockClosedOutline" slot="end" color="medium" />
+              </ion-item>
+
+              <ion-item :button="service.isPublished" @click="service.isPublished ? goToProgram() : null">
+                <ion-icon :icon="documentTextOutline" slot="start" :color="service.isPublished ? (canCreateProgram ? 'warning' : undefined) : 'medium'" />
+                <ion-label>
+                  <h3 :class="{ 'disabled-text': !service.isPublished }">Programme du service</h3>
+                  <p v-if="service.isPublished" :class="{ 'create-program-text': canCreateProgram }">
+                    {{ programDescription }}
+                  </p>
+                  <p v-else class="disabled-text">
+                    Disponible une fois publié
+                  </p>
+                </ion-label>
+                <ion-icon v-if="service.isPublished" :icon="canCreateProgram ? createOutline : chevronForwardOutline" slot="end" :color="canCreateProgram ? 'warning' : undefined" />
+                <ion-icon v-else :icon="lockClosedOutline" slot="end" color="medium" />
               </ion-item>
               
               <ion-item>
@@ -141,7 +157,8 @@ import {
 import {
   pencil, calendarOutline, timeOutline, informationCircleOutline, createOutline,
   syncOutline, checkmarkCircle, trashOutline, alertCircleOutline, timerOutline,
-  peopleOutline, chevronForwardOutline, documentTextOutline
+  peopleOutline, chevronForwardOutline, documentTextOutline, eyeOutline,
+  eyeOffOutline, lockClosedOutline
 } from 'ionicons/icons';
 import { Service, ServiceCategory } from '@/types/service';
 import { serviceService } from '@/services/serviceService';
@@ -156,6 +173,7 @@ const router = useRouter();
 const { isAdmin } = useUser();
 const service = ref<Service | null>(null);
 const loading = ref(true);
+const updating = ref(false);
 const memberCount = ref(0);
 const loadingMembers = ref(false);
 const program = ref<ServiceProgram | null>(null);
@@ -299,6 +317,27 @@ const confirmDelete = async () => {
   await alert.present();
 };
 
+const togglePublishStatus = async () => {
+  if (!service.value || updating.value) return;
+
+  updating.value = true;
+
+  try {
+    const updatedService = await serviceService.updateService({
+      ...service.value,
+      isPublished: !service.value.isPublished
+    });
+
+    if (updatedService) {
+      service.value = updatedService;
+    }
+  } catch (error) {
+    console.error('Error updating publish status:', error);
+  } finally {
+    updating.value = false;
+  }
+};
+
 onMounted(() => {
   loadService();
 });
@@ -313,6 +352,11 @@ onMounted(() => {
 .create-program-text {
   color: var(--ion-color-warning);
   font-weight: 500;
+  font-style: italic;
+}
+
+.disabled-text {
+  color: var(--ion-color-medium);
   font-style: italic;
 }
 </style>

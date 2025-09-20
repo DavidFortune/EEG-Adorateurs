@@ -109,7 +109,7 @@ const continueToNextStep = () => {
     
     // Go to next step
     onboardingStore.nextStep();
-    router.push('/onboarding/ministries');
+    router.push('/onboarding/phone');
   }
 };
 

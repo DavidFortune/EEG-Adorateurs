@@ -211,7 +211,8 @@ import { useRouter } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
   IonIcon, IonSearchbar, IonList, IonItem, IonLabel, IonChip, IonRefresher,
-  IonRefresherContent, IonLoading, IonModal, IonCheckbox, IonActionSheet, actionSheetController
+  IonRefresherContent, IonLoading, IonModal, IonCheckbox, IonActionSheet, actionSheetController,
+  onIonViewWillEnter
 } from '@ionic/vue';
 import {
   addOutline, folderOutline, filterOutline, swapVerticalOutline, closeCircle,
@@ -455,6 +456,11 @@ const editResource = (resourceId: string) => {
 onMounted(() => {
   loadResources();
   loadResourceCollections();
+});
+
+// Refresh resources every time the page is displayed
+onIonViewWillEnter(() => {
+  loadResources();
 });
 </script>
 

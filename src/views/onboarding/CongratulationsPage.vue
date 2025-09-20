@@ -120,6 +120,7 @@ const saveUserData = async () => {
         firstName,
         lastName,
         fullName: onboardingStore.formData.fullName,
+        phone: onboardingStore.formData.phone || '',
         ministries: ministries,
         availabilities: onboardingStore.formData.availabilities,
         isOnboardingCompleted: true

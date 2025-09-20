@@ -35,6 +35,32 @@
           </ion-card-content>
         </ion-card>
 
+        <!-- Mobile Phone Prompt Card -->
+        <ion-card v-if="!memberPhone" class="phone-prompt-card">
+          <ion-card-content>
+            <div class="prompt-content">
+              <div class="prompt-icon">
+                <ion-icon :icon="phonePortraitOutline" color="primary"></ion-icon>
+              </div>
+              <div class="prompt-text">
+                <h3 class="prompt-title">Ajoutez votre numéro de téléphone</h3>
+                <p class="prompt-description">
+                  Recevez des rappels importants et restez informé des activités de l'église.
+                </p>
+              </div>
+              <ion-button
+                @click="goToProfile"
+                fill="outline"
+                color="primary"
+                class="prompt-button"
+              >
+                <ion-icon :icon="addOutline" slot="start"></ion-icon>
+                Ajouter mon mobile
+              </ion-button>
+            </div>
+          </ion-card-content>
+        </ion-card>
+
         <!-- Upcoming Services Section -->
         <ion-card class="services-card">
           <ion-card-header>
@@ -182,8 +208,9 @@ import {
   IonChip, IonLabel
 } from '@ionic/vue';
 import {
-  bookOutline, peopleOutline, checkmarkCircle, calendarOutline, checkmarkOutline, 
-  closeOutline, helpOutline, arrowForwardOutline, homeOutline
+  bookOutline, peopleOutline, checkmarkCircle, calendarOutline, checkmarkOutline,
+  closeOutline, helpOutline, arrowForwardOutline, homeOutline, phonePortraitOutline,
+  addOutline
 } from 'ionicons/icons';
 import { useUser } from '@/composables/useUser';
 import { serviceService } from '@/services/serviceService';
@@ -203,6 +230,10 @@ const memberFirstName = computed(() => {
 
 const memberMinistries = computed(() => {
   return member.value?.ministries || [];
+});
+
+const memberPhone = computed(() => {
+  return member.value?.phone;
 });
 
 // PWA Install Prompt
@@ -250,6 +281,10 @@ const toggleUserMenu = () => {
 
 const closeUserMenu = () => {
   isUserMenuOpen.value = false;
+};
+
+const goToProfile = () => {
+  router.push('/my-account');
 };
 
 // PWA Install Prompt Functions

@@ -1,30 +1,33 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import type { OnboardingFormData, Member } from '@/types/member';
-import type { Service } from '@/types/service';
 
 export const useOnboardingStore = defineStore('onboarding', () => {
   const currentStep = ref(0);
   const totalSteps = 6;
   const completedSteps = ref<Set<number>>(new Set());
-  
+
   const formData = ref<OnboardingFormData>({
     email: '',
     fullName: '',
+    phone: '',
     ministries: [],
     customMinistry: '',
     availabilities: {}
   });
 
-  const availableServices = ref<Service[]>([]);
 
   const progressPercentage = computed(() => {
-    const stepPercentages = [0, 0, 33, 66, 85, 100];
+    const stepPercentages = [0, 0, 33, 50, 75, 100];
     return stepPercentages[currentStep.value] || 0;
   });
 
   const isStep3Valid = computed(() => {
     return formData.value.fullName.trim() !== '';
+  });
+
+  const isPhoneValid = computed(() => {
+    return formData.value.phone.trim() !== '';
   });
 
   const selectedMinistriesCount = computed(() => {
@@ -76,13 +79,6 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     }
   };
 
-  const setAvailability = (serviceId: string, availability: 'available' | 'unavailable' | null) => {
-    if (availability === null) {
-      delete formData.value.availabilities[serviceId];
-    } else {
-      formData.value.availabilities[serviceId] = availability;
-    }
-  };
 
   const markStepCompleted = (step: number) => {
     completedSteps.value.add(step);
@@ -93,26 +89,26 @@ export const useOnboardingStore = defineStore('onboarding', () => {
   };
 
   const getNextIncompleteStep = () => {
-    // Step mapping: 0=welcome, 1=unused, 2=personal-info, 3=ministries, 4=availability, 5=congratulations
+    // Step mapping: 0=welcome, 1=unused, 2=personal-info, 3=phone, 4=ministries, 5=congratulations
     const stepRoutes = [
       '/onboarding/welcome',           // 0
       '/onboarding/welcome',           // 1 (unused)
       '/onboarding/personal-info',     // 2
-      '/onboarding/ministries',        // 3
-      '/onboarding/availability',      // 4
+      '/onboarding/phone',             // 3
+      '/onboarding/ministries',        // 4
       '/onboarding/congratulations'    // 5
     ];
 
     // Check what data exists to determine completion
     const hasPersonalInfo = formData.value.fullName.trim() !== '';
-    const hasMinistries = (formData.value.ministries || []).length > 0 || 
+    const hasPhone = formData.value.phone.trim() !== '';
+    const hasMinistries = (formData.value.ministries || []).length > 0 ||
                          (formData.value.customMinistry || '').trim() !== '';
-    const hasAvailabilities = Object.keys(formData.value.availabilities).length > 0;
 
     // Mark steps as completed based on data
     if (hasPersonalInfo) markStepCompleted(2);
-    if (hasMinistries) markStepCompleted(3);
-    if (hasAvailabilities) markStepCompleted(4);
+    if (hasPhone) markStepCompleted(3);
+    if (hasMinistries) markStepCompleted(4);
 
     // Always start from welcome if step 0 is not completed
     if (!isStepCompleted(0)) {
@@ -134,6 +130,7 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     formData.value = {
       email: '',
       fullName: '',
+      phone: '',
       ministries: [],
       customMinistry: '',
       availabilities: {}
@@ -142,19 +139,14 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     completedSteps.value.clear();
   };
 
-  const setAvailableServices = (services: Service[]) => {
-    availableServices.value = services;
-    // Reset availabilities for new services
-    formData.value.availabilities = {};
-  };
 
   return {
     currentStep,
     totalSteps,
     formData,
-    availableServices,
     progressPercentage,
     isStep3Valid,
+    isPhoneValid,
     selectedMinistriesCount,
     nextStep,
     previousStep,
@@ -163,9 +155,7 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     addMinistry,
     removeMinistry,
     toggleMinistry,
-    setAvailability,
     resetForm,
-    setAvailableServices,
     markStepCompleted,
     isStepCompleted,
     getNextIncompleteStep

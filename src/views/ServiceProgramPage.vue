@@ -144,7 +144,7 @@
                     
                     <!-- Column 2: Order Number -->
                     <div class="item-column item-order-column">
-                      <div class="item-order">{{ item.order }}</div>
+                      <div class="item-order">{{ item.globalOrder || item.order }}</div>
                     </div>
                     
                     <!-- Column 3: Details -->
@@ -153,51 +153,28 @@
                         <ion-icon :icon="getItemIcon(item.type)" />
                         {{ item.type }}
                       </div>
-                      <h4 class="item-title">{{ item.title }}</h4>
+                      <h4 class="item-title">{{ item.resourceId && getLinkedResource(item.resourceId) ? getLinkedResource(item.resourceId).title : item.title }}</h4>
                       <p v-if="item.subtitle" class="item-subtitle">{{ item.subtitle }}</p>
 
-                      <div v-if="item.reference || item.notes" class="item-details">
-                        <div v-if="item.reference" class="item-reference">
-                          <ion-icon :icon="bookOutline" />
-                          {{ item.reference }}
-                        </div>
+                      <div v-if="item.notes" class="item-details">
                         <div v-if="item.notes" class="item-notes">
                           <ion-icon :icon="documentTextOutline" />
                           {{ item.notes }}
                         </div>
                       </div>
                   
-                      <div v-if="item.lyrics" class="item-lyrics">
-                        <ion-button 
-                          @click="showLyrics(item)" 
-                          fill="outline" 
-                          size="small"
-                          class="lyrics-button"
-                        >
-                          <ion-icon :icon="musicalNotesOutline" slot="start" />
-                          Voir les paroles
-                        </ion-button>
-                      </div>
                       
                       <div v-if="item.resourceId && getLinkedResource(item.resourceId)" class="item-resources">
-                        <div class="resource-media-links">
-                          <div class="resource-title" @click="showResourceDetails(item)">
-                            <ion-icon :icon="libraryOutline" />
-                            {{ getLinkedResource(item.resourceId)?.title }}
-                          </div>
-                          <div class="media-buttons">
-                            <ion-button 
-                              v-for="content in getLinkedResource(item.resourceId)?.contents" 
-                              :key="content.type"
-                              @click="content.url ? openUrl(content.url) : showResourceDetails(item)"
-                              fill="clear"
-                              size="small"
-                              class="media-button"
-                            >
-                              <ion-icon :icon="getMediaTypeIcon(content.type)" slot="icon-only" />
-                              <span class="media-label">{{ content.type === 'lyrics' ? 'Paroles' : content.type === 'video' ? 'Vidéo' : content.type === 'audio' ? 'Audio' : content.type === 'music_sheet' ? 'Partition' : content.type }}</span>
-                            </ion-button>
-                          </div>
+                        <div class="media-buttons">
+                          <button
+                            v-for="content in getLinkedResource(item.resourceId)?.contents"
+                            :key="content.type"
+                            @click="showMediaContent(content, getLinkedResource(item.resourceId)?.title)"
+                            class="media-chip-button"
+                          >
+                            <ion-icon :icon="getMediaTypeIcon(content.type)" />
+                            <span>{{ content.type === 'lyrics' ? 'Paroles' : content.type === 'video' ? 'Vidéo' : content.type === 'audio' ? 'Audio' : content.type === 'music_sheet' ? 'Partition' : content.type }}</span>
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -275,7 +252,7 @@
                 
                 <!-- Column 2: Order Number -->
                 <div class="item-column item-order-column">
-                  <div class="item-order">{{ item.order }}</div>
+                  <div class="item-order">{{ index + 1 }}</div>
                 </div>
                 
                 <!-- Column 3: Details -->
@@ -284,7 +261,7 @@
                     <ion-icon :icon="getItemIcon(item.type)" />
                     {{ item.type }}
                   </div>
-                  <h4 class="item-title">{{ item.title }}</h4>
+                  <h4 class="item-title">{{ item.resourceId && getLinkedResource(item.resourceId) ? getLinkedResource(item.resourceId).title : item.title }}</h4>
                   <p v-if="item.subtitle" class="item-subtitle">{{ item.subtitle }}</p>
                 </div>
                 
@@ -314,48 +291,25 @@
                 </div>
               </div>
               
-              <div v-if="item.reference || item.notes" class="item-details">
-                <div v-if="item.reference" class="item-reference">
-                  <ion-icon :icon="bookOutline" />
-                  {{ item.reference }}
-                </div>
+              <div v-if="item.notes" class="item-details">
                 <div v-if="item.notes" class="item-notes">
                   <ion-icon :icon="documentTextOutline" />
                   {{ item.notes }}
                 </div>
               </div>
               
-              <div v-if="item.lyrics" class="item-lyrics">
-                <ion-button 
-                  @click="showLyrics(item)" 
-                  fill="outline" 
-                  size="small"
-                  class="lyrics-button"
-                >
-                  <ion-icon :icon="musicalNotesOutline" slot="start" />
-                  Voir les paroles
-                </ion-button>
-              </div>
               
               <div v-if="item.resourceId && getLinkedResource(item.resourceId)" class="item-resources">
-                <div class="resource-media-links">
-                  <div class="resource-title" @click="showResourceDetails(item)">
-                    <ion-icon :icon="libraryOutline" />
-                    {{ getLinkedResource(item.resourceId)?.title }}
-                  </div>
-                  <div class="media-buttons">
-                    <ion-button 
-                      v-for="content in getLinkedResource(item.resourceId)?.contents" 
-                      :key="content.type"
-                      @click="content.url ? openUrl(content.url) : showResourceDetails(item)"
-                      fill="clear"
-                      size="small"
-                      class="media-button"
-                    >
-                      <ion-icon :icon="getMediaTypeIcon(content.type)" slot="icon-only" />
-                      <span class="media-label">{{ content.type === 'lyrics' ? 'Paroles' : content.type === 'video' ? 'Vidéo' : content.type === 'audio' ? 'Audio' : content.type === 'music_sheet' ? 'Partition' : content.type }}</span>
-                    </ion-button>
-                  </div>
+                <div class="media-buttons">
+                  <button
+                    v-for="content in getLinkedResource(item.resourceId)?.contents"
+                    :key="content.type"
+                    @click="showMediaContent(content, getLinkedResource(item.resourceId)?.title)"
+                    class="media-chip-button"
+                  >
+                    <ion-icon :icon="getMediaTypeIcon(content.type)" />
+                    <span>{{ content.type === 'lyrics' ? 'Paroles' : content.type === 'video' ? 'Vidéo' : content.type === 'audio' ? 'Audio' : content.type === 'music_sheet' ? 'Partition' : content.type }}</span>
+                  </button>
                 </div>
               </div>
               </div>
@@ -401,10 +355,11 @@
             </ion-buttons>
           </ion-toolbar>
         </ion-header>
-        <ion-content class="lyrics-content">
-          <div class="lyrics-text">
+        <ion-content class="ion-padding">
+          {{ selectedItem?.lyrics }}
+          <!-- <div class="lyrics-text">
             <pre>{{ selectedItem?.lyrics }}</pre>
-          </div>
+          </div> -->
         </ion-content>
       </ion-modal>
       
@@ -444,9 +399,9 @@
                     </div>
                   </div>
                   <div class="media-actions">
-                    <ion-button 
-                      v-if="content.url" 
-                      @click="openUrl(content.url)"
+                    <ion-button
+                      v-if="content.url"
+                      @click="showMediaContent(content)"
                       fill="outline"
                       size="small"
                     >
@@ -714,13 +669,6 @@
               ></ion-input>
             </ion-item>
             
-            <ion-item>
-              <ion-label position="stacked">Rôle du participant</ion-label>
-              <ion-input 
-                v-model="addItemForm.participantRole" 
-                placeholder="Ex: Pasteur, Dirigeant, etc."
-              ></ion-input>
-            </ion-item>
             
             <ion-item>
               <ion-label position="stacked">Durée (minutes) *</ion-label>
@@ -732,13 +680,6 @@
               ></ion-input>
             </ion-item>
             
-            <ion-item>
-              <ion-label position="stacked">Référence</ion-label>
-              <ion-input 
-                v-model="addItemForm.reference" 
-                placeholder="Ex: Jean 3:16, Chant #123"
-              ></ion-input>
-            </ion-item>
             
             <ion-item>
               <ion-label position="stacked">Notes</ion-label>
@@ -749,14 +690,6 @@
               ></ion-textarea>
             </ion-item>
             
-            <ion-item v-if="addItemForm.type === 'Chant'">
-              <ion-label position="stacked">Paroles</ion-label>
-              <ion-textarea 
-                v-model="addItemForm.lyrics" 
-                placeholder="Paroles du chant (optionnel)"
-                :rows="5"
-              ></ion-textarea>
-            </ion-item>
             
             <!-- Resource Selector -->
             <div class="resource-selector-container">
@@ -820,13 +753,6 @@
               ></ion-input>
             </ion-item>
             
-            <ion-item>
-              <ion-label position="stacked">Rôle du participant</ion-label>
-              <ion-input 
-                v-model="editItemForm.participantRole" 
-                placeholder="Ex: Pasteur, Dirigeant, etc."
-              ></ion-input>
-            </ion-item>
             
             <ion-item>
               <ion-label position="stacked">Durée (minutes) *</ion-label>
@@ -838,13 +764,6 @@
               ></ion-input>
             </ion-item>
             
-            <ion-item>
-              <ion-label position="stacked">Référence</ion-label>
-              <ion-input 
-                v-model="editItemForm.reference" 
-                placeholder="Ex: Jean 3:16, Chant #123"
-              ></ion-input>
-            </ion-item>
             
             <ion-item>
               <ion-label position="stacked">Notes</ion-label>
@@ -855,14 +774,6 @@
               ></ion-textarea>
             </ion-item>
             
-            <ion-item v-if="editItemForm.type === 'Chant'">
-              <ion-label position="stacked">Paroles</ion-label>
-              <ion-textarea 
-                v-model="editItemForm.lyrics" 
-                placeholder="Paroles du chant (optionnel)"
-                :rows="5"
-              ></ion-textarea>
-            </ion-item>
             
             <!-- Resource Selector -->
             <div class="resource-selector-container">
@@ -880,6 +791,101 @@
               >
                 <ion-icon :icon="checkmarkOutline" slot="start" />
                 Enregistrer
+              </ion-button>
+            </div>
+          </div>
+        </ion-content>
+      </ion-modal>
+
+      <!-- Media Viewer Modal -->
+      <ion-modal :is-open="showMediaModal" @ionModalDidDismiss="closeMediaModal">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>{{ selectedMediaContent?.title || 'Média' }}</ion-title>
+            <ion-buttons slot="end">
+              <ion-button @click="closeMediaModal">
+                <ion-icon :icon="closeOutline" />
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="media-viewer-content">
+          <div v-if="selectedMediaContent" class="media-container">
+            <!-- Video Content -->
+            <div v-if="selectedMediaContent.type === 'video'" class="video-container">
+              <!-- YouTube Video -->
+              <iframe
+                v-if="isYouTubeUrl(selectedMediaContent.url)"
+                :src="getYouTubeEmbedUrl(selectedMediaContent.url)"
+                frameborder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen
+                class="media-iframe"
+              ></iframe>
+              <!-- Regular Video -->
+              <video
+                v-else
+                :src="selectedMediaContent.url"
+                controls
+                class="media-video"
+                :poster="selectedMediaContent.thumbnailUrl"
+              ></video>
+            </div>
+
+            <!-- Audio Content -->
+            <div v-if="selectedMediaContent.type === 'audio'" class="audio-container">
+              <audio :src="selectedMediaContent.url" controls class="media-audio"></audio>
+              <div class="audio-info">
+                <h3>{{ selectedMediaContent.title }}</h3>
+                <p v-if="selectedMediaContent.notes">{{ selectedMediaContent.notes }}</p>
+              </div>
+            </div>
+
+            <!-- Music Sheet Content -->
+            <div v-if="selectedMediaContent.type === 'music_sheet'" class="music-sheet-container">
+              <div class="file-info">
+                <ion-icon :icon="musicalNotesOutline" />
+                <div>
+                  <h3>{{ selectedMediaContent.title }}</h3>
+                  <p>Partition musicale</p>
+                  <p v-if="selectedMediaContent.notes">{{ selectedMediaContent.notes }}</p>
+                </div>
+              </div>
+              <ion-button
+                @click="downloadFile(selectedMediaContent.url, selectedMediaContent.title)"
+                expand="block"
+                fill="outline"
+              >
+                <ion-icon :icon="downloadOutline" slot="start" />
+                Télécharger
+              </ion-button>
+            </div>
+
+            <!-- Lyrics Content -->
+            <div v-if="selectedMediaContent.type === 'lyrics'" class="lyrics-container">
+              <div class="lyrics-content">
+                <pre>{{ selectedMediaContent.content }}</pre>
+              </div>
+            </div>
+
+            <!-- Fallback for other content types -->
+            <div v-if="!['video', 'audio', 'music_sheet', 'lyrics'].includes(selectedMediaContent.type)" class="fallback-container">
+              <div class="file-info">
+                <ion-icon :icon="documentOutline" />
+                <div>
+                  <h3>{{ selectedMediaContent.title }}</h3>
+                  <p>{{ selectedMediaContent.type }}</p>
+                  <p v-if="selectedMediaContent.notes">{{ selectedMediaContent.notes }}</p>
+                </div>
+              </div>
+              <ion-button
+                v-if="selectedMediaContent.url"
+                @click="downloadFile(selectedMediaContent.url, selectedMediaContent.title)"
+                expand="block"
+                fill="outline"
+              >
+                <ion-icon :icon="downloadOutline" slot="start" />
+                Télécharger
               </ion-button>
             </div>
           </div>
@@ -903,7 +909,8 @@ import {
   closeOutline, musicalNoteOutline, libraryOutline, micOutline,
   megaphoneOutline, giftOutline, handLeftOutline, personCircleOutline,
   checkmarkOutline, reorderThreeOutline, addOutline, trashOutline,
-  playCircleOutline, volumeHighOutline, documentOutline, linkOutline
+  playCircleOutline, volumeHighOutline, documentOutline, linkOutline,
+  downloadOutline
 } from 'ionicons/icons';
 import ResourceSelector from '@/components/ResourceSelector.vue';
 import { serviceService } from '@/services/serviceService';
@@ -939,6 +946,8 @@ const showLyricsModal = ref(false);
 const selectedItem = ref<ProgramItem | null>(null);
 const showResourceModal = ref(false);
 const selectedResource = ref<Resource | null>(null);
+const showMediaModal = ref(false);
+const selectedMediaContent = ref<any>(null);
 const isEditMode = ref(false);
 const isDragging = ref(false);
 const draggedItemId = ref<string | null>(null);
@@ -953,11 +962,8 @@ const addItemForm = ref({
   title: '',
   subtitle: '',
   participantName: '',
-  participantRole: '',
   duration: 5,
-  reference: '',
   notes: '',
-  lyrics: '',
   resourceId: null as string | null
 });
 const showAddSectionModalState = ref(false);
@@ -980,11 +986,8 @@ const editItemForm = ref({
   title: '',
   subtitle: '',
   participantName: '',
-  participantRole: '',
   duration: 5,
-  reference: '',
   notes: '',
-  lyrics: '',
   resourceId: null as string | null
 });
 
@@ -1040,11 +1043,51 @@ const sortedSections = computed(() => {
   return [...program.value.sections].sort((a, b) => a.order - b.order);
 });
 
+// Create a computed property that returns all items with their global order
+const allItemsWithGlobalOrder = computed(() => {
+  if (!program.value) return [];
+
+  const items: Array<any> = [];
+  let globalOrder = 1;
+
+  if (program.value.sections.length > 0) {
+    // If we have sections, iterate through them in order
+    sortedSections.value.forEach(section => {
+      const sectionItems = program.value!.items
+        .filter(item => item.sectionId === section.id)
+        .sort((a, b) => a.order - b.order);
+
+      sectionItems.forEach(item => {
+        items.push({ ...item, globalOrder: globalOrder++ });
+      });
+    });
+
+    // Add any items without sections at the end
+    const itemsWithoutSection = program.value.items
+      .filter(item => !item.sectionId)
+      .sort((a, b) => a.order - b.order);
+
+    itemsWithoutSection.forEach(item => {
+      items.push({ ...item, globalOrder: globalOrder++ });
+    });
+  } else {
+    // No sections, just number items sequentially
+    program.value.items
+      .sort((a, b) => a.order - b.order)
+      .forEach(item => {
+        items.push({ ...item, globalOrder: globalOrder++ });
+      });
+  }
+
+  return items;
+});
+
 const getSectionItems = (sectionId: string) => {
   if (!program.value) return [];
-  return program.value.items
-    .filter(item => item.sectionId === sectionId)
-    .sort((a, b) => a.order - b.order);
+
+  // Return items with their global order
+  return allItemsWithGlobalOrder.value
+    .filter(item => item.sectionId === sectionId);
 };
 
 const getSectionItemsCount = (sectionId: string) => {
@@ -1101,8 +1144,59 @@ const navigateToResource = (resourceId: string) => {
   router.push(`/resources/${resourceId}`);
 };
 
-const openUrl = (url: string) => {
-  window.open(url, '_blank');
+const showMediaContent = (content: any, resourceTitle?: string) => {
+  selectedMediaContent.value = {
+    ...content,
+    title: resourceTitle || content.title || 'Contenu média'
+  };
+  showMediaModal.value = true;
+};
+
+const closeMediaModal = () => {
+  showMediaModal.value = false;
+  selectedMediaContent.value = null;
+};
+
+const downloadFile = (url: string, filename: string) => {
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename || 'download';
+  link.target = '_blank';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+const isYouTubeUrl = (url: string): boolean => {
+  if (!url) return false;
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)/,
+    /^[a-zA-Z0-9_-]{11}$/ // Just a YouTube video ID
+  ];
+  return patterns.some(pattern => pattern.test(url));
+};
+
+const getYouTubeEmbedUrl = (url: string): string | null => {
+  if (!url) return null;
+
+  // Extract video ID from various YouTube URL formats
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match && match[1]) {
+      return `https://www.youtube.com/embed/${match[1]}`;
+    }
+  }
+
+  // Check if it's already just a video ID
+  if (/^[a-zA-Z0-9_-]{11}$/.test(url)) {
+    return `https://www.youtube.com/embed/${url}`;
+  }
+
+  return null;
 };
 
 const getMediaTypeIcon = (type: string) => {
@@ -1394,13 +1488,13 @@ const saveNewItem = async () => {
   const position = addItemPosition.value;
   const sectionId = addItemSectionId.value;
   
-  // Calculate order based on position
+  // Calculate order based on position (global numbering)
   let order = 1;
   if (position === 'end') {
     order = program.value.items.length + 1;
   } else if (position === 'section' && sectionId) {
-    const sectionItems = program.value.items.filter(item => item.sectionId === sectionId);
-    order = sectionItems.length > 0 ? Math.max(...sectionItems.map(item => item.order)) + 1 : 1;
+    // For global numbering, always use the total count of items + 1
+    order = program.value.items.length + 1;
   }
   
   try {
@@ -1419,21 +1513,13 @@ const saveNewItem = async () => {
     
     // Add optional fields if provided
     if (addItemForm.value.subtitle) itemData.subtitle = addItemForm.value.subtitle;
-    if (addItemForm.value.reference) itemData.reference = addItemForm.value.reference;
     if (addItemForm.value.notes) itemData.notes = addItemForm.value.notes;
-    if (addItemForm.value.type === 'Chant') {
-      if (addItemForm.value.lyrics && addItemForm.value.lyrics.trim()) {
-        itemData.lyrics = addItemForm.value.lyrics.trim();
-      } else {
-        itemData.lyrics = '';
-      }
-    }
     
     // Add participant if provided
     if (addItemForm.value.participantName) {
       itemData.participant = {
         name: addItemForm.value.participantName,
-        role: addItemForm.value.participantRole || ''
+        role: ''
       };
     }
     
@@ -1473,11 +1559,8 @@ const showEditItemModal = (item: ProgramItem) => {
     title: item.title,
     subtitle: item.subtitle || '',
     participantName: item.participant?.name || '',
-    participantRole: item.participant?.role || '',
     duration: item.duration || 5,
-    reference: item.reference || '',
     notes: item.notes || '',
-    lyrics: item.lyrics || '',
     resourceId: item.resourceId || null
   };
   
@@ -1492,11 +1575,8 @@ const closeEditItemForm = () => {
     title: '',
     subtitle: '',
     participantName: '',
-    participantRole: '',
     duration: 5,
-    reference: '',
     notes: '',
-    lyrics: '',
     resourceId: null
   };
 };
@@ -1529,7 +1609,7 @@ const saveEditItem = async () => {
     if (editItemForm.value.participantName) {
       itemData.participant = {
         name: editItemForm.value.participantName,
-        role: editItemForm.value.participantRole || ''
+        role: ''
       };
     }
     
@@ -2474,7 +2554,7 @@ onMounted(async () => {
   border-top: 1px solid var(--ion-color-light);
 }
 
-.item-reference, .item-notes {
+.item-notes {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -2482,16 +2562,8 @@ onMounted(async () => {
   color: var(--ion-color-medium);
 }
 
-.item-reference ion-icon, .item-notes ion-icon {
+.item-notes ion-icon {
   font-size: 1rem;
-}
-
-.item-lyrics {
-  margin-top: 4px;
-}
-
-.lyrics-button {
-  --color: var(--ion-color-primary);
 }
 
 /* Item Type Styling */
@@ -3072,50 +3144,179 @@ onMounted(async () => {
 }
 
 /* Resource Media Links */
-.resource-media-links {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.resource-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--ion-color-primary);
-  font-weight: 600;
-  cursor: pointer;
-  padding: 4px 0;
-}
-
-.resource-title:hover {
-  color: var(--ion-color-primary-shade);
+.item-resources {
+  margin-top: 6px;
 }
 
 .media-buttons {
   display: flex;
   flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.media-chip-button {
+  display: inline-flex;
+  align-items: center;
   gap: 4px;
-}
-
-.media-button {
-  --padding-start: 8px;
-  --padding-end: 8px;
-  --height: 28px;
-  font-size: 11px;
-  --color: var(--ion-color-primary);
-}
-
-.media-button ion-icon {
-  font-size: 14px;
-  margin-right: 4px;
-}
-
-.media-label {
-  font-size: 11px;
+  padding: 3px 10px;
+  background: transparent;
+  border: 1px solid var(--ion-color-medium-tint);
+  border-radius: 12px;
+  font-size: 12px;
+  color: var(--ion-color-medium-shade);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
   font-weight: 500;
+  white-space: nowrap;
+  height: 24px;
+}
+
+.media-chip-button:hover {
+  background: var(--ion-color-light);
+  border-color: var(--ion-color-primary);
+  color: var(--ion-color-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.media-chip-button:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.media-chip-button ion-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.media-chip-button span {
+  font-size: 11px;
+}
+
+/* Media Viewer Modal */
+.media-viewer-content {
+  --background: var(--ion-color-light);
+}
+
+.media-container {
+  padding: 0px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.video-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+.media-iframe {
+  width: 100%;
+  height: 60vh;
+  max-height: 400px;
+  border-radius: 8px;
+}
+
+.media-video {
+  width: 100%;
+  max-width: 800px;
+  height: auto;
+  border-radius: 8px;
+}
+
+.audio-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 32px;
+}
+
+.media-audio {
+  width: 100%;
+  max-width: 400px;
+}
+
+.audio-info {
+  text-align: center;
+}
+
+.audio-info h3 {
+  margin: 0 0 8px 0;
+  font-size: 1.2rem;
+  color: var(--ion-color-dark);
+}
+
+.audio-info p {
+  margin: 0;
+  color: var(--ion-color-medium);
+  font-size: 0.9rem;
+}
+
+.music-sheet-container,
+.fallback-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  padding: 32px;
+  text-align: center;
+}
+
+.file-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.file-info ion-icon {
+  font-size: 2rem;
+  color: var(--ion-color-primary);
+}
+
+.file-info h3 {
+  margin: 0 0 4px 0;
+  font-size: 1.1rem;
+  color: var(--ion-color-dark);
+}
+
+.file-info p {
+  margin: 0;
+  color: var(--ion-color-medium);
+  font-size: 0.9rem;
+}
+
+.lyrics-container {
+  padding: 16px;
+  height: 100%;
+}
+
+.lyrics-content {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  height: 100%;
+  overflow-y: auto;
+}
+
+.lyrics-content pre {
+  font-family: inherit;
+  white-space: pre-wrap;
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--ion-color-dark);
 }
 
 /* Resource Detail Modal */

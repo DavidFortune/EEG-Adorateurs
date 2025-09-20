@@ -26,13 +26,13 @@ const routes: Array<RouteRecordRaw> = [
     meta: { requiresAuth: true }
   },
   {
-    path: '/onboarding/ministries',
-    component: () => import('@/views/onboarding/MinistriesPage.vue'),
+    path: '/onboarding/phone',
+    component: () => import('@/views/onboarding/PhonePage.vue'),
     meta: { requiresAuth: true }
   },
   {
-    path: '/onboarding/availability',
-    component: () => import('@/views/onboarding/AvailabilityPage.vue'),
+    path: '/onboarding/ministries',
+    component: () => import('@/views/onboarding/MinistriesPage.vue'),
     meta: { requiresAuth: true }
   },
   {

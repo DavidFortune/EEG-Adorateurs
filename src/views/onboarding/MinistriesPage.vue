@@ -220,7 +220,7 @@ const updateStoreData = () => {
 const goBack = () => {
   updateStoreData();
   onboardingStore.previousStep();
-  router.push('/onboarding/personal-info');
+  router.push('/onboarding/phone');
 };
 
 const continueToNextStep = () => {
@@ -230,10 +230,10 @@ const continueToNextStep = () => {
   updateStoreData();
   
   // Mark this step as completed
-  onboardingStore.markStepCompleted(3);
+  onboardingStore.markStepCompleted(4);
   
   onboardingStore.nextStep();
-  router.push('/onboarding/availability');
+  router.push('/onboarding/congratulations');
 };
 
 const loadMinistries = async () => {
