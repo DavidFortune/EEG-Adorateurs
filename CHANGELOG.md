@@ -2,6 +2,68 @@
 
 All notable changes to EEG Adorateurs will be documented in this file.
 
+## [1.5.0] - 2025-09-20
+
+### Added
+- **Phone Number Input Masking**: Enhanced user experience with real-time phone number formatting
+  - Progressive phone input masking in onboarding (PhonePage) with format (438) 123-4567
+  - Phone input masking in profile forms (MyAccountPage) for consistent data entry
+  - Support for both Canadian and US phone number formats with auto-formatting
+
+- **Service Publishing System**: Complete publish/unpublish functionality for service management
+  - Toggle button in service detail page header to publish/unpublish services
+  - Visual feedback with eye/eye-off icons and disabled states
+  - Conditional access control - service links only appear when services are published
+  - Lock icons and disabled styling for unpublished service actions
+
+- **Enhanced Phone Data Persistence**: Improved onboarding data management
+  - Phone numbers now properly saved during onboarding completion process
+  - Phone field included in member creation and updates in Firestore
+  - Phone validation with optional field support in profile forms
+
+### Enhanced
+- **Service Display Logic**: Improved service filtering and access control
+  - Team and Program buttons only displayed for published services
+  - Clear visual indicators for published vs unpublished status
+  - Admin-only access to publish/unpublish functionality
+
+- **Past Services Sorting**: Improved chronological organization
+  - Past services now display from most recent to oldest order
+  - Better user experience when reviewing historical service data
+
+- **Input Validation**: Enhanced form validation and user feedback
+  - Phone number validation with support for multiple formats
+  - Real-time input formatting with visual feedback
+  - Improved error messaging for invalid phone numbers
+
+### Fixed
+- **TypeScript Build Issues**: Resolved compilation errors for production builds
+  - Fixed missing `setAvailability` method in onboarding store
+  - Removed references to non-existent properties (reference, lyrics, participantRole)
+  - Added proper null safety checks in ServiceProgramPage
+  - Ensured clean production builds with no TypeScript errors
+
+- **Data Consistency**: Improved data handling across components
+  - Fixed phone number persistence through onboarding flow
+  - Resolved null pointer exceptions in resource linking
+  - Corrected form data validation and submission processes
+
+### Technical
+- **Store Management**: Enhanced Pinia store functionality
+  - Added `setAvailability` method to onboarding store for service availability tracking
+  - Improved type safety and method consistency across stores
+  - Better state management for form data persistence
+
+- **Build Process**: Optimized production build configuration
+  - Successful webpack/vite builds with proper code splitting
+  - Optimized bundle sizes with legacy browser support
+  - Firebase hosting deployment automation with 145 files successfully uploaded
+
+- **Component Architecture**: Improved component structure and data flow
+  - Better separation of concerns in service management components
+  - Enhanced prop validation and TypeScript interfaces
+  - Modular approach to form validation and data handling
+
 ## [1.4.0] - 2025-09-14
 
 ### Added
