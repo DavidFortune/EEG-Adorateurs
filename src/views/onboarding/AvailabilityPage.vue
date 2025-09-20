@@ -158,8 +158,6 @@ const loadServices = async () => {
       const serviceDate = new Date(`${service.date}T${service.time}:00`);
       return serviceDate > now;
     });
-    
-    onboardingStore.setAvailableServices(availableServices.value);
   } catch (error) {
     console.error('Error loading services:', error);
   }

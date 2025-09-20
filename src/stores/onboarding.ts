@@ -126,6 +126,14 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     return stepRoutes[5];
   };
 
+  const setAvailability = (serviceId: string, availability: 'available' | 'unavailable' | null) => {
+    if (availability === null) {
+      delete formData.value.availabilities[serviceId];
+    } else {
+      formData.value.availabilities[serviceId] = availability;
+    }
+  };
+
   const resetForm = () => {
     formData.value = {
       email: '',
@@ -155,6 +163,7 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     addMinistry,
     removeMinistry,
     toggleMinistry,
+    setAvailability,
     resetForm,
     markStepCompleted,
     isStepCompleted,

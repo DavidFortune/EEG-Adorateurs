@@ -153,7 +153,7 @@
                         <ion-icon :icon="getItemIcon(item.type)" />
                         {{ item.type }}
                       </div>
-                      <h4 class="item-title">{{ item.resourceId && getLinkedResource(item.resourceId) ? getLinkedResource(item.resourceId).title : item.title }}</h4>
+                      <h4 class="item-title">{{ item.resourceId && getLinkedResource(item.resourceId) ? getLinkedResource(item.resourceId)?.title : item.title }}</h4>
                       <p v-if="item.subtitle" class="item-subtitle">{{ item.subtitle }}</p>
 
                       <div v-if="item.notes" class="item-details">
@@ -261,7 +261,7 @@
                     <ion-icon :icon="getItemIcon(item.type)" />
                     {{ item.type }}
                   </div>
-                  <h4 class="item-title">{{ item.resourceId && getLinkedResource(item.resourceId) ? getLinkedResource(item.resourceId).title : item.title }}</h4>
+                  <h4 class="item-title">{{ item.resourceId && getLinkedResource(item.resourceId) ? getLinkedResource(item.resourceId)?.title : item.title }}</h4>
                   <p v-if="item.subtitle" class="item-subtitle">{{ item.subtitle }}</p>
                 </div>
                 
@@ -816,7 +816,7 @@
               <!-- YouTube Video -->
               <iframe
                 v-if="isYouTubeUrl(selectedMediaContent.url)"
-                :src="getYouTubeEmbedUrl(selectedMediaContent.url)"
+                :src="getYouTubeEmbedUrl(selectedMediaContent.url) || ''"
                 frameborder="0"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowfullscreen
@@ -1450,11 +1450,8 @@ const selectItemType = (itemType: ProgramItemType) => {
     title: '',
     subtitle: '',
     participantName: '',
-    participantRole: '',
     duration: 5,
-    reference: '',
     notes: '',
-    lyrics: '',
     resourceId: null
   };
   
@@ -1470,11 +1467,8 @@ const closeAddItemForm = () => {
     title: '',
     subtitle: '',
     participantName: '',
-    participantRole: '',
     duration: 5,
-    reference: '',
     notes: '',
-    lyrics: '',
     resourceId: null
   };
   // Reset position values
@@ -1594,16 +1588,7 @@ const saveEditItem = async () => {
     
     // Add optional fields if provided
     if (editItemForm.value.subtitle) itemData.subtitle = editItemForm.value.subtitle;
-    if (editItemForm.value.reference) itemData.reference = editItemForm.value.reference;
     if (editItemForm.value.notes) itemData.notes = editItemForm.value.notes;
-    // Handle lyrics field for songs
-    if (editItemForm.value.type === 'Chant') {
-      if (editItemForm.value.lyrics && editItemForm.value.lyrics.trim()) {
-        itemData.lyrics = editItemForm.value.lyrics.trim();
-      } else {
-        itemData.lyrics = '';
-      }
-    }
     
     // Add participant if provided
     if (editItemForm.value.participantName) {
