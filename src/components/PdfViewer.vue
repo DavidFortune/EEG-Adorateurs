@@ -130,8 +130,8 @@ import * as pdfjsLib from 'pdfjs-dist';
 import { Swiper } from 'swiper';
 import 'swiper/css';
 
-// Configure PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
+// Configure PDF.js worker - use local worker to avoid CORS issues
+pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
 
 interface Props {
   isOpen: boolean;
@@ -217,7 +217,7 @@ const loadPdf = async () => {
       loadingTask = pdfjsLib.getDocument({
         url: pdfUrl,
         withCredentials: false,
-        cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/cmaps/`,
+        cMapUrl: `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/cmaps/`,
         cMapPacked: true,
       });
 
@@ -246,7 +246,7 @@ const loadPdf = async () => {
 
           loadingTask = pdfjsLib.getDocument({
             data: arrayBuffer,
-            cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/cmaps/`,
+            cMapUrl: `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/cmaps/`,
             cMapPacked: true,
           });
 
@@ -279,7 +279,7 @@ const loadPdf = async () => {
 
         loadingTask = pdfjsLib.getDocument({
           data: arrayBuffer,
-          cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/cmaps/`,
+          cMapUrl: `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/cmaps/`,
           cMapPacked: true,
         });
 
