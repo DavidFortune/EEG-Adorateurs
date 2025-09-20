@@ -14,7 +14,7 @@
           <ion-label>Services</ion-label>
         </ion-tab-button>
 
-        <ion-tab-button v-if="isAdmin" tab="resources" href="/tabs/resources">
+        <ion-tab-button tab="resources" href="/tabs/resources">
           <ion-icon aria-hidden="true" :icon="libraryOutline" />
           <ion-label>Ressources</ion-label>
         </ion-tab-button>
@@ -37,7 +37,4 @@
 import { IonTabBar, IonTabButton, IonTabs, IonLabel, IonIcon, IonPage, IonRouterOutlet } from '@ionic/vue';
 import { home, calendar, checkboxOutline, people, libraryOutline } from 'ionicons/icons';
 import SideMenu from '@/components/SideMenu.vue';
-import { useUser } from '@/composables/useUser';
-
-const { isAdmin } = useUser();
 </script>
