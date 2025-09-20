@@ -23,13 +23,42 @@
       </div>
 
       <div v-else-if="error" class="error-container">
-        <ion-icon :icon="alertCircleOutline" color="danger" />
-        <p>{{ error }}</p>
-        <div class="error-actions">
-          <ion-button @click="loadPdf" fill="outline">Réessayer</ion-button>
-          <ion-button @click="openInBrowser" fill="clear" color="medium">
-            Ouvrir dans le navigateur
-          </ion-button>
+        <div v-if="!showFallbackViewer" class="error-message">
+          <ion-icon :icon="alertCircleOutline" color="danger" />
+          <p>{{ error }}</p>
+          <div class="error-actions">
+            <ion-button @click="loadPdf" fill="outline">Réessayer</ion-button>
+            <ion-button
+              v-if="isFirebaseStorageUrl(props.pdfUrl)"
+              @click="showFallbackViewer = true"
+              fill="clear"
+              color="primary"
+            >
+              Voir avec visionneuse simple
+            </ion-button>
+            <ion-button @click="openInBrowser" fill="clear" color="medium">
+              Ouvrir dans le navigateur
+            </ion-button>
+          </div>
+        </div>
+
+        <!-- Fallback iframe viewer for Firebase Storage -->
+        <div v-else class="fallback-viewer">
+          <div class="fallback-header">
+            <ion-button @click="showFallbackViewer = false" fill="clear" size="small">
+              <ion-icon :icon="arrowBackOutline" slot="start" />
+              Retour
+            </ion-button>
+            <span>Visionneuse simple</span>
+            <ion-button @click="openInBrowser" fill="clear" size="small">
+              <ion-icon :icon="expandOutline" />
+            </ion-button>
+          </div>
+          <iframe
+            :src="props.pdfUrl + '#toolbar=1&navpanes=0&scrollbar=1'"
+            class="fallback-iframe"
+            frameborder="0"
+          ></iframe>
         </div>
       </div>
 
@@ -126,6 +155,7 @@ const swiperContainer = ref<HTMLElement>();
 const swiper = ref<Swiper>();
 const pdfDocument = ref<any>(null);
 const canvasRefs = ref<Map<number, HTMLCanvasElement>>(new Map());
+const showFallbackViewer = ref(false);
 
 // Touch handling for zoom
 const initialDistance = ref(0);
@@ -153,6 +183,19 @@ const openInBrowser = () => {
   }
 };
 
+const isFirebaseStorageUrl = (url: string): boolean => {
+  return url.includes('firebasestorage.googleapis.com') || url.includes('storage.googleapis.com');
+};
+
+const getFirebaseStorageDownloadUrl = (url: string): string => {
+  // For Firebase Storage URLs, we can modify them to bypass CORS in some cases
+  if (url.includes('?alt=media')) {
+    // Add CORS bypass parameter
+    return url + '&cors=true';
+  }
+  return url;
+};
+
 const loadPdf = async () => {
   if (!props.pdfUrl) return;
 
@@ -160,12 +203,19 @@ const loadPdf = async () => {
   error.value = '';
 
   try {
+    let pdfUrl = props.pdfUrl;
+
+    // Special handling for Firebase Storage URLs
+    if (isFirebaseStorageUrl(pdfUrl)) {
+      pdfUrl = getFirebaseStorageDownloadUrl(pdfUrl);
+    }
+
     // First try: Direct URL with CORS configuration
     let loadingTask;
 
     try {
       loadingTask = pdfjsLib.getDocument({
-        url: props.pdfUrl,
+        url: pdfUrl,
         withCredentials: false,
         cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/cmaps/`,
         cMapPacked: true,
@@ -173,29 +223,68 @@ const loadPdf = async () => {
 
       pdfDocument.value = await loadingTask.promise;
     } catch (corsError) {
-      console.warn('Direct PDF loading failed, trying with fetch:', corsError);
+      console.warn('Direct PDF loading failed, trying alternative methods:', corsError);
 
-      // Second try: Fetch as blob and load
-      const response = await fetch(props.pdfUrl, {
-        mode: 'cors',
-        headers: {
-          'Accept': 'application/pdf',
+      // Second try: For Firebase Storage, try with XMLHttpRequest
+      if (isFirebaseStorageUrl(props.pdfUrl)) {
+        try {
+          const xhr = new XMLHttpRequest();
+          xhr.open('GET', props.pdfUrl, true);
+          xhr.responseType = 'arraybuffer';
+
+          const arrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+            xhr.onload = () => {
+              if (xhr.status === 200) {
+                resolve(xhr.response);
+              } else {
+                reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
+              }
+            };
+            xhr.onerror = () => reject(new Error('Network error'));
+            xhr.send();
+          });
+
+          loadingTask = pdfjsLib.getDocument({
+            data: arrayBuffer,
+            cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/cmaps/`,
+            cMapPacked: true,
+          });
+
+          pdfDocument.value = await loadingTask.promise;
+        } catch (xhrError) {
+          console.warn('XMLHttpRequest failed, trying fetch with no-cors:', xhrError);
+
+          // Third try: Fetch with no-cors mode (won't work for PDF.js but will provide better error)
+          const response = await fetch(props.pdfUrl, {
+            mode: 'no-cors',
+          });
+
+          // This will likely fail, but let's try anyway
+          throw new Error('CORS_BLOCKED');
         }
-      });
+      } else {
+        // Third try: Regular fetch for non-Firebase URLs
+        const response = await fetch(pdfUrl, {
+          mode: 'cors',
+          headers: {
+            'Accept': 'application/pdf',
+          }
+        });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+
+        loadingTask = pdfjsLib.getDocument({
+          data: arrayBuffer,
+          cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/cmaps/`,
+          cMapPacked: true,
+        });
+
+        pdfDocument.value = await loadingTask.promise;
       }
-
-      const arrayBuffer = await response.arrayBuffer();
-
-      loadingTask = pdfjsLib.getDocument({
-        data: arrayBuffer,
-        cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/cmaps/`,
-        cMapPacked: true,
-      });
-
-      pdfDocument.value = await loadingTask.promise;
     }
 
     totalPages.value = pdfDocument.value.numPages;
@@ -207,8 +296,12 @@ const loadPdf = async () => {
     console.error('Error loading PDF:', err);
 
     // Provide more specific error messages
-    if (err.message.includes('Failed to fetch') || err.message.includes('CORS')) {
-      error.value = 'Impossible de charger le PDF à cause des restrictions de sécurité. Le serveur doit autoriser l\'accès CORS.';
+    if (err.message === 'CORS_BLOCKED' || err.message.includes('CORS') || err.message.includes('Failed to fetch')) {
+      if (isFirebaseStorageUrl(props.pdfUrl)) {
+        error.value = 'Impossible de charger le PDF depuis Firebase Storage à cause des restrictions CORS. Utilisez le bouton ci-dessous pour ouvrir le PDF.';
+      } else {
+        error.value = 'Impossible de charger le PDF à cause des restrictions de sécurité. Le serveur doit autoriser l\'accès CORS.';
+      }
     } else if (err.message.includes('Invalid PDF')) {
       error.value = 'Le fichier PDF semble être corrompu ou invalide.';
     } else if (err.message.includes('HTTP')) {
@@ -340,6 +433,7 @@ watch(() => props.isOpen, (isOpen) => {
   if (isOpen && props.pdfUrl) {
     currentPage.value = 1;
     currentScale.value = 1;
+    showFallbackViewer.value = false;
     loadPdf();
   } else if (!isOpen) {
     // Cleanup
@@ -349,6 +443,7 @@ watch(() => props.isOpen, (isOpen) => {
     }
     canvasRefs.value.clear();
     pdfDocument.value = null;
+    showFallbackViewer.value = false;
   }
 });
 
@@ -380,6 +475,31 @@ onUnmounted(() => {
   gap: 0.5rem;
   flex-wrap: wrap;
   justify-content: center;
+}
+
+.fallback-viewer {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.fallback-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  font-size: 0.9rem;
+}
+
+.fallback-iframe {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: white;
 }
 
 .pdf-container {
