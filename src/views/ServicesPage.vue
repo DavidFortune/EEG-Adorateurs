@@ -87,7 +87,8 @@
                   size="small"
                   class="header-action-button"
                 >
-                  <ion-icon :icon="peopleOutline" slot="icon-only" />
+                  <ion-icon :icon="peopleOutline" slot="start" />
+                  <ion-label>Équipes</ion-label>
                 </ion-button>
                 <ion-button
                   v-if="hasServiceProgram(service)"
@@ -96,7 +97,8 @@
                   size="small"
                   class="header-action-button"
                 >
-                  <ion-icon :icon="documentTextOutline" slot="icon-only" />
+                  <ion-icon :icon="documentTextOutline" slot="start" />
+                  <ion-label>Programme</ion-label>
                 </ion-button>
               </div>
             </div>
@@ -301,16 +303,16 @@ onMounted(() => {
 }
 
 .header-action-button {
-  --border-radius: 50%;
-  --padding-start: 8px;
-  --padding-end: 8px;
-  --height: 36px;
-  --width: 36px;
-  min-width: 36px;
+  --border-radius: 20px;
+  --padding-start: 12px;
+  --padding-end: 12px;
+  --height: 32px;
+  font-size: 0.875rem;
 }
 
 .header-action-button ion-icon {
-  font-size: 1.2rem;
+  font-size: 1rem;
+  margin-right: 4px;
 }
 
 .empty-state {
@@ -361,6 +363,12 @@ onMounted(() => {
     flex-direction: column;
     gap: 0.5rem;
   }
+
+  .header-actions {
+    align-self: flex-start;
+    margin-left: 0;
+    margin-top: 0.5rem;
+  }
   
   .card-badges {
     flex-direction: row;
@@ -381,6 +389,17 @@ onMounted(() => {
   
   ion-card-subtitle {
     font-size: 0.8rem !important;
+  }
+
+  .header-action-button {
+    --height: 28px;
+    font-size: 0.8rem;
+    --padding-start: 8px;
+    --padding-end: 8px;
+  }
+
+  .header-action-button ion-icon {
+    font-size: 0.9rem;
   }
 }
 </style>
