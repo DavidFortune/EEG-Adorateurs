@@ -24,17 +24,26 @@
 
       <div v-else-if="error" class="error-container">
         <div v-if="!showFallbackViewer" class="error-message">
-          <ion-icon :icon="alertCircleOutline" color="danger" />
+          <ion-icon
+            :icon="isFirebaseStorageUrl(props.pdfUrl) ? informationCircleOutline : alertCircleOutline"
+            :color="isFirebaseStorageUrl(props.pdfUrl) ? 'primary' : 'danger'"
+          />
           <p>{{ error }}</p>
           <div class="error-actions">
-            <ion-button @click="loadPdf" fill="outline">Réessayer</ion-button>
+            <ion-button
+              v-if="!isFirebaseStorageUrl(props.pdfUrl)"
+              @click="loadPdf"
+              fill="outline"
+            >
+              Réessayer
+            </ion-button>
             <ion-button
               v-if="isFirebaseStorageUrl(props.pdfUrl)"
               @click="showFallbackViewer = true"
-              fill="clear"
+              fill="solid"
               color="primary"
             >
-              Voir avec visionneuse simple
+              Utiliser la visionneuse simple
             </ion-button>
             <ion-button @click="openInBrowser" fill="clear" color="medium">
               Ouvrir dans le navigateur
@@ -124,7 +133,7 @@ import {
 } from '@ionic/vue';
 import {
   arrowBackOutline, expandOutline, contractOutline, alertCircleOutline,
-  chevronBackOutline, chevronForwardOutline
+  chevronBackOutline, chevronForwardOutline, informationCircleOutline
 } from 'ionicons/icons';
 import * as pdfjsLib from 'pdfjs-dist';
 import { Swiper } from 'swiper';
@@ -203,17 +212,18 @@ const loadPdf = async () => {
   error.value = '';
 
   try {
-    let pdfUrl = props.pdfUrl;
-
-    // Special handling for Firebase Storage URLs
-    if (isFirebaseStorageUrl(pdfUrl)) {
-      pdfUrl = getFirebaseStorageDownloadUrl(pdfUrl);
+    // For Firebase Storage URLs, skip PDF.js and go directly to fallback
+    if (isFirebaseStorageUrl(props.pdfUrl)) {
+      console.log('Firebase Storage URL detected, using fallback viewer');
+      throw new Error('FIREBASE_STORAGE_CORS');
     }
 
-    // First try: Direct URL with CORS configuration
+    // For other URLs, try PDF.js first
+    let pdfUrl = props.pdfUrl;
     let loadingTask;
 
     try {
+      // First try: Direct URL loading
       loadingTask = pdfjsLib.getDocument({
         url: pdfUrl,
         withCredentials: false,
@@ -223,68 +233,29 @@ const loadPdf = async () => {
 
       pdfDocument.value = await loadingTask.promise;
     } catch (corsError) {
-      console.warn('Direct PDF loading failed, trying alternative methods:', corsError);
+      console.warn('Direct PDF loading failed, trying fetch method:', corsError);
 
-      // Second try: For Firebase Storage, try with XMLHttpRequest
-      if (isFirebaseStorageUrl(props.pdfUrl)) {
-        try {
-          const xhr = new XMLHttpRequest();
-          xhr.open('GET', props.pdfUrl, true);
-          xhr.responseType = 'arraybuffer';
-
-          const arrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
-            xhr.onload = () => {
-              if (xhr.status === 200) {
-                resolve(xhr.response);
-              } else {
-                reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
-              }
-            };
-            xhr.onerror = () => reject(new Error('Network error'));
-            xhr.send();
-          });
-
-          loadingTask = pdfjsLib.getDocument({
-            data: arrayBuffer,
-            cMapUrl: `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/cmaps/`,
-            cMapPacked: true,
-          });
-
-          pdfDocument.value = await loadingTask.promise;
-        } catch (xhrError) {
-          console.warn('XMLHttpRequest failed, trying fetch with no-cors:', xhrError);
-
-          // Third try: Fetch with no-cors mode (won't work for PDF.js but will provide better error)
-          const response = await fetch(props.pdfUrl, {
-            mode: 'no-cors',
-          });
-
-          // This will likely fail, but let's try anyway
-          throw new Error('CORS_BLOCKED');
+      // Second try: Fetch as blob and load
+      const response = await fetch(pdfUrl, {
+        mode: 'cors',
+        headers: {
+          'Accept': 'application/pdf',
         }
-      } else {
-        // Third try: Regular fetch for non-Firebase URLs
-        const response = await fetch(pdfUrl, {
-          mode: 'cors',
-          headers: {
-            'Accept': 'application/pdf',
-          }
-        });
+      });
 
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const arrayBuffer = await response.arrayBuffer();
-
-        loadingTask = pdfjsLib.getDocument({
-          data: arrayBuffer,
-          cMapUrl: `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/cmaps/`,
-          cMapPacked: true,
-        });
-
-        pdfDocument.value = await loadingTask.promise;
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
+
+      const arrayBuffer = await response.arrayBuffer();
+
+      loadingTask = pdfjsLib.getDocument({
+        data: arrayBuffer,
+        cMapUrl: `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/cmaps/`,
+        cMapPacked: true,
+      });
+
+      pdfDocument.value = await loadingTask.promise;
     }
 
     totalPages.value = pdfDocument.value.numPages;
@@ -295,19 +266,21 @@ const loadPdf = async () => {
   } catch (err: any) {
     console.error('Error loading PDF:', err);
 
-    // Provide more specific error messages
-    if (err.message === 'CORS_BLOCKED' || err.message.includes('CORS') || err.message.includes('Failed to fetch')) {
-      if (isFirebaseStorageUrl(props.pdfUrl)) {
-        error.value = 'Impossible de charger le PDF depuis Firebase Storage à cause des restrictions CORS. Utilisez le bouton ci-dessous pour ouvrir le PDF.';
-      } else {
-        error.value = 'Impossible de charger le PDF à cause des restrictions de sécurité. Le serveur doit autoriser l\'accès CORS.';
-      }
+    // Provide more specific error messages based on error type
+    if (err.message === 'FIREBASE_STORAGE_CORS') {
+      error.value = 'Les PDFs Firebase Storage ne peuvent pas être affichés avec la visionneuse avancée à cause des restrictions CORS. Utilisez la visionneuse simple ci-dessous.';
+      // Automatically show fallback viewer for Firebase Storage
+      setTimeout(() => {
+        showFallbackViewer.value = true;
+      }, 500);
+    } else if (err.message.includes('Failed to fetch') || err.message.includes('CORS')) {
+      error.value = 'Impossible de charger le PDF à cause des restrictions de sécurité. Essayez les options ci-dessous.';
     } else if (err.message.includes('Invalid PDF')) {
       error.value = 'Le fichier PDF semble être corrompu ou invalide.';
     } else if (err.message.includes('HTTP')) {
       error.value = `Erreur du serveur: ${err.message}`;
     } else {
-      error.value = 'Erreur lors du chargement du PDF. Veuillez réessayer.';
+      error.value = 'Erreur lors du chargement du PDF. Veuillez essayer les options ci-dessous.';
     }
   } finally {
     loading.value = false;
