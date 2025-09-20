@@ -71,49 +71,67 @@
           </ion-card-header>
           <ion-card-content>
             <div v-if="upcomingServices.length > 0">
-              <div 
-                v-for="service in upcomingServices.slice(0, 2)" 
-                :key="service.id" 
+              <div
+                v-for="service in upcomingServices.slice(0, 3)"
+                :key="service.id"
                 class="service-item"
               >
                 <div class="service-info">
                   <h4 class="service-title">{{ service.title }}</h4>
                   <p class="service-date">{{ formatServiceDateTime(service.date, service.time) }}</p>
+
+                  <!-- Assignment Status -->
+                  <div class="assignment-status">
+                    <ion-chip
+                      v-if="getUserAssignmentStatus(service.id)"
+                      color="success"
+                      class="status-chip"
+                    >
+                      <ion-icon :icon="checkmarkCircle" slot="start"></ion-icon>
+                      <ion-label>Assigné</ion-label>
+                    </ion-chip>
+                    <ion-chip
+                      v-else
+                      color="medium"
+                      class="status-chip"
+                    >
+                      <ion-icon :icon="helpOutline" slot="start"></ion-icon>
+                      <ion-label>Non assigné</ion-label>
+                    </ion-chip>
+                  </div>
                 </div>
-                <div class="availability-status">
-                  <ion-chip 
-                    v-if="getServiceAvailability(service.id) === 'available'"
-                    color="success"
-                    class="status-chip"
+
+                <!-- Action Buttons -->
+                <div class="service-actions">
+                  <ion-button
+                    v-if="hasTeamRequirements(service)"
+                    @click="goToServiceMembers(service.id)"
+                    fill="clear"
+                    size="small"
+                    class="action-button"
                   >
-                    <ion-icon :icon="checkmarkOutline" slot="start"></ion-icon>
-                    <ion-label>Disponible</ion-label>
-                  </ion-chip>
-                  <ion-chip 
-                    v-else-if="getServiceAvailability(service.id) === 'unavailable'"
-                    color="danger"
-                    class="status-chip"
+                    <ion-icon :icon="peopleOutline" slot="start" />
+                    <ion-label>Équipes</ion-label>
+                  </ion-button>
+                  <ion-button
+                    v-if="hasServiceProgram(service)"
+                    @click="goToServiceProgram(service.id)"
+                    fill="clear"
+                    size="small"
+                    class="action-button"
                   >
-                    <ion-icon :icon="closeOutline" slot="start"></ion-icon>
-                    <ion-label>Indisponible</ion-label>
-                  </ion-chip>
-                  <ion-chip 
-                    v-else
-                    color="warning"
-                    class="status-chip"
-                  >
-                    <ion-icon :icon="helpOutline" slot="start"></ion-icon>
-                    <ion-label>À définir</ion-label>
-                  </ion-chip>
+                    <ion-icon :icon="bookOutline" slot="start" />
+                    <ion-label>Programme</ion-label>
+                  </ion-button>
                 </div>
               </div>
-              <ion-button 
-                fill="clear" 
-                expand="block" 
+              <ion-button
+                fill="clear"
+                expand="block"
                 class="view-all-button"
-                @click="() => router.push('/tabs/disponibilites')"
+                @click="() => router.push('/tabs/services')"
               >
-                Voir toutes mes disponibilités
+                Voir tous les services
                 <ion-icon :icon="arrowForwardOutline" slot="end"></ion-icon>
               </ion-button>
             </div>
@@ -208,21 +226,24 @@ import {
   IonChip, IonLabel
 } from '@ionic/vue';
 import {
-  bookOutline, peopleOutline, checkmarkCircle, calendarOutline, checkmarkOutline,
-  closeOutline, helpOutline, arrowForwardOutline, homeOutline, phonePortraitOutline,
+  bookOutline, peopleOutline, checkmarkCircle, calendarOutline,
+  helpOutline, arrowForwardOutline, homeOutline, phonePortraitOutline,
   addOutline
 } from 'ionicons/icons';
 import { useUser } from '@/composables/useUser';
 import { serviceService } from '@/services/serviceService';
+import { assignmentsService } from '@/firebase/assignments';
 import { timezoneUtils } from '@/utils/timezone';
 import UserMenu from '@/components/UserMenu.vue';
 import InstallPrompt from '@/components/InstallPrompt.vue';
 import type { Service } from '@/types/service';
+import type { ServiceAssignment } from '@/types/assignment';
 
 const router = useRouter();
 const { userAvatar, userInitials, userName, member } = useUser();
 const isUserMenuOpen = ref(false);
 const upcomingServices = ref<Service[]>([]);
+const userAssignments = ref<ServiceAssignment[]>([]);
 
 const memberFirstName = computed(() => {
   return member.value?.firstName || 'Ami(e)';
@@ -245,8 +266,43 @@ const formatServiceDateTime = (date: string, time: string) => {
   return timezoneUtils.formatDateTimeForDisplay(date, time);
 };
 
-const getServiceAvailability = (serviceId: string): 'available' | 'unavailable' | null => {
-  return member.value?.availabilities[serviceId] || null;
+const getUserAssignmentStatus = (serviceId: string): boolean => {
+  return userAssignments.value.some(assignment => assignment.serviceId === serviceId);
+};
+
+const hasTeamRequirements = (service: Service) => {
+  return service.isPublished && service.teamRequirements && service.teamRequirements.length > 0;
+};
+
+const hasServiceProgram = (service: Service) => {
+  return service.isPublished;
+};
+
+const goToServiceMembers = (serviceId: string) => {
+  router.push(`/service-members/${serviceId}`);
+};
+
+const goToServiceProgram = (serviceId: string) => {
+  router.push(`/service-program/${serviceId}`);
+};
+
+const loadUserAssignments = async () => {
+  try {
+    if (!member.value?.id || upcomingServices.value.length === 0) return;
+
+    const allAssignments: ServiceAssignment[] = [];
+
+    // Get assignments for each upcoming service
+    for (const service of upcomingServices.value) {
+      const serviceAssignments = await assignmentsService.getMemberServiceAssignments(service.id, member.value.id);
+      allAssignments.push(...serviceAssignments);
+    }
+
+    userAssignments.value = allAssignments;
+  } catch (error) {
+    console.error('Error loading user assignments:', error);
+    userAssignments.value = [];
+  }
 };
 
 const loadUpcomingServices = async () => {
@@ -269,8 +325,13 @@ const loadUpcomingServices = async () => {
   }
 };
 
-const handleRefresh = async (event: any) => {
+const loadData = async () => {
   await loadUpcomingServices();
+  await loadUserAssignments();
+};
+
+const handleRefresh = async (event: any) => {
+  await loadData();
   event.target.complete();
 };
 
@@ -338,7 +399,7 @@ const onAppInstalled = () => {
 };
 
 onMounted(() => {
-  loadUpcomingServices();
+  loadData();
   
   // Listen for the beforeinstallprompt event
   window.addEventListener('beforeinstallprompt', (e) => {
@@ -466,7 +527,7 @@ onMounted(() => {
 .service-item {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   padding: 1rem 0;
   border-bottom: 1px solid #F3F4F6;
 }
@@ -489,11 +550,32 @@ onMounted(() => {
 .service-date {
   font-size: 0.875rem;
   color: #6B7280;
-  margin: 0;
+  margin: 0 0 0.5rem 0;
 }
 
-.availability-status {
+.assignment-status {
+  margin-bottom: 0.5rem;
+}
+
+.service-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
   margin-left: 1rem;
+}
+
+.action-button {
+  --border-radius: 20px;
+  --padding-start: 12px;
+  --padding-end: 12px;
+  --height: 32px;
+  font-size: 0.8rem;
+  min-width: 100px;
+}
+
+.action-button ion-icon {
+  font-size: 0.9rem;
+  margin-right: 4px;
 }
 
 .status-chip {
@@ -564,9 +646,18 @@ onMounted(() => {
     align-items: flex-start;
     gap: 0.5rem;
   }
-  
-  .availability-status {
+
+  .service-actions {
     margin-left: 0;
+    margin-top: 0.5rem;
+    flex-direction: row;
+    gap: 0.5rem;
+  }
+
+  .action-button {
+    min-width: 80px;
+    font-size: 0.75rem;
+    --height: 28px;
   }
 }
 </style>
