@@ -25,7 +25,12 @@
       <div v-else-if="error" class="error-container">
         <ion-icon :icon="alertCircleOutline" color="danger" />
         <p>{{ error }}</p>
-        <ion-button @click="loadPdf" fill="outline">Réessayer</ion-button>
+        <div class="error-actions">
+          <ion-button @click="loadPdf" fill="outline">Réessayer</ion-button>
+          <ion-button @click="openInBrowser" fill="clear" color="medium">
+            Ouvrir dans le navigateur
+          </ion-button>
+        </div>
       </div>
 
       <div v-else class="pdf-container" :class="{ 'fullscreen': isFullscreen }">
@@ -97,7 +102,7 @@ import { Swiper } from 'swiper';
 import 'swiper/css';
 
 // Configure PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
 
 interface Props {
   isOpen: boolean;
@@ -142,6 +147,12 @@ const toggleFullscreen = () => {
   isFullscreen.value = !isFullscreen.value;
 };
 
+const openInBrowser = () => {
+  if (props.pdfUrl) {
+    window.open(props.pdfUrl, '_blank');
+  }
+};
+
 const loadPdf = async () => {
   if (!props.pdfUrl) return;
 
@@ -149,8 +160,44 @@ const loadPdf = async () => {
   error.value = '';
 
   try {
-    const loadingTask = pdfjsLib.getDocument(props.pdfUrl);
-    pdfDocument.value = await loadingTask.promise;
+    // First try: Direct URL with CORS configuration
+    let loadingTask;
+
+    try {
+      loadingTask = pdfjsLib.getDocument({
+        url: props.pdfUrl,
+        withCredentials: false,
+        cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/cmaps/`,
+        cMapPacked: true,
+      });
+
+      pdfDocument.value = await loadingTask.promise;
+    } catch (corsError) {
+      console.warn('Direct PDF loading failed, trying with fetch:', corsError);
+
+      // Second try: Fetch as blob and load
+      const response = await fetch(props.pdfUrl, {
+        mode: 'cors',
+        headers: {
+          'Accept': 'application/pdf',
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+
+      loadingTask = pdfjsLib.getDocument({
+        data: arrayBuffer,
+        cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/cmaps/`,
+        cMapPacked: true,
+      });
+
+      pdfDocument.value = await loadingTask.promise;
+    }
+
     totalPages.value = pdfDocument.value.numPages;
 
     await nextTick();
@@ -158,7 +205,17 @@ const loadPdf = async () => {
     await renderAllPages();
   } catch (err: any) {
     console.error('Error loading PDF:', err);
-    error.value = 'Erreur lors du chargement du PDF. Vérifiez que le lien est valide.';
+
+    // Provide more specific error messages
+    if (err.message.includes('Failed to fetch') || err.message.includes('CORS')) {
+      error.value = 'Impossible de charger le PDF à cause des restrictions de sécurité. Le serveur doit autoriser l\'accès CORS.';
+    } else if (err.message.includes('Invalid PDF')) {
+      error.value = 'Le fichier PDF semble être corrompu ou invalide.';
+    } else if (err.message.includes('HTTP')) {
+      error.value = `Erreur du serveur: ${err.message}`;
+    } else {
+      error.value = 'Erreur lors du chargement du PDF. Veuillez réessayer.';
+    }
   } finally {
     loading.value = false;
   }
@@ -316,6 +373,13 @@ onUnmounted(() => {
   height: 100%;
   text-align: center;
   gap: 1rem;
+}
+
+.error-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 .pdf-container {
