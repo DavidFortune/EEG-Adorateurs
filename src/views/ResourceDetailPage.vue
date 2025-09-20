@@ -53,115 +53,152 @@
         
         <!-- Resource Contents -->
         <div class="resource-contents">
-          <ion-segment v-if="resource.contents.length > 1" v-model="selectedContentIndex" scrollable>
-            <ion-segment-button v-for="(content, index) in resource.contents" :key="index" :value="index">
-              <ion-icon :icon="getContentIcon(content.type)" />
-              <ion-label>{{ getContentLabel(content.type) }}</ion-label>
+          <ion-segment v-if="availableTypes.length > 1" :value="selectedContentType" @ionChange="(event) => selectedContentType = event.detail.value as ResourceType" scrollable>
+            <ion-segment-button v-for="type in availableTypes" :key="type" :value="type">
+              <ion-icon :icon="getContentIcon(type)" />
+              <ion-label>{{ getContentLabel(type) }}</ion-label>
             </ion-segment-button>
           </ion-segment>
-          
-          <div class="content-display" v-if="selectedContent">
-            <!-- Notes Display -->
-            <div v-if="selectedContent.notes" class="content-notes">
-              <ion-card>
-                <ion-card-header>
-                  <ion-card-subtitle>Notes</ion-card-subtitle>
-                </ion-card-header>
-                <ion-card-content>
-                  {{ selectedContent.notes }}
-                </ion-card-content>
-              </ion-card>
-            </div>
-            
+
+          <div class="content-display" v-if="selectedContents.length > 0">
             <!-- Lyrics Display -->
-            <div v-if="selectedContent.type === ResourceTypeEnum.LYRICS" class="lyrics-content">
-              <pre>{{ selectedContent.content }}</pre>
-            </div>
-            
-            <!-- Video Display -->
-            <div v-if="selectedContent.type === ResourceTypeEnum.VIDEO" class="video-content">
-              <!-- YouTube video embedded as iframe -->
-              <iframe
-                v-if="selectedContent.url && isYouTubeUrl(selectedContent.url)"
-                :src="getYouTubeEmbedUrl(selectedContent.url) || ''"
-                frameborder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowfullscreen
-                class="video-player"
-              ></iframe>
-              <!-- Regular video file -->
-              <video 
-                v-else-if="selectedContent.url" 
-                :src="selectedContent.url" 
-                controls 
-                class="video-player"
-                :poster="selectedContent.thumbnailUrl"
-              ></video>
-            </div>
-            
-            <!-- Audio Display -->
-            <div v-if="selectedContent.type === ResourceTypeEnum.AUDIO" class="audio-content">
-              <audio 
-                v-if="selectedContent.url" 
-                :src="selectedContent.url" 
-                controls 
-                class="audio-player"
-              ></audio>
-            </div>
-            
-            <!-- YouTube Display -->
-            <div v-if="selectedContent.type === ResourceTypeEnum.YOUTUBE" class="youtube-content">
-              <iframe
-                v-if="getYouTubeEmbedUrl(selectedContent.url)"
-                :src="getYouTubeEmbedUrl(selectedContent.url) || undefined"
-                frameborder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowfullscreen
-                class="youtube-player"
-              ></iframe>
-              <ion-button 
-                v-else-if="selectedContent.url" 
-                :href="selectedContent.url" 
-                target="_blank" 
-                expand="block"
-              >
-                <ion-icon :icon="logoYoutube" slot="start" />
-                Ouvrir sur YouTube
-              </ion-button>
-            </div>
-            
-            <!-- Music Sheet Display -->
-            <div v-if="selectedContent.type === ResourceTypeEnum.MUSIC_SHEET" class="chart-content">
-              <ion-button 
-                v-if="selectedContent.url" 
-                :href="selectedContent.url" 
-                target="_blank" 
-                expand="block"
-                download=""
-              >
-                <ion-icon :icon="downloadOutline" slot="start" />
-                Télécharger la partition
-              </ion-button>
-              <div v-if="selectedContent.content" class="chart-preview">
-                <pre>{{ selectedContent.content }}</pre>
+            <div v-if="selectedContentType === ResourceTypeEnum.LYRICS" class="lyrics-content">
+              <div v-for="(content, index) in selectedContents" :key="index" class="content-item">
+                <div v-if="content.notes" class="content-notes">
+                  <ion-card>
+                    <ion-card-header>
+                      <ion-card-subtitle>Notes</ion-card-subtitle>
+                    </ion-card-header>
+                    <ion-card-content>
+                      {{ content.notes }}
+                    </ion-card-content>
+                  </ion-card>
+                </div>
+                <pre>{{ content.content }}</pre>
               </div>
             </div>
-            
+
+            <!-- Video Display -->
+            <div v-if="selectedContentType === ResourceTypeEnum.VIDEO" class="video-content">
+              <div v-for="(content, index) in selectedContents" :key="index" class="content-item">
+                <div v-if="content.notes" class="content-notes">
+                  <ion-card>
+                    <ion-card-header>
+                      <ion-card-subtitle>Notes</ion-card-subtitle>
+                    </ion-card-header>
+                    <ion-card-content>
+                      {{ content.notes }}
+                    </ion-card-content>
+                  </ion-card>
+                </div>
+
+                <!-- YouTube video embedded as iframe -->
+                <iframe
+                  v-if="content.url && (isYouTubeUrl(content.url) || content.type === ResourceTypeEnum.YOUTUBE)"
+                  :src="getYouTubeEmbedUrl(content.url) || ''"
+                  frameborder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowfullscreen
+                  class="video-player"
+                ></iframe>
+                <!-- Regular video file -->
+                <video
+                  v-else-if="content.url"
+                  :src="content.url"
+                  controls
+                  class="video-player"
+                  :poster="content.thumbnailUrl"
+                ></video>
+                <ion-button
+                  v-else-if="content.url && content.type === ResourceTypeEnum.YOUTUBE"
+                  :href="content.url"
+                  target="_blank"
+                  expand="block"
+                >
+                  <ion-icon :icon="logoYoutube" slot="start" />
+                  Ouvrir sur YouTube
+                </ion-button>
+              </div>
+            </div>
+
+            <!-- Audio Display -->
+            <div v-if="selectedContentType === ResourceTypeEnum.AUDIO" class="audio-content">
+              <div v-for="(content, index) in selectedContents" :key="index" class="content-item">
+                <div v-if="content.notes" class="content-notes">
+                  <ion-card>
+                    <ion-card-header>
+                      <ion-card-subtitle>Notes</ion-card-subtitle>
+                    </ion-card-header>
+                    <ion-card-content>
+                      {{ content.notes }}
+                    </ion-card-content>
+                  </ion-card>
+                </div>
+                <audio
+                  v-if="content.url"
+                  :src="content.url"
+                  controls
+                  class="audio-player"
+                ></audio>
+              </div>
+            </div>
+
+            <!-- Music Sheet Display -->
+            <div v-if="selectedContentType === ResourceTypeEnum.MUSIC_SHEET" class="chart-content">
+              <div v-for="(content, index) in selectedContents" :key="index" class="content-item">
+                <div v-if="content.notes" class="content-notes">
+                  <ion-card>
+                    <ion-card-header>
+                      <ion-card-subtitle>Notes</ion-card-subtitle>
+                    </ion-card-header>
+                    <ion-card-content>
+                      {{ content.notes }}
+                    </ion-card-content>
+                  </ion-card>
+                </div>
+                <ion-button
+                  v-if="content.url"
+                  :href="content.url"
+                  target="_blank"
+                  expand="block"
+                  download=""
+                >
+                  <ion-icon :icon="downloadOutline" slot="start" />
+                  Télécharger la partition
+                </ion-button>
+                <div v-if="content.content" class="chart-preview">
+                  <pre>{{ content.content }}</pre>
+                </div>
+              </div>
+            </div>
+
             <!-- File Display -->
-            <div v-if="selectedContent.type === ResourceTypeEnum.FILE" class="file-content">
-              <ion-button 
-                v-if="selectedContent.url" 
-                :href="selectedContent.url" 
-                target="_blank" 
-                expand="block"
-                download=""
-              >
-                <ion-icon :icon="downloadOutline" slot="start" />
-                Télécharger le fichier
-              </ion-button>
-              <div v-if="selectedContent.mimeType" class="file-info">
-                <p>Type: {{ selectedContent.mimeType }}</p>
-                <p v-if="selectedContent.fileSize">Taille: {{ formatFileSize(selectedContent.fileSize) }}</p>
+            <div v-if="selectedContentType === ResourceTypeEnum.FILE" class="file-content">
+              <div v-for="(content, index) in selectedContents" :key="index" class="content-item">
+                <div v-if="content.notes" class="content-notes">
+                  <ion-card>
+                    <ion-card-header>
+                      <ion-card-subtitle>Notes</ion-card-subtitle>
+                    </ion-card-header>
+                    <ion-card-content>
+                      {{ content.notes }}
+                    </ion-card-content>
+                  </ion-card>
+                </div>
+                <ion-button
+                  v-if="content.url"
+                  :href="content.url"
+                  target="_blank"
+                  expand="block"
+                  download=""
+                >
+                  <ion-icon :icon="downloadOutline" slot="start" />
+                  Télécharger le fichier
+                </ion-button>
+                <div v-if="content.mimeType" class="file-info">
+                  <p>Type: {{ content.mimeType }}</p>
+                  <p v-if="content.fileSize">Taille: {{ formatFileSize(content.fileSize) }}</p>
+                </div>
               </div>
             </div>
           </div>
@@ -219,7 +256,7 @@ const { isAdmin } = useUser();
 const resource = ref<Resource | null>(null);
 const collections = ref<ResourceCollection[]>([]);
 const loading = ref(true);
-const selectedContentIndex = ref(0);
+const selectedContentType = ref<ResourceType | undefined>(undefined);
 
 // Make enum available in template
 const ResourceTypeEnum = ResourceType;
@@ -229,9 +266,38 @@ const resourceCollections = computed(() => {
   return collections.value.filter(c => resource.value!.collectionIds.includes(c.id));
 });
 
-const selectedContent = computed(() => {
-  if (!resource.value || resource.value.contents.length === 0) return null;
-  return resource.value.contents[selectedContentIndex.value];
+const contentsByType = computed(() => {
+  if (!resource.value) return new Map();
+
+  const grouped = new Map<ResourceType, typeof resource.value.contents>();
+  resource.value.contents.forEach(content => {
+    // Group VIDEO and YOUTUBE types together under VIDEO
+    const groupType = content.type === ResourceType.YOUTUBE ? ResourceType.VIDEO : content.type;
+
+    if (!grouped.has(groupType)) {
+      grouped.set(groupType, []);
+    }
+    grouped.get(groupType)!.push(content);
+  });
+
+  return grouped;
+});
+
+const availableTypes = computed(() => {
+  const typeOrder = [
+    ResourceType.LYRICS,
+    ResourceType.VIDEO,
+    ResourceType.AUDIO,
+    ResourceType.MUSIC_SHEET,
+    ResourceType.FILE
+  ];
+
+  return typeOrder.filter(type => contentsByType.value.has(type));
+});
+
+const selectedContents = computed(() => {
+  if (!selectedContentType.value) return [];
+  return contentsByType.value.get(selectedContentType.value) || [];
 });
 
 const loadResource = async () => {
@@ -286,15 +352,15 @@ const getContentLabel = (type: ResourceType) => {
     case ResourceType.LYRICS:
       return 'Paroles';
     case ResourceType.VIDEO:
-      return 'Vidéo';
+      return 'Vidéos';
     case ResourceType.AUDIO:
-      return 'Audio';
+      return 'Audios';
     case ResourceType.MUSIC_SHEET:
-      return 'Partition';
+      return 'Partitions';
     case ResourceType.YOUTUBE:
-      return 'YouTube';
+      return 'Vidéos';
     case ResourceType.FILE:
-      return 'Fichier';
+      return 'Fichiers';
     default:
       return type;
   }
@@ -379,6 +445,19 @@ const goBack = () => {
 
 onMounted(() => {
   loadResource();
+});
+
+// Auto-select first available type when resource loads
+const initializeSelectedType = () => {
+  if (availableTypes.value.length > 0 && !selectedContentType.value) {
+    selectedContentType.value = availableTypes.value[0];
+  }
+};
+
+// Watch for changes in available types to auto-select
+computed(() => {
+  initializeSelectedType();
+  return availableTypes.value;
 });
 </script>
 
@@ -491,6 +570,18 @@ onMounted(() => {
 .content-notes ion-card {
   background: var(--ion-color-light);
   border-left: 4px solid var(--ion-color-primary);
+}
+
+.content-item {
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--ion-color-light-shade);
+}
+
+.content-item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
 }
 
 @media (max-width: 768px) {
