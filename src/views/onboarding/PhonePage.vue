@@ -101,9 +101,11 @@ const isFormValid = computed(() => {
   const trimmed = phone.value.trim();
   if (trimmed === '') return false;
 
-  // Basic phone validation - accepts various formats
-  const phoneRegex = /^(\+?1[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})$/;
-  return phoneRegex.test(trimmed);
+  // Extract only digits
+  const digits = trimmed.replace(/\D/g, '');
+
+  // Must be exactly 10 digits (3+3+4 format)
+  return digits.length === 10;
 });
 
 const validatePhone = () => {
@@ -126,19 +128,17 @@ const applyPhoneMask = (value: string): string => {
   // Remove all non-digit characters
   const digits = value.replace(/\D/g, '');
 
+  // Limit to maximum 10 digits (3+3+4 format)
+  const limitedDigits = digits.slice(0, 10);
+
   // Apply mask based on number of digits
-  if (digits.length <= 3) {
-    return digits;
-  } else if (digits.length <= 6) {
-    return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
-  } else if (digits.length <= 10) {
-    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
-  } else if (digits.length === 11 && digits.startsWith('1')) {
-    return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7, 11)}`;
+  if (limitedDigits.length <= 3) {
+    return limitedDigits;
+  } else if (limitedDigits.length <= 6) {
+    return `(${limitedDigits.slice(0, 3)}) ${limitedDigits.slice(3)}`;
   } else {
-    // Limit to 10 digits for local format
-    const limitedDigits = digits.slice(0, 10);
-    return `(${limitedDigits.slice(0, 3)}) ${limitedDigits.slice(3, 6)}-${limitedDigits.slice(6)}`;
+    // Last block limited to 4 digits max
+    return `(${limitedDigits.slice(0, 3)}) ${limitedDigits.slice(3, 6)}-${limitedDigits.slice(6, 10)}`;
   }
 };
 

@@ -66,6 +66,7 @@ export function useUser() {
     userAvatar,
     userInitials,
     userName,
-    isAdmin
+    isAdmin,
+    loadMemberData
   }
 }

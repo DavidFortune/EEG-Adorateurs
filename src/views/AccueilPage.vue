@@ -43,13 +43,13 @@
                 <ion-icon :icon="phonePortraitOutline" color="primary"></ion-icon>
               </div>
               <div class="prompt-text">
-                <h3 class="prompt-title">Ajoutez votre numéro de téléphone</h3>
+                <h3 class="prompt-title">Restez connecté!</h3>
                 <p class="prompt-description">
-                  Recevez des rappels importants et restez informé des activités de l'église.
+                  Recevez les mises à jour et activités de l’église directement sur votre cellulaire.
                 </p>
               </div>
               <ion-button
-                @click="goToProfile"
+                @click="openPhoneModal"
                 fill="outline"
                 color="primary"
                 class="prompt-button"
@@ -200,12 +200,19 @@
         </ion-card>
       </div>
       
-      <UserMenu 
-        :is-open="isUserMenuOpen" 
-        trigger-id="avatar-trigger-accueil" 
+      <UserMenu
+        :is-open="isUserMenuOpen"
+        trigger-id="avatar-trigger-accueil"
         @close="closeUserMenu"
       />
     </ion-content>
+
+    <!-- Phone Request Modal -->
+    <PhoneRequestModal
+      :is-open="showPhoneModal"
+      @close="closePhoneModal"
+      @save="savePhoneNumber"
+    />
 
     <!-- PWA Install Prompt -->
     <InstallPrompt
@@ -234,16 +241,19 @@ import { useUser } from '@/composables/useUser';
 import { serviceService } from '@/services/serviceService';
 import { assignmentsService } from '@/firebase/assignments';
 import { timezoneUtils } from '@/utils/timezone';
+import { membersService } from '@/firebase/members';
 import UserMenu from '@/components/UserMenu.vue';
 import InstallPrompt from '@/components/InstallPrompt.vue';
+import PhoneRequestModal from '@/components/PhoneRequestModal.vue';
 import type { Service } from '@/types/service';
 import type { ServiceAssignment } from '@/types/assignment';
 
 const router = useRouter();
-const { userAvatar, userInitials, userName, member } = useUser();
+const { userAvatar, userInitials, userName, member, loadMemberData } = useUser();
 const isUserMenuOpen = ref(false);
 const upcomingServices = ref<Service[]>([]);
 const userAssignments = ref<ServiceAssignment[]>([]);
+const showPhoneModal = ref(false);
 
 const memberFirstName = computed(() => {
   return member.value?.firstName || 'Ami(e)';
@@ -344,8 +354,37 @@ const closeUserMenu = () => {
   isUserMenuOpen.value = false;
 };
 
-const goToProfile = () => {
-  router.push('/my-account');
+const openPhoneModal = () => {
+  showPhoneModal.value = true;
+};
+
+const closePhoneModal = () => {
+  showPhoneModal.value = false;
+};
+
+const savePhoneNumber = async (phoneNumber: string) => {
+  try {
+    if (!member.value?.id) {
+      console.error('No member ID found');
+      return;
+    }
+
+    const updatedMember = await membersService.updateMember(member.value.id, {
+      phone: phoneNumber
+    });
+
+    if (updatedMember) {
+      // Refresh member data to ensure it's current
+      await loadMemberData();
+      showPhoneModal.value = false;
+
+      // Show success message (optional - could add a toast notification)
+      console.log('Phone number saved successfully');
+    }
+  } catch (error) {
+    console.error('Error saving phone number:', error);
+    // Could show error toast here
+  }
 };
 
 // PWA Install Prompt Functions
@@ -400,7 +439,14 @@ const onAppInstalled = () => {
 
 onMounted(() => {
   loadData();
-  
+
+  // Auto-show phone popup after 2 seconds if user doesn't have phone
+  setTimeout(() => {
+    if (!memberPhone.value) {
+      showPhoneModal.value = true;
+    }
+  }, 2000);
+
   // Listen for the beforeinstallprompt event
   window.addEventListener('beforeinstallprompt', (e) => {
     console.log('beforeinstallprompt event fired');
@@ -408,7 +454,7 @@ onMounted(() => {
     deferredPrompt.value = e;
     showInstallPromptAfterDelay();
   });
-  
+
   // Listen for the appinstalled event
   window.addEventListener('appinstalled', () => {
     console.log('PWA was installed');
