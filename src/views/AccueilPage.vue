@@ -35,6 +35,32 @@
           </ion-card-content>
         </ion-card>
 
+        <!-- Availability Encouragement Card -->
+        <ion-card v-if="servicesAwaitingResponseCount > 0" class="encouragement-card">
+          <ion-card-content>
+            <div class="encouragement-content">
+              <div class="encouragement-icon">
+                <ion-icon :icon="handRightOutline" color="primary"></ion-icon>
+              </div>
+              <div class="encouragement-text">
+                <h3 class="encouragement-title">{{ servicesAwaitingResponseCount }} service{{ servicesAwaitingResponseCount > 1 ? 's' : '' }} en attente</h3>
+                <p class="encouragement-description">
+                  Aidez-nous à planifier les services en indiquant vos disponibilités. Votre engagement fait la différence.
+                </p>
+              </div>
+              <ion-button
+                @click="() => router.push('/tabs/disponibilites')"
+                fill="solid"
+                color="primary"
+                class="encouragement-button"
+              >
+                <ion-icon :icon="calendarOutline" slot="start"></ion-icon>
+                Indiquer mes disponibilités
+              </ion-button>
+            </div>
+          </ion-card-content>
+        </ion-card>
+
         <!-- Mobile Phone Prompt Card -->
         <ion-card v-if="!memberPhone" class="phone-prompt-card">
           <ion-card-content>
@@ -225,7 +251,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonCard, IonCardHeader, IonCardTitle, 
@@ -235,7 +261,7 @@ import {
 import {
   bookOutline, peopleOutline, checkmarkCircle, calendarOutline,
   helpOutline, arrowForwardOutline, homeOutline, phonePortraitOutline,
-  addOutline
+  addOutline, handRightOutline
 } from 'ionicons/icons';
 import { useUser } from '@/composables/useUser';
 import { serviceService } from '@/services/serviceService';
@@ -265,6 +291,24 @@ const memberMinistries = computed(() => {
 
 const memberPhone = computed(() => {
   return member.value?.phone;
+});
+
+const getServiceAvailability = (serviceId: string): 'available' | 'unavailable' | null => {
+  return member.value?.availabilities?.[serviceId] || null;
+};
+
+const isUserAssignedToService = (serviceId: string): boolean => {
+  return userAssignments.value.some(assignment => assignment.serviceId === serviceId);
+};
+
+const servicesAwaitingResponseCount = computed(() => {
+  if (!member.value) return 0;
+
+  return upcomingServices.value.filter(service => {
+    const availability = getServiceAvailability(service.id);
+    const isAssigned = isUserAssignedToService(service.id);
+    return availability === null && !isAssigned;
+  }).length;
 });
 
 // PWA Install Prompt
@@ -437,15 +481,22 @@ const onAppInstalled = () => {
   hasBeenPrompted.value = true;
 };
 
+// Watch for member data changes
+watch(() => member.value, (newMember) => {
+  if (newMember) {
+    loadData();
+  }
+}, { immediate: true });
+
 onMounted(() => {
   loadData();
 
-  // Auto-show phone popup after 2 seconds if user doesn't have phone
+  // Auto-show phone popup after 5 seconds if user doesn't have phone
   setTimeout(() => {
     if (!memberPhone.value) {
       showPhoneModal.value = true;
     }
-  }, 2000);
+  }, 5000);
 
   // Listen for the beforeinstallprompt event
   window.addEventListener('beforeinstallprompt', (e) => {
@@ -465,7 +516,7 @@ onMounted(() => {
 
 <style scoped>
 .content-container {
-  padding: 1rem;
+  padding: 0rem;
 }
 
 .header-avatar {
@@ -496,6 +547,56 @@ onMounted(() => {
   margin-bottom: 1.5rem;
   background: linear-gradient(135deg, var(--ion-color-primary) 0%, #9f1018 100%);
   color: white;
+}
+
+/* Encouragement Card */
+.encouragement-card {
+  margin-bottom: 1.5rem;
+  background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%);
+  border: 1px solid #3B82F6;
+}
+
+.encouragement-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 1rem;
+}
+
+.encouragement-icon {
+  flex-shrink: 0;
+}
+
+.encouragement-icon ion-icon {
+  font-size: 3rem;
+}
+
+.encouragement-text {
+  flex: 1;
+}
+
+.encouragement-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1E40AF;
+  margin: 0 0 0.5rem 0;
+}
+
+.encouragement-description {
+  font-size: 0.95rem;
+  color: #1E3A8A;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.encouragement-button {
+  --border-radius: 8px;
+  --padding-start: 20px;
+  --padding-end: 20px;
+  --height: 44px;
+  font-weight: 600;
+  font-size: 0.95rem;
 }
 
 .welcome-section ion-card-content {
@@ -705,6 +806,11 @@ onMounted(() => {
     min-width: 80px;
     font-size: 0.75rem;
     --height: 28px;
+  }
+
+  .encouragement-button {
+    align-self: stretch;
+    margin-top: 0.5rem;
   }
 }
 </style>

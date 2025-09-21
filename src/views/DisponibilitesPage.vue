@@ -19,40 +19,29 @@
       <ion-loading :is-open="loading" message="Chargement de vos disponibilités..."></ion-loading>
 
       <div class="ion-padding">
-        <!-- Segment Control -->
-        <div class="segment-container">
-          <ion-segment v-model="selectedSegment" @ionChange="onSegmentChange">
-            <ion-segment-button value="availabilities">
-              <ion-label>Mes disponibilités</ion-label>
-            </ion-segment-button>
-            <ion-segment-button value="assignments">
-              <ion-label>Mes assignations</ion-label>
-            </ion-segment-button>
-          </ion-segment>
-        </div>
-
         <!-- Availabilities View -->
-        <div v-if="selectedSegment === 'availabilities'" class="availabilities-view">
+        <div class="availabilities-view">
           <div class="header-section">
-            <h2>Vos disponibilités</h2>
             <p>Gérez votre disponibilité pour chaque service individuellement</p>
-            
-            <!-- Navigation to detailed availability submission -->
-            <ion-button 
-              expand="block" 
-              fill="outline" 
-              @click="goToAvailabilitySubmission"
-              class="submission-button"
-            >
-              <ion-icon :icon="createOutline" slot="start" />
-              Gérer mes disponibilités détaillées
-            </ion-button>
+
+            <!-- Segment Control -->
+            <ion-segment v-model="selectedSegment" mode="ios">
+              <ion-segment-button value="all">
+                <ion-label>Tous</ion-label>
+              </ion-segment-button>
+              <ion-segment-button value="answered">
+                <ion-label>Répondu</ion-label>
+              </ion-segment-button>
+              <ion-segment-button value="unanswered">
+                <ion-label>Sans réponse</ion-label>
+              </ion-segment-button>
+            </ion-segment>
           </div>
 
           <!-- Services List -->
-          <div class="services-list" v-if="availableServices.length > 0">
-            <div 
-              v-for="service in availableServices" 
+          <div class="services-list" v-if="filteredServices.length > 0">
+            <div
+              v-for="service in filteredServices" 
               :key="service.id"
               class="service-card"
               :class="{
@@ -104,65 +93,9 @@
           </div>
 
           <!-- No services message -->
-          <div v-if="availableServices.length === 0 && !loading" class="no-services">
+          <div v-if="filteredServices.length === 0 && !loading" class="no-services">
             <ion-icon :icon="calendarOutline" color="medium"></ion-icon>
-            <p>Aucun service disponible pour le moment</p>
-          </div>
-        </div>
-
-        <!-- Assignments View -->
-        <div v-if="selectedSegment === 'assignments'" class="assignments-view">
-          <div class="header-section">
-            <h2>Vos assignations</h2>
-            <p>Consultez les services pour lesquels vous êtes assigné</p>
-          </div>
-
-          <!-- Assignments List -->
-          <div class="assignments-list" v-if="userAssignments.length > 0">
-            <ion-card 
-              v-for="assignment in sortedAssignments" 
-              :key="assignment.id"
-              class="assignment-card"
-            >
-              <ion-card-header>
-                <div class="assignment-header">
-                  <div class="service-info">
-                    <ion-card-title class="service-title">
-                      {{ getServiceById(assignment.serviceId)?.title || 'Service inconnu' }}
-                    </ion-card-title>
-                    <ion-card-subtitle class="service-datetime">
-                      <ion-icon :icon="calendarOutline" />
-                      {{ formatAssignmentDateTime(assignment.serviceId) }}
-                    </ion-card-subtitle>
-                  </div>
-                  <ion-chip color="success" class="assignment-chip">
-                    <ion-icon :icon="checkmarkCircleOutline" />
-                    <ion-label>Assigné</ion-label>
-                  </ion-chip>
-                </div>
-              </ion-card-header>
-              
-              <ion-card-content>
-                <div class="assignment-details">
-                  <div class="team-info">
-                    <ion-icon :icon="peopleOutline" class="team-icon" />
-                    <span class="team-name">{{ assignment.teamName }}</span>
-                  </div>
-                  <div class="assignment-meta">
-                    <span class="assigned-date">
-                      Assigné le {{ formatAssignedDate(assignment.assignedAt) }}
-                    </span>
-                  </div>
-                </div>
-              </ion-card-content>
-            </ion-card>
-          </div>
-
-          <!-- No assignments message -->
-          <div v-if="userAssignments.length === 0 && !loading" class="no-assignments">
-            <ion-icon :icon="checkmarkCircleOutline" color="medium"></ion-icon>
-            <h3>Aucune assignation</h3>
-            <p>Vous n'êtes assigné à aucun service pour le moment</p>
+            <p>{{ getNoServicesMessage() }}</p>
           </div>
         </div>
 
@@ -172,17 +105,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, onMounted, watch, computed } from 'vue';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton,
-  IonIcon, IonRefresher, IonRefresherContent, IonLoading, IonSegment,
-  IonSegmentButton, IonLabel, IonCard, IonCardHeader, IonCardTitle,
-  IonCardSubtitle, IonCardContent, IonChip, toastController
+  IonIcon, IonRefresher, IonRefresherContent, IonLoading, IonLabel,
+  IonChip, IonSegment, IonSegmentButton, toastController
 } from '@ionic/vue';
 import {
-  thumbsUpOutline, thumbsDownOutline, calendarOutline, createOutline,
-  checkmarkCircleOutline, peopleOutline
+  thumbsUpOutline, thumbsDownOutline, calendarOutline,
+  checkmarkCircleOutline
 } from 'ionicons/icons';
 import { 
   collection, 
@@ -199,33 +130,12 @@ import type { Service } from '@/types/service';
 import type { ServiceAssignment } from '@/types/assignment';
 
 const { member } = useUser();
-const router = useRouter();
 const loading = ref(false);
-const selectedSegment = ref('availabilities');
 const availableServices = ref<Service[]>([]);
 const userAssignments = ref<ServiceAssignment[]>([]);
 const currentAvailabilities = ref<{ [serviceId: string]: 'available' | 'unavailable' | null }>({});
 const originalAvailabilities = ref<{ [serviceId: string]: 'available' | 'unavailable' | null }>({});
-
-
-// Computed properties
-const sortedAssignments = computed(() => {
-  return userAssignments.value
-    .filter(assignment => {
-      const service = getServiceById(assignment.serviceId);
-      if (!service) return false;
-      const serviceDate = new Date(`${service.date}T${service.time}:00`);
-      return serviceDate >= new Date();
-    })
-    .sort((a, b) => {
-      const serviceA = getServiceById(a.serviceId);
-      const serviceB = getServiceById(b.serviceId);
-      if (!serviceA || !serviceB) return 0;
-      const dateA = new Date(`${serviceA.date}T${serviceA.time}:00`);
-      const dateB = new Date(`${serviceB.date}T${serviceB.time}:00`);
-      return dateA.getTime() - dateB.getTime();
-    });
-});
+const selectedSegment = ref<'all' | 'answered' | 'unanswered'>('all');
 
 // Helper functions
 const formatServiceDateTime = (date: string, time: string) => {
@@ -236,31 +146,33 @@ const getServiceAvailability = (serviceId: string): 'available' | 'unavailable' 
   return currentAvailabilities.value[serviceId] || null;
 };
 
-const getServiceById = (serviceId: string): Service | undefined => {
-  return availableServices.value.find(service => service.id === serviceId);
-};
-
-const formatAssignmentDateTime = (serviceId: string): string => {
-  const service = getServiceById(serviceId);
-  if (!service) return 'Date inconnue';
-  return formatServiceDateTime(service.date, service.time);
-};
-
-const formatAssignedDate = (dateString: string): string => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric'
-  });
-};
-
 const isUserAssignedToService = (serviceId: string): boolean => {
   return userAssignments.value.some(assignment => assignment.serviceId === serviceId);
 };
 
-const onSegmentChange = () => {
-  // Segment change is handled by reactivity
+const filteredServices = computed(() => {
+  if (selectedSegment.value === 'all') {
+    return availableServices.value;
+  } else if (selectedSegment.value === 'answered') {
+    return availableServices.value.filter(service => {
+      const availability = getServiceAvailability(service.id);
+      return availability === 'available' || availability === 'unavailable' || isUserAssignedToService(service.id);
+    });
+  } else { // unanswered
+    return availableServices.value.filter(service => {
+      const availability = getServiceAvailability(service.id);
+      return availability === null && !isUserAssignedToService(service.id);
+    });
+  }
+});
+
+const getNoServicesMessage = (): string => {
+  if (selectedSegment.value === 'answered') {
+    return "Aucun service avec réponse";
+  } else if (selectedSegment.value === 'unanswered') {
+    return "Aucun service sans réponse";
+  }
+  return "Aucun service disponible pour le moment";
 };
 
 const setAvailability = async (serviceId: string, availability: 'available' | 'unavailable') => {
@@ -365,11 +277,6 @@ const showToast = async (message: string, color: 'success' | 'danger' = 'success
   await toast.present();
 };
 
-const goToAvailabilitySubmission = () => {
-  router.push('/availability-submission');
-};
-
-
 // Watch for member data changes
 watch(() => member.value, (newMember) => {
   if (newMember) {
@@ -387,15 +294,6 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.segment-container {
-  margin-bottom: 1.5rem;
-}
-
-.segment-container ion-segment {
-  border-radius: 8px;
-  background: var(--ion-color-light);
-}
-
 .header-section {
   margin-bottom: 2rem;
 }
@@ -413,10 +311,29 @@ onMounted(async () => {
   margin: 0 0 1rem 0;
 }
 
-.submission-button {
-  --border-radius: 12px;
+.header-section ion-segment {
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  --background: #F3F4F6;
+  border-radius: 8px;
+  padding: 2px;
+}
+
+.header-section ion-segment-button {
+  --indicator-color: #FFFFFF;
+  --color: #6B7280;
+  --color-checked: #111827;
   font-weight: 500;
-  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  min-height: 36px;
+  --padding-top: 8px;
+  --padding-bottom: 8px;
+  --border-radius: 6px;
+}
+
+.header-section ion-segment-button.segment-button-checked {
+  --background: #FFFFFF;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .services-list {
@@ -440,31 +357,36 @@ onMounted(async () => {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .service-info {
     margin-bottom: 1rem;
     text-align: center;
   }
-  
+
   .availability-buttons {
     justify-content: center;
     gap: 1rem;
   }
 }
 
+/* No answer = Border grey, no background (default style above) */
+
+/* Available = Border green, no background */
 .service-card.available {
-  background: #ECFDF5;
+  background: #FFFFFF;
   border-color: #10B981;
 }
 
+/* Unavailable = Border red, no background */
 .service-card.unavailable {
-  background: #FEF2F2;
+  background: #FFFFFF;
   border-color: #EF4444;
 }
 
+/* Assigned = Border green, background light green */
 .service-card.assigned {
-  background: #FFFBEB;
-  border-color: #F59E0B;
+  background: #ECFDF5;
+  border-color: #10B981;
 }
 
 .service-info {
@@ -538,99 +460,5 @@ onMounted(async () => {
 .no-services ion-icon {
   font-size: 3rem;
   margin-bottom: 1rem;
-}
-
-/* Assignment Styles */
-.assignments-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.assignment-card {
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  border-left: 4px solid var(--ion-color-success);
-}
-
-.assignment-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
-}
-
-.assignment-header .service-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.assignment-chip {
-  flex-shrink: 0;
-  font-weight: 500;
-}
-
-.assignment-details {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.team-info {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.team-icon {
-  font-size: 1.125rem;
-  color: var(--ion-color-primary);
-  flex-shrink: 0;
-}
-
-.team-name {
-  font-weight: 500;
-  color: var(--ion-color-dark);
-}
-
-.assignment-meta {
-  font-size: 0.875rem;
-  color: var(--ion-color-medium);
-}
-
-.no-assignments {
-  text-align: center;
-  padding: 3rem 2rem;
-  color: var(--ion-color-medium);
-}
-
-.no-assignments ion-icon {
-  font-size: 4rem;
-  margin-bottom: 1rem;
-}
-
-.no-assignments h3 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--ion-color-dark);
-  margin: 0 0 0.5rem 0;
-}
-
-.no-assignments p {
-  margin: 0;
-  font-size: 1rem;
-}
-
-/* Mobile responsive */
-@media (max-width: 768px) {
-  .assignment-header {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.75rem;
-  }
-  
-  .assignment-chip {
-    align-self: flex-start;
-  }
 }
 </style>
