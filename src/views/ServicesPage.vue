@@ -146,26 +146,37 @@ const filterMode = ref('upcoming');
 const filteredServices = computed(() => {
   const now = new Date();
 
+  // Filter out services with invalid dates first
+  const validServices = services.value.filter(service => {
+    const serviceDateTime = new Date(`${service.date}T${service.time}:00`);
+    return !isNaN(serviceDateTime.getTime());
+  });
+
+  const sortedServices = [...validServices].sort((a, b) => {
+    const dateA = new Date(`${a.date}T${a.time}:00`);
+    const dateB = new Date(`${b.date}T${b.time}:00`);
+    return filterMode.value === 'past'
+      ? dateB.getTime() - dateA.getTime()  // Past: most recent first
+      : dateA.getTime() - dateB.getTime(); // Upcoming/All: earliest first
+  });
+
   switch (filterMode.value) {
-    case 'upcoming':
-      return services.value.filter(service => {
-        const serviceDate = new Date(`${service.date}T${service.time}`);
-        return serviceDate >= now;
+    case 'upcoming': {
+      return sortedServices.filter(service => {
+        const serviceDateTime = new Date(`${service.date}T${service.time}:00`);
+        return serviceDateTime > now;
       });
-    case 'past':
-      return services.value
-        .filter(service => {
-          const serviceDate = new Date(`${service.date}T${service.time}`);
-          return serviceDate < now;
-        })
-        .sort((a, b) => {
-          // Sort past services from most recent to oldest
-          const dateA = new Date(`${a.date}T${a.time}`);
-          const dateB = new Date(`${b.date}T${b.time}`);
-          return dateB.getTime() - dateA.getTime();
-        });
+    }
+
+    case 'past': {
+      return sortedServices.filter(service => {
+        const serviceDateTime = new Date(`${service.date}T${service.time}:00`);
+        return serviceDateTime <= now;
+      });
+    }
+
     default:
-      return services.value;
+      return sortedServices;
   }
 });
 
@@ -173,12 +184,7 @@ const loadServices = async () => {
   loading.value = true;
   try {
     services.value = await serviceService.getAllServices();
-    // Sort by date and time
-    services.value.sort((a, b) => {
-      const dateA = new Date(`${a.date}T${a.time}`);
-      const dateB = new Date(`${b.date}T${b.time}`);
-      return dateA.getTime() - dateB.getTime();
-    });
+    // Note: Sorting is now handled in filteredServices computed property
   } catch (error) {
     console.error('Error loading services:', error);
   } finally {
@@ -329,6 +335,7 @@ onMounted(() => {
 }
 
 .service-card {
+  margin: 0rem;
   margin-bottom: 1rem;
 }
 

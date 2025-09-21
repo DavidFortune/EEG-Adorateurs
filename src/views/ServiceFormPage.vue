@@ -158,7 +158,7 @@
     </ion-content>
     
     <!-- Service DateTime Modal -->
-    <ion-modal :is-open="showServiceDateModal" @didDismiss="showServiceDateModal = false">
+    <ion-modal :is-open="showServiceDateModal" @didDismiss="showServiceDateModal = false" class="datetime-modal">
       <ion-header>
         <ion-toolbar>
           <ion-title>Date et heure du service</ion-title>
@@ -167,15 +167,19 @@
           </ion-buttons>
         </ion-toolbar>
       </ion-header>
-      <ion-content>
-        <ion-datetime
-          v-model="tempServiceDateTime"
-          presentation="date-time"
-          :min="minDateTime"
-          locale="fr-FR"
-          :hour-cycle="'h23'"
-        >
-        </ion-datetime>
+      <ion-content class="datetime-content">
+        <div class="datetime-container">
+          <ion-datetime
+            v-model="tempServiceDateTime"
+            presentation="date-time"
+            :min="minDateTime"
+            locale="fr-FR"
+            :hour-cycle="'h23'"
+            :first-day-of-week="1"
+            size="cover"
+          >
+          </ion-datetime>
+        </div>
         <div class="ion-padding">
           <ion-button expand="block" @click="confirmServiceDateTime">Confirmer</ion-button>
         </div>
@@ -183,7 +187,7 @@
     </ion-modal>
     
     <!-- Deadline DateTime Modal -->
-    <ion-modal :is-open="showDeadlineModal" @didDismiss="showDeadlineModal = false">
+    <ion-modal :is-open="showDeadlineModal" @didDismiss="showDeadlineModal = false" class="datetime-modal">
       <ion-header>
         <ion-toolbar>
           <ion-title>Date limite pour les disponibilités</ion-title>
@@ -192,16 +196,20 @@
           </ion-buttons>
         </ion-toolbar>
       </ion-header>
-      <ion-content>
-        <ion-datetime
-          v-model="tempDeadlineDateTime"
-          presentation="date-time"
-          :min="minDateTime"
-          :max="maxDeadlineDateTime"
-          locale="fr-FR"
-          :hour-cycle="'h23'"
-        >
-        </ion-datetime>
+      <ion-content class="datetime-content">
+        <div class="datetime-container">
+          <ion-datetime
+            v-model="tempDeadlineDateTime"
+            presentation="date-time"
+            :min="minDateTime"
+            :max="maxDeadlineDateTime"
+            locale="fr-FR"
+            :hour-cycle="'h23'"
+            :first-day-of-week="1"
+            size="cover"
+          >
+          </ion-datetime>
+        </div>
         <div class="ion-padding">
           <ion-button expand="block" @click="confirmDeadlineDateTime">Confirmer</ion-button>
           <ion-button expand="block" fill="clear" @click="clearDeadline">Supprimer la date limite</ion-button>
@@ -245,22 +253,20 @@ const categories = Object.values(ServiceCategory).map(category => ({
   label: category
 }));
 
-const minDate = computed(() => {
-  return timezoneUtils.getMinDate();
-});
-
 const minDateTime = computed(() => {
-  // Minimum datetime is current date and time
+  // Minimum datetime is current date and time in local timezone
   const now = new Date();
-  return now.toISOString();
+  // Remove milliseconds and 'Z' to avoid timezone issues
+  return now.toISOString().slice(0, 16);
 });
 
 const maxDeadlineDateTime = computed(() => {
   // Deadline can't be after the service date and time
   if (formData.date && formData.time) {
-    return `${formData.date}T${formData.time}:00`;
+    return `${formData.date}T${formData.time}`;
   }
-  return new Date().toISOString();
+  // Fallback to current date without timezone
+  return new Date().toISOString().slice(0, 16);
 });
 
 const formData = reactive({
@@ -391,30 +397,37 @@ const openServiceDatePicker = () => {
   if (formData.date && formData.time) {
     // Ensure we have the right format: YYYY-MM-DDTHH:MM
     tempServiceDateTime.value = `${formData.date}T${formData.time}`;
-    console.log('Using existing values:', tempServiceDateTime.value);
   } else {
-    // Default to tomorrow at 10:00
+    // Default to tomorrow at 10:00 in local timezone
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(10, 0, 0, 0);
-    // Use the datetime-local format (YYYY-MM-DDTHH:MM)
+
+    // Format as YYYY-MM-DDTHH:MM (ensure HH:MM format)
     const year = tomorrow.getFullYear();
     const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
     const day = String(tomorrow.getDate()).padStart(2, '0');
     const hours = String(tomorrow.getHours()).padStart(2, '0');
     const minutes = String(tomorrow.getMinutes()).padStart(2, '0');
+
     tempServiceDateTime.value = `${year}-${month}-${day}T${hours}:${minutes}`;
-    console.log('Using default values:', tempServiceDateTime.value);
   }
   showServiceDateModal.value = true;
 };
 
 const confirmServiceDateTime = () => {
   if (tempServiceDateTime.value) {
-    // tempServiceDateTime.value is in format "YYYY-MM-DDTHH:MM"
+    // tempServiceDateTime.value is in format "YYYY-MM-DDTHH:MM" or "YYYY-MM-DDTHH:MM:SS"
     const [datePart, timePart] = tempServiceDateTime.value.split('T');
     formData.date = datePart;
-    formData.time = timePart;
+
+    // Ensure time is in HH:MM format only (remove seconds if present)
+    if (timePart) {
+      const timeComponents = timePart.split(':');
+      formData.time = `${timeComponents[0]}:${timeComponents[1]}`;
+    } else {
+      formData.time = '10:00';
+    }
   }
   showServiceDateModal.value = false;
 };
@@ -435,7 +448,7 @@ const formatServiceDateTime = () => {
 
 const openDeadlinePicker = () => {
   if (formData.availabilityDeadline) {
-    // Convert ISO string to datetime-local format
+    // Convert ISO string to datetime-local format (HH:MM only)
     const date = new Date(formData.availabilityDeadline);
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -446,9 +459,10 @@ const openDeadlinePicker = () => {
   } else {
     // Default to 1 day before service at 23:59
     if (formData.date && formData.time) {
-      const serviceDate = new Date(`${formData.date}T${formData.time}`);
+      const serviceDate = new Date(`${formData.date}T${formData.time}:00`);
       serviceDate.setDate(serviceDate.getDate() - 1);
       serviceDate.setHours(23, 59, 0, 0);
+
       const year = serviceDate.getFullYear();
       const month = String(serviceDate.getMonth() + 1).padStart(2, '0');
       const day = String(serviceDate.getDate()).padStart(2, '0');
@@ -460,6 +474,7 @@ const openDeadlinePicker = () => {
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       tomorrow.setHours(23, 59, 0, 0);
+
       const year = tomorrow.getFullYear();
       const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
       const day = String(tomorrow.getDate()).padStart(2, '0');
@@ -523,9 +538,13 @@ const showToast = async (message: string, color: string) => {
 onMounted(async () => {
   // Initialize default values if not editing
   if (!isEditing.value) {
-    formData.date = minDate.value;
+    // Set default date to tomorrow
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    formData.date = tomorrow.toISOString().slice(0, 10); // YYYY-MM-DD format
+    formData.time = '10:00'; // Default time
   }
-  
+
   // Load teams first, then service data
   await loadTeams();
   await loadService();
@@ -545,32 +564,58 @@ ion-item ion-label h3 {
   color: var(--ion-color-dark);
 }
 
-ion-modal {
+/* DateTime Modal Styling */
+.datetime-modal {
   --height: auto;
   --max-height: 90vh;
+  --min-height: 600px;
 }
 
-ion-modal ion-content {
+.datetime-modal ion-content {
   --padding-top: 0;
   --padding-bottom: 1rem;
 }
 
-ion-modal ion-datetime {
-  margin: 0;
+.datetime-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.datetime-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  padding: 1rem;
+}
+
+.datetime-container ion-datetime {
   --background: transparent;
+  --border-radius: 8px;
+  width: 100%;
+  max-width: 350px;
 }
 
 @media (min-width: 768px) {
-  ion-modal {
+  .datetime-modal {
     --width: 500px;
     --border-radius: 12px;
+    --height: 600px;
   }
 }
 
 @media (max-width: 767px) {
-  ion-modal {
+  .datetime-modal {
     --width: 100%;
-    --height: 80vh;
+    --height: 85vh;
+    --min-height: 500px;
+  }
+
+  .datetime-container {
+    min-height: 350px;
+    padding: 0.5rem;
   }
 }
 

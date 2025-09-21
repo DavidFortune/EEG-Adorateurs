@@ -2,6 +2,75 @@
 
 All notable changes to EEG Adorateurs will be documented in this file.
 
+## [1.6.0] - 2025-09-21
+
+### Added
+- **Phone Request Modal**: New user engagement system for phone number collection
+  - Auto-display modal with 5-second delay on AccueilPage for users without phone numbers
+  - Bottom-sheet overlay style modal optimized for mobile and desktop
+  - Real-time phone validation with (XXX) XXX-XXXX formatting enforcement
+  - Maximum 10-digit validation with last block limited to 4 digits
+
+- **Availability Management**: Enhanced service availability system
+  - Segment control filtering (All/Answered/Unanswered) in DisponibilitésPage
+  - Service count notifications in AccueilPage showing unanswered availability requests
+  - Encouragement cards promoting user engagement with availability responses
+  - Smart filtering logic accounting for assigned vs unassigned services
+
+### Enhanced
+- **Navigation Experience**: Improved tab navigation and readability
+  - Reordered navigation tabs: Accueil, Disponibilités, Équipes, Services, Ressources
+  - Enhanced CSS with font smoothing, proper sizing, and GPU acceleration for crisp text/icons
+  - Improved contrast and visual clarity across all navigation elements
+
+- **AccueilPage Design**: Modernized home page layout and functionality
+  - Services content now displays directly on background without card wrapper
+  - Red alert cards for pending availability responses with specific count display
+  - Blue encouragement cards with positive messaging for user engagement
+  - Responsive design optimizations for mobile and desktop
+
+- **Services Management**: Improved service filtering and date handling
+  - Fixed timezone comparison issues for proper upcoming/past service categorization
+  - Enhanced date validation to filter out services with invalid date/time data
+  - Cleaned up service filtering logic with consistent HH:MM time format handling
+
+### Fixed
+- **DateTime Picker Issues**: Resolved calendar display problems in service forms
+  - Fixed modal sizing and positioning for proper datetime picker visibility
+  - Added proper CSS styling for datetime containers with adequate spacing
+  - Ensured consistent YYYY-MM-DDTHH:MM format handling without seconds
+  - Removed complex timezone conversions that caused display issues
+
+- **Time Format Consistency**: Standardized time handling across all forms
+  - Service times now consistently saved in HH:MM format (e.g., "11:00", "14:30")
+  - Fixed datetime picker extraction to remove seconds from time values
+  - Manual date formatting replaces problematic toISOString() usage
+  - Consistent time format in both service creation and deadline setting
+
+- **Phone Validation Issues**: Corrected phone input handling across multiple forms
+  - Fixed validation in MyAccountPage, PhonePage (onboarding), and PhoneRequestModal
+  - Enforced 10-digit maximum with proper last block validation (max 4 digits)
+  - Consistent (XXX) XXX-XXXX formatting with proper input masking
+
+### Technical
+- **Component Architecture**: Improved component structure and data flow
+  - Cleaned up DisponibilitésPage by removing assignments section and detailed availability button
+  - Updated availability card styles with specific border/background color specifications
+  - Enhanced computed properties for service filtering and availability counting
+  - Better error handling for invalid service dates
+
+- **CSS Improvements**: Enhanced styling and visual consistency
+  - Tab navigation CSS with font smoothing and contrast filters
+  - Availability card styling: grey border (no answer), green (available/assigned), red (unavailable)
+  - Modal styling improvements for datetime pickers with proper responsive design
+  - Removed rounded borders and unnecessary visual clutter
+
+- **Date/Time Processing**: Robust datetime handling improvements
+  - Invalid date filtering to prevent JavaScript errors
+  - Consistent date comparison logic for service categorization
+  - Proper timezone handling without complex conversion issues
+  - Manual date formatting for reliability across different environments
+
 ## [1.5.0] - 2025-09-20
 
 ### Added
