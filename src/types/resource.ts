@@ -8,9 +8,10 @@ export enum ResourceType {
 }
 
 export enum SortOption {
-  RECENT = 'recent',
-  RELEVANT = 'relevant',
-  ALPHABETICAL = 'alphabetical'
+  NEWEST = 'newest',
+  OLDEST = 'oldest',
+  ALPHABETICAL_ASC = 'alphabetical_asc',
+  ALPHABETICAL_DESC = 'alphabetical_desc'
 }
 
 export interface ResourceCollection {

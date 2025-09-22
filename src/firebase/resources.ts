@@ -207,21 +207,24 @@ export const getResources = async (filter?: ResourceFilter): Promise<Resource[]>
       constraints.push(where('collectionIds', 'array-contains-any', filter.collectionIds));
     }
     
-    // Apply sorting
+    // Apply sorting (though most sorting is now handled client-side)
     if (filter?.sortBy) {
       switch (filter.sortBy) {
-        case SortOption.RECENT:
-          constraints.push(orderBy('updatedAt', 'desc'));
+        case SortOption.NEWEST:
+          constraints.push(orderBy('createdAt', 'desc'));
           break;
-        case SortOption.ALPHABETICAL:
-          constraints.push(orderBy('title'));
+        case SortOption.OLDEST:
+          constraints.push(orderBy('createdAt', 'asc'));
           break;
-        case SortOption.RELEVANT:
-          constraints.push(orderBy('viewCount', 'desc'));
+        case SortOption.ALPHABETICAL_ASC:
+          constraints.push(orderBy('title', 'asc'));
+          break;
+        case SortOption.ALPHABETICAL_DESC:
+          constraints.push(orderBy('title', 'desc'));
           break;
       }
     } else {
-      constraints.push(orderBy('updatedAt', 'desc'));
+      constraints.push(orderBy('createdAt', 'desc'));
     }
     
     const q = query(collection(db, RESOURCES_COLLECTION), ...constraints);

@@ -51,17 +51,6 @@
             </ion-label>
           </ion-chip>
           
-          <ion-chip
-            @click="showTypeFilter = true"
-            outline
-            :color="selectedTypes.length > 0 ? 'primary' : undefined"
-          >
-            <ion-icon :icon="filterOutline" />
-            <ion-label>
-              Types
-              <span v-if="selectedTypes.length > 0">({{ selectedTypes.length }})</span>
-            </ion-label>
-          </ion-chip>
           
           <ion-chip
             @click="showSortOptions = true"
@@ -84,15 +73,6 @@
             <ion-icon :icon="closeCircle" />
           </ion-chip>
           
-          <ion-chip
-            v-for="type in selectedTypes"
-            :key="type"
-            @click="removeTypeFilter(type)"
-            color="secondary"
-          >
-            <ion-label>{{ getTypeLabel(type) }}</ion-label>
-            <ion-icon :icon="closeCircle" />
-          </ion-chip>
           
           <ion-chip @click="clearAllFilters" color="medium">
             <ion-label>Effacer tout</ion-label>
@@ -129,7 +109,7 @@
                   size="small"
                   :color="getTypeColor(type)"
                 >
-                  {{ getTypeLabel(type) }}
+                  <ion-icon :icon="getTypeIcon(type)" />
                 </ion-chip>
                 <span v-if="resource.viewCount" class="view-count">
                   <ion-icon :icon="eyeOutline" />
@@ -170,29 +150,6 @@
         </ion-content>
       </ion-modal>
       
-      <!-- Type Filter Modal -->
-      <ion-modal :is-open="showTypeFilter" @didDismiss="showTypeFilter = false">
-        <ion-header>
-          <ion-toolbar>
-            <ion-title>Filtrer par type</ion-title>
-            <ion-buttons slot="end">
-              <ion-button @click="showTypeFilter = false">Fermer</ion-button>
-            </ion-buttons>
-          </ion-toolbar>
-        </ion-header>
-        <ion-content class="ion-padding">
-          <ion-list>
-            <ion-item v-for="type in resourceTypes" :key="type.value">
-              <ion-checkbox
-                :checked="selectedTypes.includes(type.value)"
-                @ionChange="toggleTypeFilter(type.value)"
-              >
-                {{ type.label }}
-              </ion-checkbox>
-            </ion-item>
-          </ion-list>
-        </ion-content>
-      </ion-modal>
       
       <!-- Sort Options Action Sheet -->
       <ion-action-sheet
@@ -211,15 +168,15 @@ import { useRouter } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
   IonIcon, IonSearchbar, IonList, IonItem, IonLabel, IonChip, IonRefresher,
-  IonRefresherContent, IonLoading, IonModal, IonCheckbox, IonActionSheet, actionSheetController,
+  IonRefresherContent, IonLoading, IonModal, IonCheckbox, IonActionSheet,
   onIonViewWillEnter
 } from '@ionic/vue';
 import {
-  addOutline, folderOutline, filterOutline, swapVerticalOutline, closeCircle,
+  addOutline, folderOutline, swapVerticalOutline, closeCircle,
   documentTextOutline, eyeOutline, pencilOutline, musicalNotesOutline,
   videocamOutline, volumeHighOutline, logoYoutube, documentOutline
 } from 'ionicons/icons';
-import { Resource, ResourceCollection, ResourceType, SortOption, ResourceFilter } from '@/types/resource';
+import { Resource, ResourceCollection, ResourceType, SortOption } from '@/types/resource';
 import { getResources, getResourceCollections } from '@/firebase/resources';
 import { useUser } from '@/composables/useUser';
 
@@ -231,41 +188,34 @@ const resources = ref<Resource[]>([]);
 const collections = ref<ResourceCollection[]>([]);
 const searchQuery = ref('');
 const selectedCollections = ref<string[]>([]);
-const selectedTypes = ref<ResourceType[]>([]);
-const sortOption = ref<SortOption>(SortOption.RECENT);
+const sortOption = ref<SortOption>(SortOption.NEWEST);
 const showCollectionFilter = ref(false);
-const showTypeFilter = ref(false);
 const showSortOptions = ref(false);
 
-const resourceTypes = [
-  { value: ResourceType.LYRICS, label: 'Paroles' },
-  { value: ResourceType.VIDEO, label: 'Vidéo' },
-  { value: ResourceType.AUDIO, label: 'Audio' },
-  { value: ResourceType.MUSIC_SHEET, label: 'Partition' },
-  { value: ResourceType.YOUTUBE, label: 'YouTube' },
-  { value: ResourceType.FILE, label: 'Fichier' }
-];
 
 const sortButtons = [
   {
     text: 'Plus récent',
     handler: () => {
-      sortOption.value = SortOption.RECENT;
-      loadResources();
+      sortOption.value = SortOption.NEWEST;
     }
   },
   {
-    text: 'Plus pertinent',
+    text: 'Plus ancien',
     handler: () => {
-      sortOption.value = SortOption.RELEVANT;
-      loadResources();
+      sortOption.value = SortOption.OLDEST;
     }
   },
   {
-    text: 'Alphabétique',
+    text: 'Alphabétique (A-Z)',
     handler: () => {
-      sortOption.value = SortOption.ALPHABETICAL;
-      loadResources();
+      sortOption.value = SortOption.ALPHABETICAL_ASC;
+    }
+  },
+  {
+    text: 'Alphabétique (Z-A)',
+    handler: () => {
+      sortOption.value = SortOption.ALPHABETICAL_DESC;
     }
   },
   {
@@ -275,24 +225,92 @@ const sortButtons = [
 ];
 
 const hasActiveFilters = computed(() => {
-  return selectedCollections.value.length > 0 || selectedTypes.value.length > 0;
+  return selectedCollections.value.length > 0;
 });
 
 const filteredResources = computed(() => {
-  return resources.value;
+  let filtered = [...resources.value];
+
+  // Apply collection filter
+  if (selectedCollections.value.length > 0) {
+    filtered = filtered.filter(resource =>
+      resource.collectionIds.some(collectionId =>
+        selectedCollections.value.includes(collectionId)
+      )
+    );
+  }
+
+  // Apply search filter
+  if (searchQuery.value.trim()) {
+    const searchLower = searchQuery.value.toLowerCase().trim();
+    filtered = filtered.filter(resource => {
+      const searchableText = `${resource.title} ${resource.description || ''} ${resource.tags?.join(' ') || ''}`.toLowerCase();
+      return searchableText.includes(searchLower);
+    });
+  }
+
+  // Apply sorting
+  switch (sortOption.value) {
+    case SortOption.NEWEST:
+      return filtered.sort((a, b) => {
+        // Handle both Firebase Timestamp objects and ISO strings
+        const timeA = getTimestamp(a.createdAt);
+        const timeB = getTimestamp(b.createdAt);
+        return timeB - timeA; // Newest first (descending)
+      });
+
+    case SortOption.OLDEST:
+      return filtered.sort((a, b) => {
+        // Handle both Firebase Timestamp objects and ISO strings
+        const timeA = getTimestamp(a.createdAt);
+        const timeB = getTimestamp(b.createdAt);
+        return timeA - timeB; // Oldest first (ascending)
+      });
+
+    case SortOption.ALPHABETICAL_ASC:
+      return filtered.sort((a, b) => a.title.localeCompare(b.title, 'fr', { sensitivity: 'base' }));
+
+    case SortOption.ALPHABETICAL_DESC:
+      return filtered.sort((a, b) => b.title.localeCompare(a.title, 'fr', { sensitivity: 'base' }));
+
+    default:
+      return filtered;
+  }
 });
+
+// Helper function to extract timestamp from Firebase Timestamp or ISO string
+const getTimestamp = (date: any): number => {
+  if (!date) return 0;
+
+  // If it's a Firebase Timestamp object
+  if (date && typeof date === 'object' && 'toDate' in date) {
+    return date.toDate().getTime();
+  }
+
+  // If it's a string (ISO format)
+  if (typeof date === 'string') {
+    const parsed = new Date(date);
+    return isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+  }
+
+  // If it's already a Date object
+  if (date instanceof Date) {
+    return date.getTime();
+  }
+
+  // If it's a number (timestamp)
+  if (typeof date === 'number') {
+    return date;
+  }
+
+  return 0;
+};
 
 const loadResources = async () => {
   loading.value = true;
   try {
-    const filter: ResourceFilter = {
-      searchQuery: searchQuery.value || undefined,
-      collectionIds: selectedCollections.value.length > 0 ? selectedCollections.value : undefined,
-      resourceTypes: selectedTypes.value.length > 0 ? selectedTypes.value : undefined,
-      sortBy: sortOption.value
-    };
-    
-    resources.value = await getResources(filter);
+    // Load all resources, filtering will be done client-side
+    resources.value = await getResources();
   } catch (error) {
     console.error('Error loading resources:', error);
   } finally {
@@ -309,7 +327,7 @@ const loadResourceCollections = async () => {
 };
 
 const handleSearch = () => {
-  loadResources();
+  // Search filtering is now reactive through computed property, no need to reload
 };
 
 const handleRefresh = async (event: any) => {
@@ -324,40 +342,23 @@ const toggleCollectionFilter = (collectionId: string) => {
   } else {
     selectedCollections.value.push(collectionId);
   }
-  loadResources();
+  // Filtering is now reactive through computed property, no need to reload
 };
 
-const toggleTypeFilter = (type: ResourceType) => {
-  const index = selectedTypes.value.indexOf(type);
-  if (index > -1) {
-    selectedTypes.value.splice(index, 1);
-  } else {
-    selectedTypes.value.push(type);
-  }
-  loadResources();
-};
 
 const removeCollectionFilter = (collectionId: string) => {
   const index = selectedCollections.value.indexOf(collectionId);
   if (index > -1) {
     selectedCollections.value.splice(index, 1);
-    loadResources();
+    // Filtering is now reactive through computed property, no need to reload
   }
 };
 
-const removeTypeFilter = (type: ResourceType) => {
-  const index = selectedTypes.value.indexOf(type);
-  if (index > -1) {
-    selectedTypes.value.splice(index, 1);
-    loadResources();
-  }
-};
 
 const clearAllFilters = () => {
   selectedCollections.value = [];
-  selectedTypes.value = [];
   searchQuery.value = '';
-  loadResources();
+  // Filtering is now reactive through computed property, no need to reload
 };
 
 const getSelectedCollectionNames = () => {
@@ -366,12 +367,14 @@ const getSelectedCollectionNames = () => {
 
 const getSortLabel = () => {
   switch (sortOption.value) {
-    case SortOption.RECENT:
+    case SortOption.NEWEST:
       return 'Plus récent';
-    case SortOption.RELEVANT:
-      return 'Plus pertinent';
-    case SortOption.ALPHABETICAL:
-      return 'Alphabétique';
+    case SortOption.OLDEST:
+      return 'Plus ancien';
+    case SortOption.ALPHABETICAL_ASC:
+      return 'Alphabétique (A-Z)';
+    case SortOption.ALPHABETICAL_DESC:
+      return 'Alphabétique (Z-A)';
     default:
       return 'Trier';
   }
@@ -404,9 +407,24 @@ const getResourceTypes = (resource: Resource) => {
   return Array.from(types);
 };
 
-const getTypeLabel = (type: ResourceType) => {
-  const found = resourceTypes.find(t => t.value === type);
-  return found ? found.label : type;
+
+const getTypeIcon = (type: ResourceType) => {
+  switch (type) {
+    case ResourceType.LYRICS:
+      return documentTextOutline;
+    case ResourceType.VIDEO:
+      return videocamOutline;
+    case ResourceType.AUDIO:
+      return volumeHighOutline;
+    case ResourceType.MUSIC_SHEET:
+      return musicalNotesOutline;
+    case ResourceType.YOUTUBE:
+      return logoYoutube;
+    case ResourceType.FILE:
+      return documentOutline;
+    default:
+      return documentOutline;
+  }
 };
 
 const getTypeColor = (type: ResourceType) => {
@@ -484,6 +502,19 @@ onIonViewWillEnter(() => {
   align-items: center;
   gap: 0.5rem;
   margin-top: 0.5rem;
+}
+
+.resource-meta ion-chip {
+  --border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  justify-content: center;
+  align-items: center;
+}
+
+.resource-meta ion-chip ion-icon {
+  font-size: 16px;
 }
 
 .view-count {
