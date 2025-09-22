@@ -297,18 +297,30 @@ const getServiceAvailability = (serviceId: string): 'available' | 'unavailable' 
   return member.value?.availabilities?.[serviceId] || null;
 };
 
+// Memoize assignment lookup for better performance
+const userAssignmentSet = computed(() => {
+  return new Set(userAssignments.value.map(assignment => assignment.serviceId));
+});
+
 const isUserAssignedToService = (serviceId: string): boolean => {
-  return userAssignments.value.some(assignment => assignment.serviceId === serviceId);
+  return userAssignmentSet.value.has(serviceId);
 };
 
 const servicesAwaitingResponseCount = computed(() => {
   if (!member.value) return 0;
 
-  return upcomingServices.value.filter(service => {
+  const assignmentSet = userAssignmentSet.value;
+  let count = 0;
+
+  for (const service of upcomingServices.value) {
     const availability = getServiceAvailability(service.id);
-    const isAssigned = isUserAssignedToService(service.id);
-    return availability === null && !isAssigned;
-  }).length;
+    const isAssigned = assignmentSet.has(service.id);
+    if (availability === null && !isAssigned) {
+      count++;
+    }
+  }
+
+  return count;
 });
 
 // PWA Install Prompt
@@ -321,7 +333,7 @@ const formatServiceDateTime = (date: string, time: string) => {
 };
 
 const getUserAssignmentStatus = (serviceId: string): boolean => {
-  return userAssignments.value.some(assignment => assignment.serviceId === serviceId);
+  return userAssignmentSet.value.has(serviceId);
 };
 
 const hasTeamRequirements = (service: Service) => {
@@ -344,13 +356,21 @@ const loadUserAssignments = async () => {
   try {
     if (!member.value?.id || upcomingServices.value.length === 0) return;
 
+    const memberId = member.value.id;
+
+    // Load all assignments in parallel instead of sequential loop
+    const assignmentPromises = upcomingServices.value.map(service =>
+      assignmentsService.getMemberServiceAssignments(service.id, memberId)
+    );
+
+    const assignmentResults = await Promise.allSettled(assignmentPromises);
     const allAssignments: ServiceAssignment[] = [];
 
-    // Get assignments for each upcoming service
-    for (const service of upcomingServices.value) {
-      const serviceAssignments = await assignmentsService.getMemberServiceAssignments(service.id, member.value.id);
-      allAssignments.push(...serviceAssignments);
-    }
+    assignmentResults.forEach((result) => {
+      if (result.status === 'fulfilled') {
+        allAssignments.push(...result.value);
+      }
+    });
 
     userAssignments.value = allAssignments;
   } catch (error) {
@@ -363,16 +383,18 @@ const loadUpcomingServices = async () => {
   try {
     const services = await serviceService.getPublishedServices();
     const now = new Date();
-    upcomingServices.value = services
-      .filter(service => {
-        const serviceDate = new Date(`${service.date}T${service.time}:00`);
-        return serviceDate > now;
-      })
-      .sort((a, b) => {
-        const dateA = new Date(`${a.date}T${a.time}:00`);
-        const dateB = new Date(`${b.date}T${b.time}:00`);
-        return dateA.getTime() - dateB.getTime();
-      });
+    const nowTime = now.getTime();
+
+    // Pre-parse dates and filter/sort in a single pass for better performance
+    const servicesWithDates = services
+      .map(service => ({
+        ...service,
+        parsedDateTime: new Date(`${service.date}T${service.time}:00`)
+      }))
+      .filter(service => service.parsedDateTime.getTime() > nowTime)
+      .sort((a, b) => a.parsedDateTime.getTime() - b.parsedDateTime.getTime());
+
+    upcomingServices.value = servicesWithDates;
   } catch (error) {
     console.error('Error loading upcoming services:', error);
     upcomingServices.value = [];
@@ -380,6 +402,7 @@ const loadUpcomingServices = async () => {
 };
 
 const loadData = async () => {
+  // Load services first, then assignments (since assignments depend on services)
   await loadUpcomingServices();
   await loadUserAssignments();
 };

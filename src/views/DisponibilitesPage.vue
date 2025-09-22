@@ -147,23 +147,33 @@ const getServiceAvailability = (serviceId: string): 'available' | 'unavailable' 
 };
 
 const isUserAssignedToService = (serviceId: string): boolean => {
-  return userAssignments.value.some(assignment => assignment.serviceId === serviceId);
+  return userAssignmentSet.value.has(serviceId);
 };
 
+// Memoize assignment lookups for better performance
+const userAssignmentSet = computed(() => {
+  return new Set(userAssignments.value.map(assignment => assignment.serviceId));
+});
+
 const filteredServices = computed(() => {
-  if (selectedSegment.value === 'all') {
-    return availableServices.value;
-  } else if (selectedSegment.value === 'answered') {
-    return availableServices.value.filter(service => {
-      const availability = getServiceAvailability(service.id);
-      return availability === 'available' || availability === 'unavailable' || isUserAssignedToService(service.id);
-    });
-  } else { // unanswered
-    return availableServices.value.filter(service => {
-      const availability = getServiceAvailability(service.id);
-      return availability === null && !isUserAssignedToService(service.id);
-    });
+  const services = availableServices.value;
+  const assignmentSet = userAssignmentSet.value;
+  const segment = selectedSegment.value;
+
+  if (segment === 'all') {
+    return services;
   }
+
+  return services.filter(service => {
+    const availability = getServiceAvailability(service.id);
+    const isAssigned = assignmentSet.has(service.id);
+
+    if (segment === 'answered') {
+      return availability === 'available' || availability === 'unavailable' || isAssigned;
+    } else { // unanswered
+      return availability === null && !isAssigned;
+    }
+  });
 });
 
 const getNoServicesMessage = (): string => {
@@ -216,10 +226,16 @@ const loadServices = async () => {
   try {
     const services = await serviceService.getPublishedServices();
     const now = new Date();
-    availableServices.value = services.filter(service => {
-      const serviceDate = new Date(`${service.date}T${service.time}:00`);
-      return serviceDate > now;
-    });
+    const nowTime = now.getTime();
+
+    // Optimize date parsing and filtering
+    availableServices.value = services
+      .map(service => ({
+        ...service,
+        parsedDateTime: new Date(`${service.date}T${service.time}:00`)
+      }))
+      .filter(service => service.parsedDateTime.getTime() > nowTime)
+      .sort((a, b) => a.parsedDateTime.getTime() - b.parsedDateTime.getTime());
   } catch (error) {
     console.error('Error loading services:', error);
     await showToast('Erreur lors du chargement des services', 'danger');
@@ -259,12 +275,18 @@ const loadUserAssignments = async () => {
 
 
 const handleRefresh = async (event: any) => {
-  await Promise.all([
-    loadServices(),
-    loadUserAssignments()
-  ]);
-  loadMemberAvailabilities();
-  event.target.complete();
+  try {
+    await Promise.all([
+      loadServices(),
+      loadUserAssignments()
+    ]);
+    loadMemberAvailabilities();
+  } catch (error) {
+    console.error('Error during refresh:', error);
+    await showToast('Erreur lors de l\'actualisation', 'danger');
+  } finally {
+    event.target.complete();
+  }
 };
 
 const showToast = async (message: string, color: 'success' | 'danger' = 'success') => {

@@ -281,6 +281,11 @@ const formData = reactive({
 // Team requirements loaded from Firestore
 const teamRequirements = ref<TeamRequirement[]>([]);
 
+// Memoize active team requirements for better performance
+const activeTeamRequirements = computed(() =>
+  teamRequirements.value.filter(req => req.isActive && req.membersNeeded > 0)
+);
+
 const isFormValid = computed(() => {
   return formData.title.trim().length > 0 &&
          formData.date &&
@@ -291,9 +296,9 @@ const isFormValid = computed(() => {
 const loadTeams = async () => {
   try {
     const teams = await teamsService.getAllTeams();
-    // Convert teams to team requirements format
+    // Convert teams to team requirements format with better performance
     teamRequirements.value = teams
-      .sort((a, b) => a.name.localeCompare(b.name)) // Sort alphabetically
+      .sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' })) // Optimized French sort
       .map(team => ({
         teamName: team.name,
         membersNeeded: 0, // Default to 0 members needed
@@ -307,29 +312,33 @@ const loadTeams = async () => {
 
 const loadService = async () => {
   if (!isEditing.value) return;
-  
+
   const id = route.params.id as string;
   loading.value = true;
-  
+
   try {
     const service = await serviceService.getServiceById(id);
     if (service) {
-      formData.title = service.title;
-      formData.date = service.date;
-      formData.time = service.time;
-      formData.category = service.category;
-      formData.isPublished = service.isPublished;
-      formData.availabilityDeadline = service.availabilityDeadline || '';
-      
-      // Store service team requirements to apply after teams are loaded
+      // Use Object.assign for better performance with reactive objects
+      Object.assign(formData, {
+        title: service.title,
+        date: service.date,
+        time: service.time,
+        category: service.category,
+        isPublished: service.isPublished,
+        availabilityDeadline: service.availabilityDeadline || ''
+      });
+
+      // More efficient team requirements mapping
       const serviceTeamRequirements = service.teamRequirements || [];
-      
-      // Apply service team requirements to loaded teams
-      serviceTeamRequirements.forEach(req => {
-        const existingReq = teamRequirements.value.find(t => t.teamName === req.teamName);
-        if (existingReq) {
-          existingReq.membersNeeded = req.membersNeeded;
-          existingReq.isActive = req.isActive;
+      const teamReqMap = new Map(serviceTeamRequirements.map(req => [req.teamName, req]));
+
+      // Apply service team requirements using the map for O(1) lookup
+      teamRequirements.value.forEach(teamReq => {
+        const serviceReq = teamReqMap.get(teamReq.teamName);
+        if (serviceReq) {
+          teamReq.membersNeeded = serviceReq.membersNeeded;
+          teamReq.isActive = serviceReq.isActive;
         }
       });
     }
@@ -356,7 +365,7 @@ const saveService = async () => {
         category: formData.category,
         isPublished: formData.isPublished,
         availabilityDeadline: formData.availabilityDeadline || undefined,
-        teamRequirements: teamRequirements.value.filter(req => req.isActive && req.membersNeeded > 0)
+        teamRequirements: activeTeamRequirements.value
       };
       
       const updated = await serviceService.updateService(updateRequest);
@@ -372,7 +381,7 @@ const saveService = async () => {
         category: formData.category,
         isPublished: formData.isPublished,
         availabilityDeadline: formData.availabilityDeadline || undefined,
-        teamRequirements: teamRequirements.value.filter(req => req.isActive && req.membersNeeded > 0)
+        teamRequirements: activeTeamRequirements.value
       };
       
       const created = await serviceService.createService(createRequest);

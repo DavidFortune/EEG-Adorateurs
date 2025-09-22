@@ -126,7 +126,7 @@ import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
   IonIcon, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent,
   IonRefresher, IonRefresherContent, IonLoading, IonSegment, IonSegmentButton,
-  IonLabel, IonChip
+  IonLabel, IonChip, toastController
 } from '@ionic/vue';
 import {
   addOutline, calendarOutline, checkmarkCircle, timeOutline, timerOutline,
@@ -143,50 +143,62 @@ const services = ref<Service[]>([]);
 const loading = ref(false);
 const filterMode = ref('upcoming');
 
-const filteredServices = computed(() => {
-  const now = new Date();
+// Memoize service date parsing to avoid repeated computations
+const servicesWithParsedDates = computed(() => {
+  if (!services.value?.length) return [];
 
-  // Filter out services with invalid dates first
-  const validServices = services.value.filter(service => {
+  return services.value.map(service => {
     const serviceDateTime = new Date(`${service.date}T${service.time}:00`);
-    return !isNaN(serviceDateTime.getTime());
-  });
+    return {
+      ...service,
+      parsedDateTime: serviceDateTime,
+      isValidDate: !isNaN(serviceDateTime.getTime())
+    };
+  }).filter(service => service.isValidDate);
+});
 
-  const sortedServices = [...validServices].sort((a, b) => {
-    const dateA = new Date(`${a.date}T${a.time}:00`);
-    const dateB = new Date(`${b.date}T${b.time}:00`);
-    return filterMode.value === 'past'
-      ? dateB.getTime() - dateA.getTime()  // Past: most recent first
-      : dateA.getTime() - dateB.getTime(); // Upcoming/All: earliest first
-  });
+const filteredServices = computed(() => {
+  const validServices = servicesWithParsedDates.value;
+  if (!validServices.length) return [];
+
+  const now = new Date();
+  const nowTime = now.getTime();
+
+  // Filter first, then sort for better performance
+  let filtered: typeof validServices;
 
   switch (filterMode.value) {
-    case 'upcoming': {
-      return sortedServices.filter(service => {
-        const serviceDateTime = new Date(`${service.date}T${service.time}:00`);
-        return serviceDateTime > now;
-      });
-    }
-
-    case 'past': {
-      return sortedServices.filter(service => {
-        const serviceDateTime = new Date(`${service.date}T${service.time}:00`);
-        return serviceDateTime <= now;
-      });
-    }
-
+    case 'upcoming':
+      filtered = validServices.filter(service => service.parsedDateTime.getTime() > nowTime);
+      break;
+    case 'past':
+      filtered = validServices.filter(service => service.parsedDateTime.getTime() <= nowTime);
+      break;
     default:
-      return sortedServices;
+      filtered = validServices;
   }
+
+  // Sort the filtered results
+  return filtered.sort((a, b) => {
+    return filterMode.value === 'past'
+      ? b.parsedDateTime.getTime() - a.parsedDateTime.getTime()  // Past: most recent first
+      : a.parsedDateTime.getTime() - b.parsedDateTime.getTime(); // Upcoming/All: earliest first
+  });
 });
 
 const loadServices = async () => {
   loading.value = true;
   try {
     services.value = await serviceService.getAllServices();
-    // Note: Sorting is now handled in filteredServices computed property
   } catch (error) {
     console.error('Error loading services:', error);
+    // Show user-friendly error message
+    const toast = await toastController.create({
+      message: 'Erreur lors du chargement des services',
+      duration: 3000,
+      color: 'danger'
+    });
+    await toast.present();
   } finally {
     loading.value = false;
   }
@@ -201,6 +213,7 @@ const onFilterChange = (event: any) => {
   filterMode.value = event.detail.value;
 };
 
+// Memoize date formatting for better performance
 const formatDateTime = (dateStr: string, timeStr: string) => {
   return timezoneUtils.formatDateTimeForDisplay(dateStr, timeStr);
 };

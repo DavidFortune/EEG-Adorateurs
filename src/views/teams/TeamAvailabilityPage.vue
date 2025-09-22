@@ -178,21 +178,28 @@ const teamMembers = ref<Member[]>([]);
 const upcomingServices = ref<Service[]>([]);
 const selectedServiceId = ref<string>('all');
 
+// Memoize member lookups for better performance
+const teamMembersMap = computed(() => {
+  return new Map(teamMembers.value.map(member => [member.id, member]));
+});
+
 // Computed
 const teamMembersWithAvailability = computed(() => {
   if (!team.value) return [];
-  
+  const memberMap = teamMembersMap.value;
+  const services = upcomingServices.value;
+
   return team.value.members.map(teamMember => {
-    const memberDetails = teamMembers.value.find(m => m.id === teamMember.memberId);
+    const memberDetails = memberMap.get(teamMember.memberId);
     if (!memberDetails) return null;
-    
-    // Build availability map for this member
+
+    // Build availability map for this member - optimized
     const availability: Record<string, 'available' | 'unavailable' | 'maybe' | null> = {};
-    
-    upcomingServices.value.forEach(service => {
+
+    for (const service of services) {
       availability[service.id] = memberDetails.availabilities?.[service.id] || null;
-    });
-    
+    }
+
     return {
       id: memberDetails.id,
       fullName: memberDetails.fullName,
@@ -211,11 +218,15 @@ const availabilitySummary = computed(() => {
     maybe: 0,
     noResponse: 0
   };
-  
+
   if (selectedServiceId.value === 'all') return summary;
-  
-  teamMembersWithAvailability.value.forEach(member => {
-    const status = member.availability[selectedServiceId.value];
+
+  const serviceId = selectedServiceId.value;
+  const members = teamMembersWithAvailability.value;
+
+  // Optimized counting using for loop instead of forEach
+  for (let i = 0; i < members.length; i++) {
+    const status = members[i].availability[serviceId];
     switch (status) {
       case 'available':
         summary.available++;
@@ -229,8 +240,8 @@ const availabilitySummary = computed(() => {
       default:
         summary.noResponse++;
     }
-  });
-  
+  }
+
   return summary;
 });
 
@@ -238,30 +249,48 @@ const availabilitySummary = computed(() => {
 const loadTeamData = async () => {
   try {
     loading.value = true;
-    
-    // Load team details
-    const teamData = await teamsService.getTeamById(teamId);
+
+    // Load all data in parallel for better performance
+    const [teamData, allMembers, services] = await Promise.all([
+      teamsService.getTeamById(teamId),
+      membersService.getAllMembers(),
+      firestoreService.getAllServices()
+    ]);
+
     if (!teamData) {
       console.error('Team not found');
       return;
     }
     team.value = teamData;
-    
-    // Load member details for all team members
-    const memberIds = teamData.members.map(m => m.memberId);
-    const allMembers = await membersService.getAllMembers();
-    teamMembers.value = allMembers.filter(m => memberIds.includes(m.id));
-    
-    // Load upcoming services
-    const services = await firestoreService.getAllServices();
+
+    // Use Set for faster membership lookup
+    const memberIds = new Set(teamData.members.map(m => m.memberId));
+    teamMembers.value = allMembers.filter(m => memberIds.has(m.id));
+
+    // Optimize date parsing and filtering
     const now = new Date();
+    const nowTime = now.getTime();
+
     upcomingServices.value = services
-      .filter(s => new Date(`${s.date}T${s.time}`) >= now)
-      .sort((a, b) => new Date(`${a.date}T${a.time}`).getTime() - new Date(`${b.date}T${b.time}`).getTime())
+      .map(service => ({
+        ...service,
+        parsedDateTime: new Date(`${service.date}T${service.time}`)
+      }))
+      .filter(s => s.parsedDateTime.getTime() >= nowTime)
+      .sort((a, b) => a.parsedDateTime.getTime() - b.parsedDateTime.getTime())
       .slice(0, 5); // Show next 5 services
-      
+
   } catch (error) {
     console.error('Error loading team data:', error);
+    // Show user-friendly error
+    const toast = document.createElement('ion-toast');
+    toast.message = 'Erreur lors du chargement des données';
+    toast.duration = 3000;
+    toast.color = 'danger';
+    document.body.appendChild(toast);
+    toast.present().then(() => {
+      setTimeout(() => document.body.removeChild(toast), 3100);
+    });
   } finally {
     loading.value = false;
   }

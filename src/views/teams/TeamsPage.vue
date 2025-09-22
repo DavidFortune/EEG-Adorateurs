@@ -94,7 +94,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonCard, IonCardContent, 
@@ -116,8 +116,13 @@ const members = ref<Member[]>([]);
 const loading = ref(true);
 const isAdmin = ref(false);
 
+// Memoize member lookup for better performance
+const membersMap = computed(() => {
+  return new Map(members.value.map(member => [member.id, member]));
+});
+
 const getOwnerName = (ownerId: string) => {
-  const owner = members.value.find(m => m.id === ownerId);
+  const owner = membersMap.value.get(ownerId);
   return owner ? owner.fullName : 'Propriétaire inconnu';
 };
 
@@ -141,12 +146,22 @@ const loadTeams = async () => {
       teamsService.getAllTeams(),
       membersService.getAllMembers()
     ]);
-    // Sort teams alphabetically by name
-    teams.value = teamsData.sort((a, b) => a.name.localeCompare(b.name));
-    // Sort members alphabetically by fullName
-    members.value = membersData.sort((a, b) => a.fullName.localeCompare(b.fullName));
+    // Sort teams alphabetically by name with optimized French locale
+    teams.value = teamsData.sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }));
+    // Sort members alphabetically by fullName with optimized French locale
+    members.value = membersData.sort((a, b) => a.fullName.localeCompare(b.fullName, 'fr', { sensitivity: 'base' }));
   } catch (error) {
     console.error('Error loading teams:', error);
+    // Show user-friendly error
+    const toast = document.createElement('ion-toast');
+    toast.message = 'Erreur lors du chargement des équipes';
+    toast.duration = 3000;
+    toast.color = 'danger';
+    document.body.appendChild(toast);
+    toast.present().then(() => {
+      // Clean up to prevent memory leaks
+      setTimeout(() => document.body.removeChild(toast), 3100);
+    });
   } finally {
     loading.value = false;
   }

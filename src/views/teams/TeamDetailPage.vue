@@ -393,10 +393,10 @@ const canDelete = computed(() => {
 
 const availableMembers = computed(() => {
   if (!team.value) return [];
-  const teamMemberIds = team.value.members.map(m => m.memberId);
+  const teamMemberIds = new Set(team.value.members.map(m => m.memberId));
   return members.value
-    .filter(m => !teamMemberIds.includes(m.id))
-    .sort((a, b) => a.fullName.localeCompare(b.fullName));
+    .filter(m => !teamMemberIds.has(m.id))
+    .sort((a, b) => a.fullName.localeCompare(b.fullName, 'fr', { sensitivity: 'base' }));
 });
 
 const isOwner = computed(() => {
@@ -411,32 +411,41 @@ const hasOtherMembers = computed(() => {
 
 const eligibleNewOwners = computed(() => {
   if (!team.value) return [];
+  const memberMap = membersMap.value;
+
   return team.value.members
     .filter(m => m.role !== 'owner')
-    .map(m => getMemberData(m.memberId))
-    .filter(m => m !== undefined)
-    .sort((a, b) => a.fullName.localeCompare(b.fullName)) as Member[];
+    .map(m => memberMap.get(m.memberId))
+    .filter((m): m is Member => m !== undefined)
+    .sort((a, b) => a.fullName.localeCompare(b.fullName, 'fr', { sensitivity: 'base' }));
 });
 
 const sortedTeamMembers = computed(() => {
   if (!team.value) return [];
+  const memberMap = membersMap.value;
+
   return [...team.value.members].sort((a, b) => {
-    const memberA = getMemberData(a.memberId);
-    const memberB = getMemberData(b.memberId);
-    
+    const memberA = memberMap.get(a.memberId);
+    const memberB = memberMap.get(b.memberId);
+
     // Always put owner first
     if (a.role === 'owner') return -1;
     if (b.role === 'owner') return 1;
-    
-    // Then sort alphabetically by name
+
+    // Then sort alphabetically by name with optimized locale
     const nameA = memberA?.fullName || '';
     const nameB = memberB?.fullName || '';
-    return nameA.localeCompare(nameB);
+    return nameA.localeCompare(nameB, 'fr', { sensitivity: 'base' });
   });
 });
 
+// Memoize member lookups for better performance
+const membersMap = computed(() => {
+  return new Map(members.value.map(member => [member.id, member]));
+});
+
 const getMemberData = (memberId: string) => {
-  return members.value.find(m => m.id === memberId);
+  return membersMap.value.get(memberId);
 };
 
 const getMemberInitials = (memberId: string) => {
@@ -470,10 +479,17 @@ const loadTeam = async () => {
       membersService.getAllMembers()
     ]);
     team.value = teamData;
-    // Sort members alphabetically by fullName
-    members.value = membersData.sort((a, b) => a.fullName.localeCompare(b.fullName));
+    // Sort members alphabetically by fullName with optimized locale
+    members.value = membersData.sort((a, b) => a.fullName.localeCompare(b.fullName, 'fr', { sensitivity: 'base' }));
   } catch (error) {
     console.error('Error loading team:', error);
+    // Show user-friendly error
+    const toast = await toastController.create({
+      message: 'Erreur lors du chargement de l\'équipe',
+      duration: 3000,
+      color: 'danger'
+    });
+    await toast.present();
   } finally {
     loading.value = false;
   }

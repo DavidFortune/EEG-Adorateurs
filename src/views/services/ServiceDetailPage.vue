@@ -152,7 +152,7 @@ import { useRoute, useRouter } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonBackButton,
   IonButton, IonIcon, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle,
-  IonCardContent, IonList, IonItem, IonLabel, IonChip, IonLoading, alertController
+  IonCardContent, IonList, IonItem, IonLabel, IonChip, IonLoading, alertController, toastController
 } from '@ionic/vue';
 import {
   pencil, calendarOutline, timeOutline, informationCircleOutline, createOutline,
@@ -183,11 +183,21 @@ const loadService = async () => {
   const id = route.params.id as string;
   try {
     service.value = await serviceService.getServiceById(id);
-    // Load member count and program in parallel
-    loadMemberCount();
-    loadProgram();
+
+    // Load member count and program in parallel for better performance
+    await Promise.allSettled([
+      loadMemberCount(),
+      loadProgram()
+    ]);
   } catch (error) {
     console.error('Error loading service:', error);
+    // Show user-friendly error
+    const toast = await toastController.create({
+      message: 'Erreur lors du chargement du service',
+      duration: 3000,
+      color: 'danger'
+    });
+    await toast.present();
   } finally {
     loading.value = false;
   }
@@ -202,6 +212,7 @@ const loadMemberCount = async () => {
   } catch (error) {
     console.error('Error loading member count:', error);
     memberCount.value = 0;
+    // Silent fail for member count as it's not critical
   } finally {
     loadingMembers.value = false;
   }
@@ -215,6 +226,7 @@ const loadProgram = async () => {
   } catch (error) {
     console.error('Error loading program:', error);
     program.value = null;
+    // Silent fail for program as it's not critical
   } finally {
     loadingProgram.value = false;
   }

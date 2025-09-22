@@ -257,43 +257,56 @@ const totalAssignments = computed(() => {
   return assignments.value.filter(a => a.teamId === teamId).length;
 });
 
+// Memoize member lookups for better performance
+const teamMembersMap = computed(() => {
+  return new Map(teamMembers.value.map(member => [member.id, member]));
+});
+
 const servicesWithAssignments = computed(() => {
   const now = new Date();
-  
+  const nowTime = now.getTime();
+  const memberMap = teamMembersMap.value;
+  const teamName = team.value?.name;
+  const canViewReqs = canViewTeamRequirements.value;
+
+  // Pre-filter assignments for this team
+  const teamAssignments = assignments.value.filter(a => a.teamId === teamId);
+  const assignmentsByServiceId = new Map<string, ServiceAssignment[]>();
+
+  for (const assignment of teamAssignments) {
+    const serviceAssignments = assignmentsByServiceId.get(assignment.serviceId) || [];
+    serviceAssignments.push(assignment);
+    assignmentsByServiceId.set(assignment.serviceId, serviceAssignments);
+  }
+
   return services.value
     .filter(service => {
-      // Filter upcoming services
-      const serviceDate = new Date(`${service.date}T${service.time}`);
-      return serviceDate >= now;
+      // Filter upcoming services with optimized date parsing
+      const serviceDateTime = new Date(`${service.date}T${service.time}`);
+      return serviceDateTime.getTime() >= nowTime;
     })
     .map(service => {
-      // Get assignments for this service and team
-      const serviceAssignments = assignments.value
-        .filter(a => a.serviceId === service.id && a.teamId === teamId)
-        .map(assignment => {
-          // Add member details to assignment
-          const member = teamMembers.value.find(m => m.id === assignment.memberId);
-          return {
-            ...assignment,
-            member
-          };
-        });
-      
+      // Get assignments for this service using the pre-built map
+      const serviceAssignments = (assignmentsByServiceId.get(service.id) || [])
+        .map(assignment => ({
+          ...assignment,
+          member: memberMap.get(assignment.memberId)
+        }));
+
       return {
         ...service,
         assignments: serviceAssignments
       };
     })
     .filter(service => {
-      // If user can view team requirements, show services with requirements or assignments
-      if (canViewTeamRequirements.value) {
+      // Optimized requirement checking
+      if (canViewReqs) {
         const hasTeamRequirement = service.teamRequirements?.some(
-          req => req.isActive && team.value && req.teamName === team.value.name
+          req => req.isActive && teamName && req.teamName === teamName
         );
         return hasTeamRequirement || service.assignments.length > 0;
       }
-      
-      // If user cannot view requirements, only show services where they have assignments
+
       return service.assignments.length > 0;
     })
     .sort((a, b) => new Date(`${a.date}T${a.time}`).getTime() - new Date(`${b.date}T${b.time}`).getTime())
@@ -302,35 +315,44 @@ const servicesWithAssignments = computed(() => {
 
 const membersWithAssignments = computed(() => {
   if (!team.value) return [];
-  
+
+  const memberMap = teamMembersMap.value;
+  const now = new Date();
+  const nowTime = now.getTime();
+
+  // Create service lookup map
+  const servicesMap = new Map(services.value.map(service => [service.id, service]));
+
+  // Pre-filter assignments for this team
+  const teamAssignments = assignments.value.filter(a => a.teamId === teamId);
+
   return team.value.members.map(teamMember => {
-    const memberDetails = teamMembers.value.find(m => m.id === teamMember.memberId);
+    const memberDetails = memberMap.get(teamMember.memberId);
     if (!memberDetails) return null;
-    
-    // Get all assignments for this member
-    const memberAssignments = assignments.value
-      .filter(a => a.memberId === memberDetails.id && a.teamId === teamId)
+
+    // Get all assignments for this member with optimized filtering
+    const memberAssignments = teamAssignments
+      .filter(a => a.memberId === memberDetails.id)
       .map(assignment => {
-        // Add service details to assignment
-        const service = services.value.find(s => s.id === assignment.serviceId);
+        const service = servicesMap.get(assignment.serviceId);
         return {
           ...assignment,
           service
         };
       })
       .filter(a => {
-        // Only show future assignments
+        // Only show future assignments with optimized date comparison
         if (!a.service) return false;
-        const serviceDate = new Date(`${a.service.date}T${a.service.time}`);
-        return serviceDate >= new Date();
+        const serviceDateTime = new Date(`${a.service.date}T${a.service.time}`);
+        return serviceDateTime.getTime() >= nowTime;
       });
-    
+
     return {
       ...memberDetails,
       role: teamMember.role,
       assignments: memberAssignments
     };
-  }).filter(m => m !== null);
+  }).filter((m): m is NonNullable<typeof m> => m !== null);
 });
 
 // Methods
