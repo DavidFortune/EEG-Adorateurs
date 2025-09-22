@@ -163,7 +163,7 @@
                     expand="block"
                     color="primary"
                   >
-                    <ion-icon :icon="viewOutline" slot="start" />
+                    <ion-icon :icon="eyeOutline" slot="start" />
                     Voir la partition
                   </ion-button>
                   <ion-button
@@ -240,11 +240,11 @@
       </div>
     </ion-content>
 
-    <!-- Enhanced PDF Viewer -->
+    <!-- PDF Viewer Modal -->
     <PdfViewer
       :is-open="!!currentPdfUrl"
       :pdf-url="currentPdfUrl"
-      :title="resource?.title || 'Partition PDF'"
+      :title="resource?.title || 'Partition'"
       @close="closePdfViewer"
     />
   </ion-page>
@@ -261,10 +261,10 @@ import {
 } from '@ionic/vue';
 import PdfViewer from '@/components/PdfViewer.vue';
 import {
-  pencilOutline, folderOutline, calendarOutline, eyeOutline, documentTextOutline,
-  videocamOutline, volumeHighOutline, musicalNotesOutline, logoYoutube,
-  downloadOutline, trashOutline, alertCircleOutline, eyeOutline as viewOutline
+  pencilOutline, folderOutline, calendarOutline, eyeOutline,
+  downloadOutline, trashOutline, alertCircleOutline, logoYoutube
 } from 'ionicons/icons';
+import { getContentIcon, getContentLabel, formatFileSize, isYouTubeUrl, getYouTubeEmbedUrl, isPdfFile } from '@/utils/resource-utils';
 import { Resource, ResourceCollection, ResourceType } from '@/types/resource';
 import { getResourceById, deleteResource, getResourceCollections } from '@/firebase/resources';
 import { useUser } from '@/composables/useUser';
@@ -349,75 +349,6 @@ const formatDate = (dateString: string) => {
   });
 };
 
-const getContentIcon = (type: ResourceType) => {
-  switch (type) {
-    case ResourceType.LYRICS:
-      return documentTextOutline;
-    case ResourceType.VIDEO:
-      return videocamOutline;
-    case ResourceType.AUDIO:
-      return volumeHighOutline;
-    case ResourceType.MUSIC_SHEET:
-      return musicalNotesOutline;
-    case ResourceType.YOUTUBE:
-      return logoYoutube;
-    case ResourceType.FILE:
-      return documentTextOutline;
-    default:
-      return documentTextOutline;
-  }
-};
-
-const getContentLabel = (type: ResourceType) => {
-  switch (type) {
-    case ResourceType.LYRICS:
-      return 'Paroles';
-    case ResourceType.VIDEO:
-      return 'Vidéos';
-    case ResourceType.AUDIO:
-      return 'Audios';
-    case ResourceType.MUSIC_SHEET:
-      return 'Partitions';
-    case ResourceType.YOUTUBE:
-      return 'Vidéos';
-    case ResourceType.FILE:
-      return 'Fichiers';
-    default:
-      return type;
-  }
-};
-
-const isYouTubeUrl = (url?: string): boolean => {
-  if (!url) return false;
-  const patterns = [
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)/,
-    /^[a-zA-Z0-9_-]{11}$/ // Just a YouTube video ID
-  ];
-  return patterns.some(pattern => pattern.test(url));
-};
-
-const getYouTubeEmbedUrl = (url?: string) => {
-  if (!url) return null;
-  
-  // Extract video ID from various YouTube URL formats
-  const patterns = [
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
-  ];
-  
-  for (const pattern of patterns) {
-    const match = url.match(pattern);
-    if (match && match[1]) {
-      return `https://www.youtube.com/embed/${match[1]}`;
-    }
-  }
-  
-  // Check if it's already just a video ID
-  if (/^[a-zA-Z0-9_-]{11}$/.test(url)) {
-    return `https://www.youtube.com/embed/${url}`;
-  }
-  
-  return null;
-};
 
 const editResource = () => {
   router.push(`/resource-form/${resource.value?.id}`);
@@ -452,17 +383,6 @@ const confirmDelete = async () => {
   await alert.present();
 };
 
-const formatFileSize = (bytes: number): string => {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-};
-
-const isPdfFile = (url: string): boolean => {
-  return url.toLowerCase().includes('.pdf') || url.toLowerCase().includes('pdf');
-};
 
 const openPdfViewer = (url: string) => {
   currentPdfUrl.value = url;
@@ -472,25 +392,19 @@ const closePdfViewer = () => {
   currentPdfUrl.value = '';
 };
 
+
 const goBack = () => {
   router.push('/tabs/resources');
 };
 
+
+// Auto-select first available content type
 onMounted(() => {
-  loadResource();
-});
-
-// Auto-select first available type when resource loads
-const initializeSelectedType = () => {
-  if (availableTypes.value.length > 0 && !selectedContentType.value) {
-    selectedContentType.value = availableTypes.value[0];
-  }
-};
-
-// Watch for changes in available types to auto-select
-computed(() => {
-  initializeSelectedType();
-  return availableTypes.value;
+  loadResource().then(() => {
+    if (availableTypes.value.length > 0 && !selectedContentType.value) {
+      selectedContentType.value = availableTypes.value[0];
+    }
+  });
 });
 </script>
 

@@ -133,15 +133,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import {
   IonButton, IonIcon, IonModal, IonHeader, IonToolbar, IonTitle, IonButtons,
   IonContent, IonFooter, IonSearchbar, IonSegment, IonSegmentButton, IonLabel,
   IonLoading
 } from '@ionic/vue';
 import {
-  addOutline, closeOutline, checkmarkCircle, ellipseOutline, documentOutline,
-  musicalNotesOutline, videocamOutline, volumeHighOutline, libraryOutline
+  addOutline, closeOutline, checkmarkCircle, ellipseOutline, documentOutline
 } from 'ionicons/icons';
 import type { Resource, ResourceCollection, ResourceType } from '@/types/resource';
 import { getResources, getResourceCollections } from '@/firebase/resources';
