@@ -55,11 +55,11 @@ const routes: Array<RouteRecordRaw> = [
       },
       {
         path: 'services',
-        component: () => import('@/views/ServicesPage.vue')
+        component: () => import('@/views/services/ServicesPage.vue')
       },
       {
         path: 'resources',
-        component: () => import('@/views/ResourcesPage.vue')
+        component: () => import('@/views/resources/ResourcesPage.vue')
       },
       {
         path: 'disponibilites',
@@ -67,43 +67,43 @@ const routes: Array<RouteRecordRaw> = [
       },
       {
         path: 'teams',
-        component: () => import('@/views/TeamsPage.vue')
+        component: () => import('@/views/teams/TeamsPage.vue')
       }
     ]
   },
   {
     path: '/service-detail/:id',
-    component: () => import('@/views/ServiceDetailPage.vue'),
+    component: () => import('@/views/services/ServiceDetailPage.vue'),
     meta: { requiresAuth: true }
   },
   {
     path: '/service-members/:id',
-    component: () => import('@/views/ServiceMembersPage.vue'),
+    component: () => import('@/views/services/ServiceMembersPage.vue'),
     meta: { requiresAuth: true }
   },
   {
     path: '/service-program/:id',
-    component: () => import('@/views/ServiceProgramPage.vue'),
+    component: () => import('@/views/services/ServiceProgramPage.vue'),
     meta: { requiresAuth: true }
   },
   {
     path: '/service-form/:id?',
-    component: () => import('@/views/ServiceFormPage.vue'),
+    component: () => import('@/views/services/ServiceFormPage.vue'),
     meta: { requiresAuth: true, requiresAdmin: true }
   },
   {
     path: '/resource-detail/:id',
-    component: () => import('@/views/ResourceDetailPage.vue'),
+    component: () => import('@/views/resources/ResourceDetailPage.vue'),
     meta: { requiresAuth: true }
   },
   {
     path: '/resource-form/:id?',
-    component: () => import('@/views/ResourceFormPage.vue'),
+    component: () => import('@/views/resources/ResourceFormPage.vue'),
     meta: { requiresAuth: true, requiresAdmin: true }
   },
   {
     path: '/collections',
-    component: () => import('@/views/ResourceCollectionsPage.vue'),
+    component: () => import('@/views/resources/ResourceCollectionsPage.vue'),
     meta: { requiresAuth: true, requiresAdmin: true }
   },
   {
@@ -118,29 +118,29 @@ const routes: Array<RouteRecordRaw> = [
   },
   {
     path: '/releases',
-    component: () => import('@/views/ReleasesPage.vue'),
+    component: () => import('@/views/corporate/ReleasesPage.vue'),
     meta: { requiresAuth: true }
   },
   {
     path: '/about',
-    component: () => import('@/views/AboutPage.vue')
+    component: () => import('@/views/corporate/AboutPage.vue')
   },
   {
     path: '/privacy',
-    component: () => import('@/views/PrivacyPage.vue')
+    component: () => import('@/views/corporate/PrivacyPage.vue')
   },
   {
     path: '/terms',
-    component: () => import('@/views/TermsPage.vue')
+    component: () => import('@/views/corporate/TermsPage.vue')
   },
   {
     path: '/team-detail/:id',
-    component: () => import('@/views/TeamDetailPage.vue'),
+    component: () => import('@/views/teams/TeamDetailPage.vue'),
     meta: { requiresAuth: true }
   },
   {
     path: '/team-form/:id?',
-    component: () => import('@/views/TeamFormPage.vue'),
+    component: () => import('@/views/teams/TeamFormPage.vue'),
     meta: { requiresAuth: true, requiresAdmin: true }
   },
   {
@@ -149,18 +149,13 @@ const routes: Array<RouteRecordRaw> = [
     meta: { requiresAuth: true, requiresAdmin: true }
   },
   {
-    path: '/availability-submission',
-    component: () => import('@/views/AvailabilitySubmissionPage.vue'),
-    meta: { requiresAuth: true }
-  },
-  {
     path: '/team-availability/:id',
-    component: () => import('@/views/TeamAvailabilityPage.vue'),
+    component: () => import('@/views/teams/TeamAvailabilityPage.vue'),
     meta: { requiresAuth: true }
   },
   {
     path: '/team-assignments/:id',
-    component: () => import('@/views/TeamAssignmentsPage.vue'),
+    component: () => import('@/views/teams/TeamAssignmentsPage.vue'),
     meta: { requiresAuth: true }
   }
 ]
