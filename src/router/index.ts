@@ -157,6 +157,11 @@ const routes: Array<RouteRecordRaw> = [
     path: '/team-assignments/:id',
     component: () => import('@/views/teams/TeamAssignmentsPage.vue'),
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/team-scheduling/:id',
+    component: () => import('@/views/teams/TeamSchedulingView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true }
   }
 ]
 

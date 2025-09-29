@@ -64,16 +64,24 @@
           </ion-card-header>
           <ion-card-content>
             <div class="action-buttons">
-              <ion-button 
-                expand="block" 
+              <ion-button
+                expand="block"
+                fill="solid"
+                @click="() => team && router.push(`/team-scheduling/${team.id}`)"
+              >
+                <ion-icon :icon="calendarOutline" slot="start"></ion-icon>
+                Planning de l'équipe
+              </ion-button>
+              <ion-button
+                expand="block"
                 fill="outline"
                 @click="() => team && router.push(`/team-availability/${team.id}`)"
               >
                 <ion-icon :icon="calendarOutline" slot="start"></ion-icon>
                 Voir les disponibilités
               </ion-button>
-              <ion-button 
-                expand="block" 
+              <ion-button
+                expand="block"
                 fill="outline"
                 @click="() => team && router.push(`/team-assignments/${team.id}`)"
               >

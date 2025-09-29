@@ -249,11 +249,16 @@ export const useSchedulingStore = defineStore('scheduling', () => {
           });
         }
 
+
+        // Calculate actual assigned count based on members marked as assigned
+        const actualAssignedCount = members.filter(m => m.isAssigned).length;
+
+        // Use the actual count to ensure consistency
         newTeams[team.id] = {
           id: team.id,
           name: team.name,
           required: requirement.membersNeeded,
-          assigned: teamAssignments.length,
+          assigned: actualAssignedCount,
           members
         };
       }

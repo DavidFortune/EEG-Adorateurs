@@ -1,11 +1,14 @@
 <template>
   <div class="event-selector">
     <div class="event-tabs-container">
-      <div 
-        v-for="(event, index) in events" 
+      <div
+        v-for="(event, index) in events"
         :key="event.id"
         class="event-tab"
-        :class="{ active: index === activeEventIndex }"
+        :class="{
+          active: index === activeEventIndex,
+          'sunday-service': isSundayService(event)
+        }"
         @click="$emit('select', index)"
       >
         <div class="event-title">{{ truncateTitle(event.title) }}</div>
@@ -37,6 +40,11 @@ defineEmits<{
 
 function truncateTitle(title: string): string {
   return title.length > 20 ? title.substring(0, 17) + '...' : title;
+}
+
+function isSundayService(event: SchedulingEvent): boolean {
+  // Check if the date starts with "Dim" (French for Sunday)
+  return event.date.toLowerCase().startsWith('dim');
 }
 
 function getStatusColor(status: EventStatus): string {
@@ -129,5 +137,34 @@ function getStatusLabel(status: EventStatus): string {
   --ion-color-danger: white;
   color: var(--ion-color-dark) !important;
   background: white !important;
+}
+
+/* Sunday service highlighting */
+.event-tab.sunday-service {
+  background: var(--ion-color-light);
+  border-color: var(--ion-color-medium);
+}
+
+.event-tab.sunday-service:hover {
+  border-color: var(--ion-color-medium-shade);
+  transform: translateY(-1px);
+}
+
+.event-tab.sunday-service.active {
+  background: var(--ion-color-dark);
+  color: white;
+  border-color: var(--ion-color-dark);
+}
+
+.event-tab.sunday-service .event-title {
+  font-weight: 700;
+}
+
+.event-tab.sunday-service .event-date {
+  font-weight: 600;
+}
+
+.event-tab.sunday-service.active .event-date {
+  color: white;
 }
 </style>

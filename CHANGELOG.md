@@ -2,6 +2,29 @@
 
 All notable changes to EEG Adorateurs will be documented in this file.
 
+## [1.6.5] - 2025-09-29
+
+### Fixed
+- **Team Scheduling Display Issues**: Resolved assignment state inconsistencies in Audio Visuel team
+  - Fixed team assignment count calculation to use actual assigned members rather than database count
+  - Corrected member styling priority to ensure assigned styling always takes precedence over availability status
+  - Enhanced CSS specificity in TeamCardNoPen component to prevent style conflicts
+  - Member assignment styling now consistently shows light green background regardless of original availability
+
+### Enhanced
+- **Member State Visualization**: Improved visual consistency between scheduling views
+  - Updated TeamCardNoPen styling to match DisponibilitesPage card styling exactly
+  - Assigned members: Light green background (#ECFDF5) with green border (#10B981)
+  - Available members: White background with green border
+  - Unavailable members: White background with red border
+  - No response members: White background with grey border
+
+### Technical
+- **Scheduling Store Optimization**: Improved data consistency and calculation accuracy
+  - Added debugging capabilities for team assignment tracking
+  - Changed assignment counting logic to use filtered member states rather than raw database counts
+  - Enhanced CSS selector specificity using `:not()` pseudo-class to prevent style override conflicts
+
 ## [1.6.0] - 2025-09-21
 
 ### Added
