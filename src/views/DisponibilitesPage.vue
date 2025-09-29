@@ -187,30 +187,37 @@ const getNoServicesMessage = (): string => {
 
 const setAvailability = async (serviceId: string, availability: 'available' | 'unavailable') => {
   if (!member.value) return;
-  
+
   const currentValue = getServiceAvailability(serviceId);
   const newValue = currentValue === availability ? null : availability;
-  
+
   // Update local state immediately for better UX
   currentAvailabilities.value[serviceId] = newValue;
-  
+
   try {
-    // Update member's availabilities in database
-    const updatedAvailabilities = { ...member.value.availabilities };
+    // Ensure we start with existing availabilities or an empty object
+    const existingAvailabilities = member.value.availabilities || {};
+    const updatedAvailabilities = { ...existingAvailabilities };
+
     if (newValue === null) {
       delete updatedAvailabilities[serviceId];
     } else {
       updatedAvailabilities[serviceId] = newValue;
     }
-    
-    await membersService.updateMember(member.value.id, {
+
+    const updatedMember = await membersService.updateMember(member.value.id, {
       availabilities: updatedAvailabilities
     });
-    
-    // Update the original availabilities to reflect the saved state
-    originalAvailabilities.value = { ...updatedAvailabilities };
-    
-    const statusText = newValue === 'available' ? 'Disponible' : 
+
+    // Update the member value with the returned data from the server
+    if (updatedMember) {
+      member.value = updatedMember;
+      // Update the original availabilities to reflect the saved state
+      originalAvailabilities.value = { ...updatedMember.availabilities };
+      currentAvailabilities.value = { ...updatedMember.availabilities };
+    }
+
+    const statusText = newValue === 'available' ? 'Disponible' :
                       newValue === 'unavailable' ? 'Indisponible' : 'Effacée';
     await showToast(`Disponibilité mise à jour: ${statusText}`, 'success');
   } catch (error) {
@@ -246,8 +253,9 @@ const loadServices = async () => {
 
 const loadMemberAvailabilities = () => {
   if (member.value) {
-    currentAvailabilities.value = { ...member.value.availabilities };
-    originalAvailabilities.value = { ...member.value.availabilities };
+    const memberAvailabilities = member.value.availabilities || {};
+    currentAvailabilities.value = { ...memberAvailabilities };
+    originalAvailabilities.value = { ...memberAvailabilities };
   }
 };
 

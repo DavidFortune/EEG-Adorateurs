@@ -156,11 +156,11 @@ export const membersService = {
     try {
       const docRef = doc(db, MEMBERS_COLLECTION, memberId);
       const docSnap = await getDoc(docRef);
-      
+
       if (!docSnap.exists()) {
         return null;
       }
-      
+
       // If ministries are being updated, ensure they exist in the collection
       if (updates.ministries && updates.ministries.length > 0) {
         try {
@@ -171,16 +171,25 @@ export const membersService = {
           // Continue with member update even if ministry creation fails
         }
       }
-      
+
       const existingMember = convertFirestoreToMember({ id: docSnap.id, ...docSnap.data() } as FirestoreMember);
+
+      // Special handling for availabilities to prevent data loss
+      let updatedAvailabilities = existingMember.availabilities || {};
+      if (updates.availabilities !== undefined) {
+        // Only update, don't replace the entire object
+        updatedAvailabilities = updates.availabilities;
+      }
+
       const updatedMember: Member = {
         ...existingMember,
         ...updates,
+        availabilities: updatedAvailabilities,
         updatedAt: new Date().toISOString()
       };
-      
+
       await updateDoc(docRef, convertMemberToFirestore(updatedMember));
-      
+
       return updatedMember;
     } catch (error) {
       console.error('Error updating member:', error);
