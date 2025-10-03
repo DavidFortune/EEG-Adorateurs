@@ -241,6 +241,35 @@ class UpdateService {
   async getReleaseNotes(): Promise<ReleaseNote[]> {
     return [
       {
+        version: '1.7.0',
+        date: '2025-01-10',
+        title: 'Workflow d\'approbation des équipes',
+        description: 'Système complet d\'approbation pour rejoindre les équipes avec filtrage basé sur l\'appartenance',
+        features: [
+          'Nouvelle étape de sélection d\'équipes dans l\'onboarding',
+          'Les utilisateurs peuvent demander à rejoindre plusieurs équipes',
+          'Les propriétaires et leaders peuvent approuver/rejeter les demandes en attente',
+          'Attribution de rôles lors de l\'approbation (leader, membre, invité)',
+          'Filtrage des services basé sur l\'appartenance aux équipes approuvées',
+          'Section des demandes en attente dans la page de détails d\'équipe',
+          'Auto-population du champ teams depuis la collection teams',
+          'Synchronisation automatique du tableau teams lors des changements de membres'
+        ],
+        fixes: [
+          'Correction de l\'affichage des membres existants dans TeamDetailPage',
+          'Correction des erreurs de permissions Firestore',
+          'Correction de l\'erreur "Member not found" pendant l\'onboarding',
+          'Traitement des membres sans statut pour la rétrocompatibilité'
+        ],
+        improvements: [
+          'Simplification de l\'onboarding avec suppression de l\'étape ministères',
+          'Règles Firestore mises à jour pour permettre la gestion des équipes',
+          'Interface utilisateur améliorée avec styles pour les membres en attente',
+          'Filtrage des services dans AccueilPage, ServicesPage et DisponibilitesPage',
+          'TeamSchedulingView affiche uniquement les services nécessitant l\'équipe'
+        ]
+      },
+      {
         version: '1.2.0',
         date: '2025-01-14',
         title: 'Système de gestion des équipes',
