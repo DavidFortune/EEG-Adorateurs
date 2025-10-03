@@ -90,11 +90,11 @@ import {
   arrowBack, peopleOutline, checkmarkCircle, informationCircleOutline
 } from 'ionicons/icons';
 import { teamsService } from '@/firebase/teams';
-import { useUser } from '@/composables/useUser';
+import { useOnboardingStore } from '@/stores/onboarding';
 import type { Team } from '@/types/team';
 
 const router = useRouter();
-const { member } = useUser();
+const onboardingStore = useOnboardingStore();
 
 const loading = ref(true);
 const availableTeams = ref<Team[]>([]);
@@ -108,11 +108,8 @@ const loadTeams = async () => {
     loading.value = true;
     const teams = await teamsService.getAllTeams();
 
-    // Filter out teams where user is already a member
-    availableTeams.value = teams.filter(team => {
-      const isMember = team.members.some(m => m.memberId === member.value?.id);
-      return !isMember;
-    }).sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }));
+    // During onboarding, show all teams
+    availableTeams.value = teams.sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }));
   } catch (error) {
     console.error('Error loading teams:', error);
     const toast = await toastController.create({
@@ -135,39 +132,14 @@ const toggleTeam = (teamId: string) => {
   }
 };
 
-const continueToNextStep = async () => {
-  try {
-    if (!member.value) {
-      throw new Error('Member not found');
-    }
+const continueToNextStep = () => {
+  // Store selected teams in onboarding store
+  onboardingStore.updateFormData({
+    selectedTeamIds: selectedTeamIds.value
+  });
 
-    // Send join requests for selected teams
-    if (selectedTeamIds.value.length > 0) {
-      await Promise.all(
-        selectedTeamIds.value.map(teamId =>
-          teamsService.requestToJoinTeam(teamId, member.value!.id)
-        )
-      );
-
-      const toast = await toastController.create({
-        message: `Demande${selectedTeamIds.value.length > 1 ? 's' : ''} envoyée${selectedTeamIds.value.length > 1 ? 's' : ''}`,
-        duration: 3000,
-        color: 'success'
-      });
-      toast.present();
-    }
-
-    // Navigate to next step (ministries)
-    router.push('/onboarding/ministries');
-  } catch (error: any) {
-    console.error('Error requesting to join teams:', error);
-    const toast = await toastController.create({
-      message: error.message || 'Erreur lors de l\'envoi des demandes',
-      duration: 3000,
-      color: 'danger'
-    });
-    toast.present();
-  }
+  // Navigate to next step (ministries)
+  router.push('/onboarding/ministries');
 };
 
 const goBack = () => {
@@ -175,6 +147,8 @@ const goBack = () => {
 };
 
 onMounted(() => {
+  // Load previously selected teams from store
+  selectedTeamIds.value = onboardingStore.formData.selectedTeamIds || [];
   loadTeams();
 });
 </script>

@@ -11,6 +11,7 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     email: '',
     fullName: '',
     phone: '',
+    selectedTeamIds: [],
     ministries: [],
     customMinistry: '',
     availabilities: {}
@@ -139,6 +140,7 @@ export const useOnboardingStore = defineStore('onboarding', () => {
       email: '',
       fullName: '',
       phone: '',
+      selectedTeamIds: [],
       ministries: [],
       customMinistry: '',
       availabilities: {}

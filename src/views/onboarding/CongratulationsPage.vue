@@ -52,6 +52,7 @@ import {
 import { useOnboardingStore } from '@/stores/onboarding';
 import { authService } from '@/firebase/auth';
 import { membersService } from '@/firebase/members';
+import { teamsService } from '@/firebase/teams';
 
 const router = useRouter();
 const onboardingStore = useOnboardingStore();
@@ -101,20 +102,22 @@ const saveUserData = async () => {
 
     // Check if member already exists
     const existingMember = await membersService.getMemberByFirebaseUserId(user.uid);
-    
+
+    let memberId: string;
+
     if (existingMember) {
       // Extract firstName and lastName from fullName
       const nameParts = onboardingStore.formData.fullName.trim().split(' ');
       const firstName = nameParts[0] || '';
       const lastName = nameParts.slice(1).join(' ') || '';
-      
+
       // Combine regular ministries with custom ministry if provided
       const ministries = [...(onboardingStore.formData.ministries || [])];
       const customMinistry = onboardingStore.formData.customMinistry || '';
       if (customMinistry.trim()) {
         ministries.push(customMinistry.trim());
       }
-      
+
       // Update existing member instead of creating a new one
       await membersService.updateMember(existingMember.id, {
         firstName,
@@ -125,16 +128,33 @@ const saveUserData = async () => {
         availabilities: onboardingStore.formData.availabilities,
         isOnboardingCompleted: true
       });
+      memberId = existingMember.id;
       await showToast('Profil mis à jour avec succès !');
     } else {
       // Create new member profile in Firestore
-      await membersService.createMember(
+      const newMember = await membersService.createMember(
         user.uid,
         user.email || onboardingStore.formData.email,
         user.photoURL || '',
         onboardingStore.formData
       );
+      memberId = newMember.id;
       await showToast('Profil créé avec succès !');
+    }
+
+    // Send team join requests for selected teams
+    const selectedTeamIds = onboardingStore.formData.selectedTeamIds || [];
+    if (selectedTeamIds.length > 0) {
+      try {
+        await Promise.all(
+          selectedTeamIds.map(teamId =>
+            teamsService.requestToJoinTeam(teamId, memberId)
+          )
+        );
+      } catch (error) {
+        console.error('Error requesting to join teams:', error);
+        // Don't block onboarding completion if team requests fail
+      }
     }
     
     dataSaved.value = true;

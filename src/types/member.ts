@@ -22,6 +22,7 @@ export interface OnboardingFormData {
   email: string;
   fullName: string;
   phone: string;
+  selectedTeamIds: string[];
   ministries: string[];
   customMinistry: string;
   availabilities: {
