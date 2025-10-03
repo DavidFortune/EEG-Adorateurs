@@ -278,23 +278,23 @@ export const teamsService = {
   async transferOwnership(teamId: string, newOwnerId: string): Promise<Team | null> {
     try {
       const team = await this.getTeamById(teamId);
-      
+
       if (!team) {
         return null;
       }
-      
+
       // Check if new owner is already in the team
       const newOwnerMember = team.members.find(m => m.memberId === newOwnerId);
       if (!newOwnerMember) {
         throw new Error('New owner must be a member of the team');
       }
-      
+
       // Find current owner
       const currentOwner = team.members.find(m => m.role === 'owner');
       if (!currentOwner) {
         throw new Error('Current owner not found');
       }
-      
+
       // Update members: change current owner to leader, change new owner to owner
       const updatedMembers = team.members.map(member => {
         if (member.role === 'owner') {
@@ -305,21 +305,38 @@ export const teamsService = {
         }
         return member;
       });
-      
+
       const updatedTeam: Team = {
         ...team,
         ownerId: newOwnerId,
         members: updatedMembers,
         updatedAt: new Date().toISOString()
       };
-      
+
       const docRef = doc(db, TEAMS_COLLECTION, teamId);
       await updateDoc(docRef, convertTeamToFirestore(updatedTeam));
-      
+
       return updatedTeam;
     } catch (error) {
       console.error('Error transferring ownership:', error);
       throw error;
+    }
+  },
+
+  /**
+   * Get all teams that a member belongs to
+   */
+  async getMemberTeams(memberId: string): Promise<Team[]> {
+    try {
+      const allTeams = await this.getAllTeams();
+
+      // Filter teams where the member is in the members array
+      return allTeams.filter(team =>
+        team.members.some(member => member.memberId === memberId)
+      );
+    } catch (error) {
+      console.error('Error getting member teams:', error);
+      throw new Error('Failed to fetch member teams');
     }
   }
 };

@@ -193,12 +193,32 @@ export const assignmentsService = {
       );
       const querySnapshot = await getDocs(q);
 
-      return querySnapshot.docs.map(doc => 
+      return querySnapshot.docs.map(doc =>
         convertFirestoreToAssignment({ id: doc.id, ...doc.data() } as FirestoreAssignment)
       );
     } catch (error) {
       console.error('Error getting all team assignments:', error);
       throw new Error('Failed to fetch all team assignments');
+    }
+  },
+
+  /**
+   * Get all assignments for a member across all services
+   */
+  async getAllMemberAssignments(memberId: string): Promise<ServiceAssignment[]> {
+    try {
+      const q = query(
+        collection(db, ASSIGNMENTS_COLLECTION),
+        where('memberId', '==', memberId)
+      );
+      const querySnapshot = await getDocs(q);
+
+      return querySnapshot.docs.map(doc =>
+        convertFirestoreToAssignment({ id: doc.id, ...doc.data() } as FirestoreAssignment)
+      );
+    } catch (error) {
+      console.error('Error getting all member assignments:', error);
+      throw new Error('Failed to fetch all member assignments');
     }
   }
 };

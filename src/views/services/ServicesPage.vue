@@ -120,7 +120,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
@@ -134,14 +134,33 @@ import {
 } from 'ionicons/icons';
 import { Service, ServiceCategory } from '@/types/service';
 import { serviceService } from '@/services/serviceService';
+import { teamsService } from '@/firebase/teams';
 import { timezoneUtils } from '@/utils/timezone';
 import { useUser } from '@/composables/useUser';
 
 const router = useRouter();
-const { isAdmin } = useUser();
+const { isAdmin, member } = useUser();
 const services = ref<Service[]>([]);
 const loading = ref(false);
 const filterMode = ref('upcoming');
+const userTeamNames = ref<string[]>([]);
+
+// Load user's team names from team IDs
+const loadUserTeamNames = async () => {
+  const userTeamIds = member.value?.teams || [];
+  if (userTeamIds.length > 0) {
+    try {
+      const teamPromises = userTeamIds.map(teamId => teamsService.getTeamById(teamId));
+      const teams = await Promise.all(teamPromises);
+      userTeamNames.value = teams.filter(team => team !== null).map(team => team!.name);
+    } catch (error) {
+      console.error('Error loading user team names:', error);
+      userTeamNames.value = [];
+    }
+  } else {
+    userTeamNames.value = [];
+  }
+};
 
 // Memoize service date parsing to avoid repeated computations
 const servicesWithParsedDates = computed(() => {
@@ -177,6 +196,22 @@ const filteredServices = computed(() => {
     default:
       filtered = validServices;
   }
+
+  // Filter by user membership in needed teams
+  filtered = filtered.filter(service => {
+    // If service has team requirements, check user membership
+    if (service.teamRequirements && service.teamRequirements.length > 0) {
+      const activeTeamNames = service.teamRequirements
+        .filter(req => req.isActive)
+        .map(req => req.teamName);
+
+      // Only show service if user is member of at least one needed team
+      return activeTeamNames.some(teamName => userTeamNames.value.includes(teamName));
+    }
+
+    // If no team requirements, show the service
+    return true;
+  });
 
   // Sort the filtered results
   return filtered.sort((a, b) => {
@@ -285,8 +320,16 @@ const formatDeadlineShort = (dateStr: string) => {
   });
 };
 
+// Watch for member changes to reload team names
+watch(() => member.value, (newMember) => {
+  if (newMember) {
+    loadUserTeamNames();
+  }
+}, { immediate: true });
+
 onMounted(() => {
   loadServices();
+  loadUserTeamNames();
 });
 </script>
 

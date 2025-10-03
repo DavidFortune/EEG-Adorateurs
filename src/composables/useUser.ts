@@ -1,6 +1,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { authService } from '@/firebase/auth'
 import { membersService } from '@/firebase/members'
+import { teamsService } from '@/firebase/teams'
 import type { Member } from '@/types/member'
 
 export function useUser() {
@@ -40,6 +41,29 @@ export function useUser() {
     if (user.value) {
       try {
         member.value = await membersService.getMemberByFirebaseUserId(user.value.uid)
+
+        // If teams field is empty, populate it from team members
+        if (member.value && (!member.value.teams || member.value.teams.length === 0)) {
+          try {
+            const memberTeams = await teamsService.getMemberTeams(member.value.id)
+
+            // Extract team IDs
+            const teamIds = memberTeams.map(team => team.id)
+
+            if (teamIds.length > 0) {
+              // Update member's teams field with team IDs
+              const updatedMember = await membersService.updateMember(member.value.id, {
+                teams: teamIds
+              })
+
+              if (updatedMember) {
+                member.value = updatedMember
+              }
+            }
+          } catch (error) {
+            console.error('Error populating teams from team members:', error)
+          }
+        }
       } catch (error) {
         console.error('Error loading member data:', error)
         member.value = null

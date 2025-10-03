@@ -8,8 +8,9 @@ export interface Member {
   fullName: string;
   phone?: string;
   ministries: string[];
+  teams?: string[]; // Team IDs that the member belongs to
   availabilities: {
-    [serviceId: string]: 'available' | 'unavailable' | null;
+    [serviceId: string]: 'available' | 'unavailable' | 'maybe' | null;
   };
   isOnboardingCompleted: boolean;
   isAdmin: boolean;
@@ -24,7 +25,7 @@ export interface OnboardingFormData {
   ministries: string[];
   customMinistry: string;
   availabilities: {
-    [serviceId: string]: 'available' | 'unavailable' | null;
+    [serviceId: string]: 'available' | 'unavailable' | 'maybe' | null;
   };
 }
 

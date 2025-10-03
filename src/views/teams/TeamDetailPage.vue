@@ -505,14 +505,26 @@ const loadTeam = async () => {
 
 const addMember = async () => {
   if (!selectedMemberId.value || !selectedRole.value) return;
-  
+
   try {
     await teamsService.addMemberToTeam(teamId, selectedMemberId.value, selectedRole.value);
+
+    // Update member's teams array
+    const memberToUpdate = await membersService.getMemberById(selectedMemberId.value);
+    if (memberToUpdate) {
+      const currentTeams = memberToUpdate.teams || [];
+      if (!currentTeams.includes(teamId)) {
+        await membersService.updateMember(selectedMemberId.value, {
+          teams: [...currentTeams, teamId]
+        });
+      }
+    }
+
     await loadTeam();
     showAddMemberModal.value = false;
     selectedMemberId.value = '';
     selectedRole.value = 'member';
-    
+
     const toast = await toastController.create({
       message: 'Membre ajouté avec succès',
       duration: 3000,
@@ -557,8 +569,18 @@ const showMemberActions = async (teamMember: TeamMember) => {
 const removeMember = async (memberId: string) => {
   try {
     await teamsService.removeMemberFromTeam(teamId, memberId);
+
+    // Update member's teams array to remove this team
+    const memberToUpdate = await membersService.getMemberById(memberId);
+    if (memberToUpdate && memberToUpdate.teams) {
+      const updatedTeams = memberToUpdate.teams.filter(id => id !== teamId);
+      await membersService.updateMember(memberId, {
+        teams: updatedTeams
+      });
+    }
+
     await loadTeam();
-    
+
     const toast = await toastController.create({
       message: 'Membre retiré de l\'équipe',
       duration: 3000,

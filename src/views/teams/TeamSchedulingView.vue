@@ -78,9 +78,11 @@ import {
 import { useSchedulingStore } from '@/stores/schedulingStore';
 import { teamsService } from '@/firebase/teams';
 import { authService } from '@/firebase/auth';
+import { serviceService } from '@/services/serviceService';
 import EventSelector from '@/components/scheduling/EventSelector.vue';
 import TeamCardNoPen from '@/components/scheduling/TeamCardNoPen.vue';
 import type { Team } from '@/types/team';
+import type { Service } from '@/types/service';
 
 const route = useRoute();
 const schedulingStore = useSchedulingStore();
@@ -106,18 +108,45 @@ const {
 
 const teamId = computed(() => route.params.id as string);
 const team = ref<Team | null>(null);
+const allServices = ref<Service[]>([]);
 
 // Track if user has selected a service
 const hasSelectedService = computed(() => {
   return activeEventIndex.value >= 0 && events.value.length > 0 && filteredActiveEventIndex.value >= 0;
 });
 
-// Filter events to show only future services
+// Filter events to show only future services where this team is required
 const events = computed(() => {
   const now = new Date();
+  const teamName = team.value?.name;
+
+  if (!teamName) {
+    return allEvents.value.filter(event => {
+      const eventDate = new Date(event.datetime);
+      return eventDate >= now;
+    });
+  }
+
+  // Filter to show only events where this team is required
+  const filteredEventIds = allServices.value
+    .filter(service => {
+      // Check if service has team requirements
+      if (!service.teamRequirements || service.teamRequirements.length === 0) {
+        return false;
+      }
+
+      // Check if this team is in the requirements
+      const isTeamRequired = service.teamRequirements.some(
+        req => req.isActive && req.teamName === teamName
+      );
+
+      return isTeamRequired;
+    })
+    .map(service => service.id);
+
   return allEvents.value.filter(event => {
     const eventDate = new Date(event.datetime);
-    return eventDate >= now;
+    return eventDate >= now && filteredEventIds.includes(event.id);
   });
 });
 
@@ -156,6 +185,15 @@ const loadTeamData = async () => {
   }
 };
 
+// Load all services
+const loadAllServices = async () => {
+  try {
+    allServices.value = await serviceService.getAllServices();
+  } catch (error) {
+    console.error('Error loading services:', error);
+  }
+};
+
 // Handle event selection and reload teams
 async function handleEventSelect(index: number) {
   // Get the selected event from the filtered events
@@ -182,8 +220,11 @@ onMounted(async () => {
       setCurrentUserId(user.uid);
     }
 
-    // Load team data
-    await loadTeamData();
+    // Load team data and all services in parallel
+    await Promise.all([
+      loadTeamData(),
+      loadAllServices()
+    ]);
 
     // Load services and teams
     await loadServices();

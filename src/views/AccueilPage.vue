@@ -266,6 +266,7 @@ import {
 import { useUser } from '@/composables/useUser';
 import { serviceService } from '@/services/serviceService';
 import { assignmentsService } from '@/firebase/assignments';
+import { teamsService } from '@/firebase/teams';
 import { timezoneUtils } from '@/utils/timezone';
 import { membersService } from '@/firebase/members';
 import UserMenu from '@/components/UserMenu.vue';
@@ -293,7 +294,7 @@ const memberPhone = computed(() => {
   return member.value?.phone;
 });
 
-const getServiceAvailability = (serviceId: string): 'available' | 'unavailable' | null => {
+const getServiceAvailability = (serviceId: string): 'available' | 'unavailable' | 'maybe' | null => {
   return member.value?.availabilities?.[serviceId] || null;
 };
 
@@ -384,6 +385,15 @@ const loadUpcomingServices = async () => {
     const services = await serviceService.getPublishedServices();
     const now = new Date();
     const nowTime = now.getTime();
+    const userTeamIds = member.value?.teams || [];
+
+    // Get team names for user's team IDs
+    let userTeamNames: string[] = [];
+    if (userTeamIds.length > 0) {
+      const teamPromises = userTeamIds.map(teamId => teamsService.getTeamById(teamId));
+      const teams = await Promise.all(teamPromises);
+      userTeamNames = teams.filter(team => team !== null).map(team => team!.name);
+    }
 
     // Pre-parse dates and filter/sort in a single pass for better performance
     const servicesWithDates = services
@@ -391,7 +401,23 @@ const loadUpcomingServices = async () => {
         ...service,
         parsedDateTime: new Date(`${service.date}T${service.time}:00`)
       }))
-      .filter(service => service.parsedDateTime.getTime() > nowTime)
+      .filter(service => {
+        // Filter by date
+        if (service.parsedDateTime.getTime() <= nowTime) return false;
+
+        // Filter by user membership in needed teams
+        if (service.teamRequirements && service.teamRequirements.length > 0) {
+          const activeTeamNames = service.teamRequirements
+            .filter(req => req.isActive)
+            .map(req => req.teamName);
+
+          // Only show service if user is member of at least one needed team
+          return activeTeamNames.some(teamName => userTeamNames.includes(teamName));
+        }
+
+        // If no team requirements, show the service
+        return true;
+      })
       .sort((a, b) => a.parsedDateTime.getTime() - b.parsedDateTime.getTime());
 
     upcomingServices.value = servicesWithDates;
