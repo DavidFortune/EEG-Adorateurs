@@ -92,15 +92,68 @@
           </ion-card-content>
         </ion-card>
 
+        <!-- Pending Members Section -->
+        <ion-card v-if="pendingMembers.length > 0 && canManageMembers" class="pending-members-card">
+          <ion-card-header>
+            <ion-card-title class="section-title">
+              <ion-icon :icon="timeOutline" class="section-icon"></ion-icon>
+              Demandes en attente ({{ pendingMembers.length }})
+            </ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <div class="members-list">
+              <div
+                v-for="teamMember in pendingMembers"
+                :key="teamMember.id"
+                class="member-item pending"
+              >
+                <div class="member-info">
+                  <ion-avatar class="member-avatar">
+                    <img v-if="getMemberData(teamMember.memberId)?.avatar"
+                         :src="getMemberData(teamMember.memberId)?.avatar"
+                         :alt="getMemberData(teamMember.memberId)?.fullName" />
+                    <div v-else class="avatar-initials">
+                      {{ getMemberInitials(teamMember.memberId) }}
+                    </div>
+                  </ion-avatar>
+                  <div class="member-details">
+                    <h4 class="member-name">{{ getMemberData(teamMember.memberId)?.fullName || 'Membre inconnu' }}</h4>
+                    <p class="member-status">En attente d'approbation</p>
+                    <p class="member-joined">Demandé le {{ formatDate(teamMember.joinedAt) }}</p>
+                  </div>
+                </div>
+                <div class="member-actions">
+                  <ion-button
+                    fill="solid"
+                    color="success"
+                    size="small"
+                    @click="() => showApproveModal(teamMember)"
+                  >
+                    Approuver
+                  </ion-button>
+                  <ion-button
+                    fill="outline"
+                    color="danger"
+                    size="small"
+                    @click="() => rejectMember(teamMember.memberId)"
+                  >
+                    Rejeter
+                  </ion-button>
+                </div>
+              </div>
+            </div>
+          </ion-card-content>
+        </ion-card>
+
         <!-- Members Section -->
         <ion-card class="members-card">
           <ion-card-header>
             <div class="card-header-with-action">
               <ion-card-title class="section-title">
                 <ion-icon :icon="peopleOutline" class="section-icon"></ion-icon>
-                Membres de l'équipe
+                Membres de l'équipe ({{ approvedMembers.length }})
               </ion-card-title>
-              <ion-button 
+              <ion-button
                 v-if="canManageMembers"
                 fill="clear"
                 size="small"
@@ -112,15 +165,15 @@
           </ion-card-header>
           <ion-card-content>
             <div class="members-list">
-              <div 
-                v-for="teamMember in sortedTeamMembers" 
-                :key="teamMember.id" 
+              <div
+                v-for="teamMember in sortedApprovedMembers"
+                :key="teamMember.id"
                 class="member-item"
               >
                 <div class="member-info">
                   <ion-avatar class="member-avatar">
-                    <img v-if="getMemberData(teamMember.memberId)?.avatar" 
-                         :src="getMemberData(teamMember.memberId)?.avatar" 
+                    <img v-if="getMemberData(teamMember.memberId)?.avatar"
+                         :src="getMemberData(teamMember.memberId)?.avatar"
                          :alt="getMemberData(teamMember.memberId)?.fullName" />
                     <div v-else class="avatar-initials">
                       {{ getMemberInitials(teamMember.memberId) }}
@@ -133,9 +186,9 @@
                   </div>
                 </div>
                 <div class="member-actions" v-if="canManageMembers && teamMember.role !== 'owner'">
-                  <ion-button 
-                    fill="clear" 
-                    size="small" 
+                  <ion-button
+                    fill="clear"
+                    size="small"
                     @click="() => showMemberActions(teamMember)"
                   >
                     <ion-icon :icon="ellipsisVerticalOutline"></ion-icon>
@@ -337,6 +390,62 @@
           </div>
         </ion-content>
       </ion-modal>
+
+      <!-- Approve Member Modal -->
+      <ion-modal :is-open="showApproveMemberModal" @did-dismiss="showApproveMemberModal = false">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>Approuver le membre</ion-title>
+            <ion-buttons slot="end">
+              <ion-button fill="clear" @click="showApproveMemberModal = false">
+                <ion-icon :icon="closeOutline"></ion-icon>
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content>
+          <div class="modal-content">
+            <div class="member-info-header" v-if="memberToApprove">
+              <ion-avatar class="member-avatar">
+                <img v-if="getMemberData(memberToApprove.memberId)?.avatar"
+                     :src="getMemberData(memberToApprove.memberId)?.avatar"
+                     :alt="getMemberData(memberToApprove.memberId)?.fullName" />
+                <div v-else class="avatar-initials">
+                  {{ getMemberInitials(memberToApprove.memberId) }}
+                </div>
+              </ion-avatar>
+              <div>
+                <h3>{{ getMemberData(memberToApprove.memberId)?.fullName || 'Membre' }}</h3>
+                <p class="current-role">Sélectionnez un rôle pour ce membre</p>
+              </div>
+            </div>
+
+            <ion-item>
+              <ion-select
+                v-model="approveRole"
+                placeholder="Sélectionner un rôle"
+                interface="popover"
+              >
+                <ion-select-option value="member">{{ getRoleDisplayName('member') }}</ion-select-option>
+                <ion-select-option value="leader">{{ getRoleDisplayName('leader') }}</ion-select-option>
+                <ion-select-option value="guest">{{ getRoleDisplayName('guest') }}</ion-select-option>
+              </ion-select>
+              <ion-label>Rôle</ion-label>
+            </ion-item>
+
+            <div class="modal-buttons">
+              <ion-button
+                expand="block"
+                color="success"
+                @click="approveMember"
+                :disabled="!approveRole"
+              >
+                Approuver
+              </ion-button>
+            </div>
+          </div>
+        </ion-content>
+      </ion-modal>
     </ion-content>
   </ion-page>
 </template>
@@ -351,9 +460,9 @@ import {
   alertController, toastController
 } from '@ionic/vue';
 import {
-  peopleOutline, createOutline, alertCircleOutline, calendarOutline, 
+  peopleOutline, createOutline, alertCircleOutline, calendarOutline,
   ellipsisVerticalOutline, trashOutline, closeOutline, addOutline,
-  swapHorizontalOutline, flashOutline, checkmarkDoneOutline
+  swapHorizontalOutline, flashOutline, checkmarkDoneOutline, timeOutline
 } from 'ionicons/icons';
 import { teamsService } from '@/firebase/teams';
 import { membersService } from '@/firebase/members';
@@ -372,11 +481,14 @@ const loading = ref(true);
 const showAddMemberModal = ref(false);
 const showTransferOwnershipModal = ref(false);
 const showChangeRoleModal = ref(false);
+const showApproveMemberModal = ref(false);
 const selectedMemberId = ref('');
 const selectedRole = ref<'member' | 'leader' | 'guest'>('member');
 const selectedNewOwnerId = ref('');
 const memberToChangeRole = ref<TeamMember | null>(null);
+const memberToApprove = ref<TeamMember | null>(null);
 const newRole = ref<'leader' | 'member' | 'guest'>('member');
+const approveRole = ref<'leader' | 'member' | 'guest'>('member');
 
 const teamId = route.params.id as string;
 
@@ -428,11 +540,21 @@ const eligibleNewOwners = computed(() => {
     .sort((a, b) => a.fullName.localeCompare(b.fullName, 'fr', { sensitivity: 'base' }));
 });
 
-const sortedTeamMembers = computed(() => {
+// Split members by status
+const pendingMembers = computed(() => {
   if (!team.value) return [];
+  return team.value.members.filter(m => m.status === 'pending');
+});
+
+const approvedMembers = computed(() => {
+  if (!team.value) return [];
+  return team.value.members.filter(m => m.status === 'approved');
+});
+
+const sortedApprovedMembers = computed(() => {
   const memberMap = membersMap.value;
 
-  return [...team.value.members].sort((a, b) => {
+  return [...approvedMembers.value].sort((a, b) => {
     const memberA = memberMap.get(a.memberId);
     const memberB = memberMap.get(b.memberId);
 
@@ -671,13 +793,13 @@ const openChangeRoleModal = (teamMember: TeamMember) => {
 
 const changeRole = async () => {
   if (!memberToChangeRole.value || !newRole.value) return;
-  
+
   try {
     await teamsService.updateMemberRole(teamId, memberToChangeRole.value.memberId, newRole.value);
     await loadTeam();
     showChangeRoleModal.value = false;
     memberToChangeRole.value = null;
-    
+
     const toast = await toastController.create({
       message: 'Rôle mis à jour avec succès',
       duration: 3000,
@@ -688,6 +810,72 @@ const changeRole = async () => {
     console.error('Error changing role:', error);
     const toast = await toastController.create({
       message: error.message || 'Erreur lors du changement de rôle',
+      duration: 3000,
+      color: 'danger'
+    });
+    toast.present();
+  }
+};
+
+const showApproveModal = (teamMember: TeamMember) => {
+  memberToApprove.value = teamMember;
+  approveRole.value = 'member'; // Default role
+  showApproveMemberModal.value = true;
+};
+
+const approveMember = async () => {
+  if (!memberToApprove.value || !approveRole.value) return;
+
+  try {
+    await teamsService.approvePendingMember(teamId, memberToApprove.value.memberId, approveRole.value);
+
+    // Update member's teams array to add this team
+    const memberToUpdate = await membersService.getMemberById(memberToApprove.value.memberId);
+    if (memberToUpdate) {
+      const currentTeams = memberToUpdate.teams || [];
+      if (!currentTeams.includes(teamId)) {
+        await membersService.updateMember(memberToApprove.value.memberId, {
+          teams: [...currentTeams, teamId]
+        });
+      }
+    }
+
+    await loadTeam();
+    showApproveMemberModal.value = false;
+    memberToApprove.value = null;
+
+    const toast = await toastController.create({
+      message: 'Membre approuvé avec succès',
+      duration: 3000,
+      color: 'success'
+    });
+    toast.present();
+  } catch (error: any) {
+    console.error('Error approving member:', error);
+    const toast = await toastController.create({
+      message: error.message || 'Erreur lors de l\'approbation',
+      duration: 3000,
+      color: 'danger'
+    });
+    toast.present();
+  }
+};
+
+const rejectMember = async (memberId: string) => {
+  try {
+    await teamsService.rejectPendingMember(teamId, memberId);
+    await loadTeam();
+
+    const toast = await toastController.create({
+      message: 'Demande rejetée',
+      duration: 3000,
+      color: 'success'
+    });
+    toast.present();
+  } catch (error: any) {
+    console.error('Error rejecting member:', error);
+    const toast = await toastController.create({
+      message: error.message || 'Erreur lors du rejet',
       duration: 3000,
       color: 'danger'
     });
@@ -894,6 +1082,28 @@ onMounted(() => {
   font-size: 0.75rem;
   color: #6B7280;
   margin: 0;
+}
+
+.member-status {
+  font-size: 0.875rem;
+  color: #F59E0B;
+  font-weight: 500;
+  margin: 0 0 0.25rem 0;
+}
+
+.pending-members-card {
+  margin-bottom: 1.5rem;
+  border-left: 4px solid #F59E0B;
+}
+
+.member-item.pending {
+  background: #FEF3C7;
+  border: 1px solid #FCD34D;
+}
+
+.member-item.pending .member-actions {
+  display: flex;
+  gap: 0.5rem;
 }
 
 .modal-content {

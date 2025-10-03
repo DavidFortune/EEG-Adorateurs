@@ -1,9 +1,11 @@
 export type TeamRole = 'owner' | 'leader' | 'member' | 'guest';
+export type TeamMemberStatus = 'pending' | 'approved' | 'rejected';
 
 export interface TeamMember {
   id: string;
   memberId: string;
   role: TeamRole;
+  status: TeamMemberStatus;
   joinedAt: string;
 }
 

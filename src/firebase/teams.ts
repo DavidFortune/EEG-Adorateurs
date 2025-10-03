@@ -87,6 +87,7 @@ export const teamsService = {
           id: crypto.randomUUID(),
           memberId: ownerId,
           role: 'owner',
+          status: 'approved',
           joinedAt: now
         }],
         createdAt: now,
@@ -161,41 +162,147 @@ export const teamsService = {
   },
 
   /**
-   * Add member to team
+   * Add member to team (approved by admin/owner/leader)
    */
   async addMemberToTeam(teamId: string, memberId: string, role: 'leader' | 'member' | 'guest' = 'member'): Promise<Team | null> {
     try {
       const team = await this.getTeamById(teamId);
-      
+
       if (!team) {
         return null;
       }
-      
+
       // Check if member is already in team
       const existingMember = team.members.find(m => m.memberId === memberId);
       if (existingMember) {
         throw new Error('Member is already in this team');
       }
-      
+
       const newMember: TeamMember = {
         id: crypto.randomUUID(),
         memberId,
         role,
+        status: 'approved',
         joinedAt: new Date().toISOString()
       };
-      
+
       const updatedTeam: Team = {
         ...team,
         members: [...team.members, newMember],
         updatedAt: new Date().toISOString()
       };
-      
+
       const docRef = doc(db, TEAMS_COLLECTION, teamId);
       await updateDoc(docRef, convertTeamToFirestore(updatedTeam));
-      
+
       return updatedTeam;
     } catch (error) {
       console.error('Error adding member to team:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Request to join team (pending status)
+   */
+  async requestToJoinTeam(teamId: string, memberId: string): Promise<Team | null> {
+    try {
+      const team = await this.getTeamById(teamId);
+
+      if (!team) {
+        return null;
+      }
+
+      // Check if member is already in team or has a pending request
+      const existingMember = team.members.find(m => m.memberId === memberId);
+      if (existingMember) {
+        throw new Error('Member already has a request or membership in this team');
+      }
+
+      const newMember: TeamMember = {
+        id: crypto.randomUUID(),
+        memberId,
+        role: 'member', // Default role, can be changed when approved
+        status: 'pending',
+        joinedAt: new Date().toISOString()
+      };
+
+      const updatedTeam: Team = {
+        ...team,
+        members: [...team.members, newMember],
+        updatedAt: new Date().toISOString()
+      };
+
+      const docRef = doc(db, TEAMS_COLLECTION, teamId);
+      await updateDoc(docRef, convertTeamToFirestore(updatedTeam));
+
+      return updatedTeam;
+    } catch (error) {
+      console.error('Error requesting to join team:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Approve pending member
+   */
+  async approvePendingMember(teamId: string, memberId: string, role: 'leader' | 'member' | 'guest'): Promise<Team | null> {
+    try {
+      const team = await this.getTeamById(teamId);
+
+      if (!team) {
+        return null;
+      }
+
+      const updatedMembers = team.members.map(member =>
+        member.memberId === memberId && member.status === 'pending'
+          ? { ...member, status: 'approved' as const, role }
+          : member
+      );
+
+      const updatedTeam: Team = {
+        ...team,
+        members: updatedMembers,
+        updatedAt: new Date().toISOString()
+      };
+
+      const docRef = doc(db, TEAMS_COLLECTION, teamId);
+      await updateDoc(docRef, convertTeamToFirestore(updatedTeam));
+
+      return updatedTeam;
+    } catch (error) {
+      console.error('Error approving pending member:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Reject pending member (removes them from team)
+   */
+  async rejectPendingMember(teamId: string, memberId: string): Promise<Team | null> {
+    try {
+      const team = await this.getTeamById(teamId);
+
+      if (!team) {
+        return null;
+      }
+
+      const updatedMembers = team.members.filter(
+        member => !(member.memberId === memberId && member.status === 'pending')
+      );
+
+      const updatedTeam: Team = {
+        ...team,
+        members: updatedMembers,
+        updatedAt: new Date().toISOString()
+      };
+
+      const docRef = doc(db, TEAMS_COLLECTION, teamId);
+      await updateDoc(docRef, convertTeamToFirestore(updatedTeam));
+
+      return updatedTeam;
+    } catch (error) {
+      console.error('Error rejecting pending member:', error);
       throw error;
     }
   },

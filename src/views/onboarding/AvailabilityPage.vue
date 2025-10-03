@@ -136,7 +136,7 @@ const formatServiceDateTime = (date: string, time: string) => {
   return timezoneUtils.formatDateTimeForDisplay(date, time);
 };
 
-const getServiceAvailability = (serviceId: string): 'available' | 'unavailable' | null => {
+const getServiceAvailability = (serviceId: string): 'available' | 'unavailable' | 'maybe' | null => {
   return onboardingStore.formData.availabilities[serviceId] || null;
 };
 

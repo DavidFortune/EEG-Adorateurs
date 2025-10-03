@@ -47,13 +47,18 @@ export function useUser() {
           try {
             const memberTeams = await teamsService.getMemberTeams(member.value.id)
 
-            // Extract team IDs
-            const teamIds = memberTeams.map(team => team.id)
+            // Extract team IDs where user is approved
+            const approvedTeamIds = memberTeams
+              .filter(team => {
+                const membership = team.members.find(m => m.memberId === member.value!.id)
+                return membership && membership.status === 'approved'
+              })
+              .map(team => team.id)
 
-            if (teamIds.length > 0) {
-              // Update member's teams field with team IDs
+            if (approvedTeamIds.length > 0) {
+              // Update member's teams field with approved team IDs only
               const updatedMember = await membersService.updateMember(member.value.id, {
-                teams: teamIds
+                teams: approvedTeamIds
               })
 
               if (updatedMember) {

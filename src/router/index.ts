@@ -26,6 +26,11 @@ const routes: Array<RouteRecordRaw> = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/onboarding/teams',
+    component: () => import('@/views/onboarding/TeamSelectionPage.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/onboarding/phone',
     component: () => import('@/views/onboarding/PhonePage.vue'),
     meta: { requiresAuth: true }

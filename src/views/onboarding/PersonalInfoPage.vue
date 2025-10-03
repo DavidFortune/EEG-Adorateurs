@@ -106,10 +106,10 @@ const continueToNextStep = () => {
     
     // Mark this step as completed
     onboardingStore.markStepCompleted(2);
-    
+
     // Go to next step
     onboardingStore.nextStep();
-    router.push('/onboarding/phone');
+    router.push('/onboarding/teams');
   }
 };
 
