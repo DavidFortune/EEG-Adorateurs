@@ -12,8 +12,10 @@ service cloud.firestore {
     match /members/{memberId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
-      allow update: if request.auth != null && 
-        (request.auth.uid == resource.data.firebaseUserId);
+      allow update: if request.auth != null &&
+        (request.auth.uid == resource.data.firebaseUserId ||
+         // Allow updating teams field for team management
+         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['teams', 'updatedAt'])));
       allow delete: if false; // Never allow deletion
     }
     
