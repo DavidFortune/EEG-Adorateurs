@@ -548,7 +548,8 @@ const pendingMembers = computed(() => {
 
 const approvedMembers = computed(() => {
   if (!team.value) return [];
-  return team.value.members.filter(m => m.status === 'approved');
+  // Treat members without status as approved for backward compatibility
+  return team.value.members.filter(m => m.status === 'approved' || !m.status);
 });
 
 const sortedApprovedMembers = computed(() => {

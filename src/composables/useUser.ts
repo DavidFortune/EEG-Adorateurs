@@ -47,11 +47,11 @@ export function useUser() {
           try {
             const memberTeams = await teamsService.getMemberTeams(member.value.id)
 
-            // Extract team IDs where user is approved
+            // Extract team IDs where user is approved (treat members without status as approved)
             const approvedTeamIds = memberTeams
               .filter(team => {
                 const membership = team.members.find(m => m.memberId === member.value!.id)
-                return membership && membership.status === 'approved'
+                return membership && (membership.status === 'approved' || !membership.status)
               })
               .map(team => team.id)
 
