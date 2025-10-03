@@ -10,7 +10,7 @@
 
         <!-- Description -->
         <p class="congratulations-description">
-          Votre profil est maintenant configuré. Vous êtes prêt à servir dans {{ ministriesList }}.
+          Votre profil est maintenant configuré. Vous êtes prêt à commencer!
         </p>
 
         <!-- Encouragement Card -->
@@ -65,20 +65,6 @@ const firstName = computed(() => {
   return nameParts[0] || 'Ami(e)';
 });
 
-const ministriesList = computed(() => {
-  const ministries = [...(onboardingStore.formData.ministries || [])];
-  const customMinistry = onboardingStore.formData.customMinistry || '';
-  if (customMinistry.trim()) {
-    ministries.push(customMinistry.trim());
-  }
-  
-  if (ministries.length === 0) return 'votre ministère';
-  if (ministries.length === 1) return ministries[0];
-  if (ministries.length === 2) return `${ministries[0]} et ${ministries[1]}`;
-  
-  return `${ministries.slice(0, -1).join(', ')} et ${ministries[ministries.length - 1]}`;
-});
-
 const showToast = async (message: string, color: 'success' | 'danger' = 'success') => {
   const toast = await toastController.create({
     message,
@@ -111,20 +97,12 @@ const saveUserData = async () => {
       const firstName = nameParts[0] || '';
       const lastName = nameParts.slice(1).join(' ') || '';
 
-      // Combine regular ministries with custom ministry if provided
-      const ministries = [...(onboardingStore.formData.ministries || [])];
-      const customMinistry = onboardingStore.formData.customMinistry || '';
-      if (customMinistry.trim()) {
-        ministries.push(customMinistry.trim());
-      }
-
       // Update existing member instead of creating a new one
       await membersService.updateMember(existingMember.id, {
         firstName,
         lastName,
         fullName: onboardingStore.formData.fullName,
         phone: onboardingStore.formData.phone || '',
-        ministries: ministries,
         availabilities: onboardingStore.formData.availabilities,
         isOnboardingCompleted: true
       });
@@ -176,8 +154,8 @@ const navigateToHome = () => {
 
 onMounted(async () => {
   // Ensure we're on the last step
-  onboardingStore.goToStep(5);
-  
+  onboardingStore.goToStep(4);
+
   // Save user data automatically when page loads
   await saveUserData();
 });

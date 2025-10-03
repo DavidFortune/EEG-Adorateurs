@@ -185,7 +185,7 @@ const continueToNextStep = () => {
   onboardingStore.markStepCompleted(3);
 
   onboardingStore.nextStep();
-  router.push('/onboarding/ministries');
+  router.push('/onboarding/congratulations');
 };
 
 const skipStep = () => {
@@ -194,7 +194,7 @@ const skipStep = () => {
   onboardingStore.updateFormData({ phone: '' });
   onboardingStore.markStepCompleted(3);
   onboardingStore.nextStep();
-  router.push('/onboarding/ministries');
+  router.push('/onboarding/congratulations');
 };
 
 onMounted(() => {
