@@ -3,10 +3,12 @@ import { authService } from '@/firebase/auth'
 import { membersService } from '@/firebase/members'
 import { teamsService } from '@/firebase/teams'
 import type { Member } from '@/types/member'
+import type { Team } from '@/types/team'
 
 export function useUser() {
   const user = ref(authService.getCurrentUser())
   const member = ref<Member | null>(null)
+  const memberTeams = ref<Team[]>([])
 
   const userAvatar = computed(() => {
     if (user.value?.photoURL) {
@@ -37,32 +39,55 @@ export function useUser() {
     return member.value?.isAdmin || false
   })
 
+  const isTeamLeaderOrOwner = computed(() => {
+    if (!member.value) return false
+
+    // Check if user is owner or leader in any team
+    return memberTeams.value.some(team => {
+      const membership = team.members.find(m => m.memberId === member.value!.id)
+      if (!membership) return false
+
+      // Only approved members with owner or leader role
+      const isApproved = membership.status === 'approved' || !membership.status
+      const isLeaderOrOwner = membership.role === 'owner' || membership.role === 'leader'
+
+      return isApproved && isLeaderOrOwner
+    })
+  })
+
+  const canManageServices = computed(() => {
+    return isAdmin.value || isTeamLeaderOrOwner.value
+  })
+
   const loadMemberData = async () => {
     if (user.value) {
       try {
         member.value = await membersService.getMemberByFirebaseUserId(user.value.uid)
 
-        // If teams field is empty, populate it from team members
-        if (member.value && (!member.value.teams || member.value.teams.length === 0)) {
+        // Load member teams for permission checking
+        if (member.value) {
           try {
-            const memberTeams = await teamsService.getMemberTeams(member.value.id)
+            memberTeams.value = await teamsService.getMemberTeams(member.value.id)
 
-            // Extract team IDs where user is approved (treat members without status as approved)
-            const approvedTeamIds = memberTeams
-              .filter(team => {
-                const membership = team.members.find(m => m.memberId === member.value!.id)
-                return membership && (membership.status === 'approved' || !membership.status)
-              })
-              .map(team => team.id)
+            // If teams field is empty, populate it from team members
+            if (!member.value.teams || member.value.teams.length === 0) {
+              // Extract team IDs where user is approved (treat members without status as approved)
+              const approvedTeamIds = memberTeams.value
+                .filter(team => {
+                  const membership = team.members.find(m => m.memberId === member.value!.id)
+                  return membership && (membership.status === 'approved' || !membership.status)
+                })
+                .map(team => team.id)
 
-            if (approvedTeamIds.length > 0) {
-              // Update member's teams field with approved team IDs only
-              const updatedMember = await membersService.updateMember(member.value.id, {
-                teams: approvedTeamIds
-              })
+              if (approvedTeamIds.length > 0) {
+                // Update member's teams field with approved team IDs only
+                const updatedMember = await membersService.updateMember(member.value.id, {
+                  teams: approvedTeamIds
+                })
 
-              if (updatedMember) {
-                member.value = updatedMember
+                if (updatedMember) {
+                  member.value = updatedMember
+                }
               }
             }
           } catch (error) {
@@ -75,6 +100,7 @@ export function useUser() {
       }
     } else {
       member.value = null
+      memberTeams.value = []
     }
   }
 
@@ -92,10 +118,13 @@ export function useUser() {
   return {
     user,
     member,
+    memberTeams,
     userAvatar,
     userInitials,
     userName,
     isAdmin,
+    isTeamLeaderOrOwner,
+    canManageServices,
     loadMemberData
   }
 }

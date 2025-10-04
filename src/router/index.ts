@@ -3,7 +3,9 @@ import { RouteRecordRaw } from 'vue-router';
 import TabsPage from '../views/TabsPage.vue'
 import { authService } from '@/firebase/auth';
 import { membersService } from '@/firebase/members';
+import { teamsService } from '@/firebase/teams';
 import { useOnboardingStore } from '@/stores/onboarding';
+import type { Team } from '@/types/team';
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -89,7 +91,7 @@ const routes: Array<RouteRecordRaw> = [
   {
     path: '/service-form/:id?',
     component: () => import('@/views/services/ServiceFormPage.vue'),
-    meta: { requiresAuth: true, requiresAdmin: true }
+    meta: { requiresAuth: true, requiresServiceManager: true }
   },
   {
     path: '/resource-detail/:id',
@@ -146,7 +148,7 @@ const routes: Array<RouteRecordRaw> = [
   {
     path: '/scheduling',
     component: () => import('@/views/SchedulingView.vue'),
-    meta: { requiresAuth: true, requiresAdmin: true }
+    meta: { requiresAuth: true, requiresServiceManager: true }
   },
   {
     path: '/team-availability/:id',
@@ -161,7 +163,7 @@ const routes: Array<RouteRecordRaw> = [
   {
     path: '/team-scheduling/:id',
     component: () => import('@/views/teams/TeamSchedulingView.vue'),
-    meta: { requiresAuth: true, requiresAdmin: true }
+    meta: { requiresAuth: true, requiresServiceManager: true }
   }
 ]
 
@@ -175,11 +177,12 @@ router.beforeEach(async (to, _from, next) => {
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
   const requiresGuest = to.matched.some(record => record.meta.requiresGuest);
   const requiresAdmin = to.matched.some(record => record.meta.requiresAdmin);
+  const requiresServiceManager = to.matched.some(record => record.meta.requiresServiceManager);
   const isOnboardingRoute = to.path.startsWith('/onboarding/');
-  
+
   // Wait for auth state to be initialized
   const user = await authService.waitForAuth();
-  
+
   if (requiresAuth && !user) {
     // Redirect to login if authentication is required but user is not logged in
     next('/login');
@@ -190,7 +193,7 @@ router.beforeEach(async (to, _from, next) => {
     // Check onboarding status for authenticated users
     try {
       const hasCompletedOnboarding = await membersService.hasCompletedOnboarding(user.uid);
-      
+
       if (!hasCompletedOnboarding) {
         // If onboarding is not completed, continue from last completed step
         if (!isOnboardingRoute && to.path !== '/') {
@@ -202,16 +205,48 @@ router.beforeEach(async (to, _from, next) => {
           next();
         }
       } else {
+        const member = await membersService.getMemberByFirebaseUserId(user.uid);
+
         // Check admin access for admin-only routes
         if (requiresAdmin) {
-          const member = await membersService.getMemberByFirebaseUserId(user.uid);
           if (!member || !member.isAdmin) {
             // Redirect non-admin users to home
             next('/tabs/accueil');
             return;
           }
         }
-        
+
+        // Check service manager access (admin, owner, or leader)
+        if (requiresServiceManager) {
+          if (!member) {
+            next('/tabs/accueil');
+            return;
+          }
+
+          // Admin always has access
+          if (member.isAdmin) {
+            next();
+            return;
+          }
+
+          // Check if user is owner or leader in any team
+          const memberTeams: Team[] = await teamsService.getMemberTeams(member.id);
+          const isTeamLeaderOrOwner = memberTeams.some((team: Team) => {
+            const membership = team.members.find(m => m.memberId === member.id);
+            if (!membership) return false;
+
+            const isApproved = membership.status === 'approved' || !membership.status;
+            const isLeaderOrOwner = membership.role === 'owner' || membership.role === 'leader';
+
+            return isApproved && isLeaderOrOwner;
+          });
+
+          if (!isTeamLeaderOrOwner) {
+            next('/tabs/accueil');
+            return;
+          }
+        }
+
         // Onboarding completed - prevent access to onboarding pages
         if (isOnboardingRoute) {
           next('/tabs/accueil');

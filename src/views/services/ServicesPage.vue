@@ -4,10 +4,10 @@
       <ion-toolbar>
         <ion-title>Services</ion-title>
         <ion-buttons slot="end">
-          <ion-button v-if="isAdmin" @click="goToScheduling" fill="clear" color="dark">
+          <ion-button v-if="canManageServices" @click="goToScheduling" fill="clear" color="dark">
             <ion-icon :icon="calendarOutline" />
           </ion-button>
-          <ion-button v-if="isAdmin" @click="goToCreateService" fill="clear" color="dark">
+          <ion-button v-if="canManageServices" @click="goToCreateService" fill="clear" color="dark">
             <ion-icon :icon="addOutline" />
           </ion-button>
         </ion-buttons>
@@ -42,7 +42,7 @@
           <ion-icon :icon="calendarOutline" size="large" color="medium" />
           <h2>Aucun service</h2>
           <p>{{ getEmptyStateMessage() }}</p>
-          <ion-button v-if="isAdmin" @click="goToCreateService" fill="outline">
+          <ion-button v-if="canManageServices" @click="goToCreateService" fill="outline">
             <ion-icon :icon="addOutline" slot="start" />
             Créer un service
           </ion-button>
@@ -139,7 +139,7 @@ import { timezoneUtils } from '@/utils/timezone';
 import { useUser } from '@/composables/useUser';
 
 const router = useRouter();
-const { isAdmin, member } = useUser();
+const { canManageServices, member } = useUser();
 const services = ref<Service[]>([]);
 const loading = ref(false);
 const filterMode = ref('upcoming');
