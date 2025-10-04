@@ -138,8 +138,8 @@ const continueToNextStep = () => {
     selectedTeamIds: selectedTeamIds.value
   });
 
-  // Navigate to next step (ministries)
-  router.push('/onboarding/ministries');
+  // Navigate to next step (phone)
+  router.push('/onboarding/phone');
 };
 
 const goBack = () => {
