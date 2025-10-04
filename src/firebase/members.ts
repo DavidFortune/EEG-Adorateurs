@@ -124,7 +124,7 @@ export const membersService = {
         lastName,
         fullName: trimmedFullName,
         phone: onboardingData.phone || '',
-        ministries: allMinistries,
+        ...(allMinistries.length > 0 && { ministries: allMinistries }), // Only include ministries if provided
         availabilities: onboardingData.availabilities,
         isOnboardingCompleted: true,
         isAdmin: false, // Default to false, admin rights can be granted manually

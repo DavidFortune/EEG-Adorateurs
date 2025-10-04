@@ -7,7 +7,7 @@ export interface Member {
   lastName: string;
   fullName: string;
   phone?: string;
-  ministries: string[];
+  ministries?: string[];
   teams?: string[]; // Team IDs that the member belongs to
   availabilities: {
     [serviceId: string]: 'available' | 'unavailable' | 'maybe' | null;
