@@ -93,13 +93,8 @@ export const membersService = {
       if (customMinistry.trim()) {
         allMinistries.push(customMinistry.trim());
       }
-      
-      // Validate that at least one ministry is selected
-      if (allMinistries.length === 0) {
-        throw new Error('At least one ministry must be selected');
-      }
 
-      // Create ministries in the collection if they don't exist
+      // Create ministries in the collection if they don't exist (only if ministries are provided)
       if (allMinistries.length > 0) {
         try {
           await ministriesService.ensureMinistriesExist(allMinistries);
