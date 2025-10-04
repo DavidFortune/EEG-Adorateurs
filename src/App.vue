@@ -14,6 +14,7 @@ import { onBeforeMount, onMounted, onUnmounted, ref } from 'vue';
 import { App as CapacitorApp } from '@capacitor/app';
 import { authService } from '@/firebase/auth';
 import { analyticsService } from '@/services/analyticsService';
+import { errorTrackingService } from '@/services/errorTrackingService';
 import { toastController } from '@ionic/vue';
 
 const isProcessingEmailLink = ref(false);
@@ -101,11 +102,73 @@ onMounted(async () => {
     }
   });
 
+  // Setup global error handlers
+  setupGlobalErrorHandlers();
+
   // Cleanup on unmount
   onUnmounted(() => {
     pauseListener.remove();
+    cleanupGlobalErrorHandlers();
   });
 });
+
+// Global error handler for unhandled errors
+const handleGlobalError = (event: ErrorEvent) => {
+  event.preventDefault();
+
+  const error = errorTrackingService.trackError(
+    event.error || new Error(event.message),
+    {
+      filename: event.filename,
+      lineno: event.lineno,
+      colno: event.colno,
+      type: 'global_error'
+    }
+  );
+
+  // Show user-friendly error message for critical errors
+  if (error.severity === 'critical' || error.severity === 'high') {
+    showToast('Une erreur s\'est produite. Nous travaillons à la résoudre.', 'danger');
+  }
+};
+
+// Global handler for unhandled promise rejections
+const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+  event.preventDefault();
+
+  const error = errorTrackingService.trackError(
+    event.reason,
+    {
+      type: 'unhandled_rejection',
+      promise: 'Promise rejection'
+    }
+  );
+
+  // Show recovery message if available
+  const recovery = errorTrackingService.getSuggestedRecovery(error);
+  if (recovery.userMessage) {
+    showToast(recovery.userMessage, 'danger');
+  }
+};
+
+// Setup global error handlers
+const setupGlobalErrorHandlers = () => {
+  window.addEventListener('error', handleGlobalError);
+  window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+  // Also track user ID when authenticated
+  authService.waitForAuth().then(user => {
+    if (user) {
+      errorTrackingService.setUserId(user.uid);
+    }
+  });
+};
+
+// Cleanup global error handlers
+const cleanupGlobalErrorHandlers = () => {
+  window.removeEventListener('error', handleGlobalError);
+  window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+};
 </script>
 
 <style scoped>

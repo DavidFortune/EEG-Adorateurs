@@ -2,6 +2,92 @@
 
 All notable changes to EEG Adorateurs will be documented in this file.
 
+## [1.7.1] - 2025-10-04
+
+### Added
+- **Error Tracking and Monitoring System**: Comprehensive error tracking with automatic categorization
+  - Automatic error categorization by type (Network, Authentication, Validation, Firestore, Storage, Performance, UI)
+  - Error severity classification (Low, Medium, High, Critical)
+  - Error rate metrics tracking (errors per minute, recovery rate)
+  - Real-time error monitoring dashboard with visual analytics
+  - Integration with Firebase Analytics for centralized error logging
+  - Automatic error recovery strategies with configurable retry logic
+  - Global error handlers for unhandled errors and promise rejections
+  - User-friendly error notifications with context-aware messages
+  - Error frequency tracking and most common errors identification
+  - Export functionality for error reports in JSON format
+
+- **Error Tracking Composable**: Vue composable for easy error handling in components
+  - `handleError()` function for tracking individual errors with context
+  - `withErrorHandling()` wrapper for async functions with automatic retry
+  - `getMetrics()` to access error statistics and recovery rates
+  - Built-in retry logic with exponential backoff
+  - Custom recovery strategies per error category
+
+- **Enhanced Onboarding Test Suite**: Comprehensive E2E testing for onboarding flow
+  - Added 12 new test cases (total: 18 tests)
+  - Team selection and deselection interactions testing
+  - Form validation edge cases (special characters, hyphenated names, whitespace)
+  - Phone number format validation (dashes, parentheses, spaces)
+  - Progress bar verification across onboarding steps
+  - Data persistence testing during back/forward navigation
+  - First name extraction and display on congratulations page
+  - Empty team list handling and error scenarios
+  - Complete flow testing with and without optional steps
+
+### Enhanced
+- **Error Dashboard Component**: Visual monitoring interface for error tracking
+  - Real-time error metrics display (total errors, error rate, recovery rate, critical errors)
+  - Errors by category visualization with percentage bars
+  - Errors by severity with color-coded badges
+  - Most frequent errors list with occurrence counts
+  - Recent errors timeline with recovery status indicators
+  - Auto-refresh every 10 seconds for live monitoring
+  - Export error reports as downloadable JSON files
+  - Clear history functionality with confirmation
+
+- **Global Error Handling**: Application-wide error management
+  - Window error event handler with automatic tracking
+  - Unhandled promise rejection handler
+  - User ID tracking for authenticated error context
+  - Severity-based user notifications (critical/high errors only)
+  - Context preservation with filename, line number, column number
+  - Automatic cleanup on component unmount
+
+### Technical
+- **Error Types and Interfaces**: Comprehensive TypeScript definitions
+  - `ErrorCategory` enum with 9 categories
+  - `ErrorSeverity` enum with 4 levels
+  - `TrackedError` interface with full context and metadata
+  - `ErrorRateMetrics` interface for analytics
+  - `ErrorFrequency` tracking for pattern detection
+  - `ErrorRecoveryStrategy` interface for recovery workflows
+
+- **Error Tracking Service**: Core service with advanced features
+  - In-memory storage of last 200 errors for performance
+  - Error frequency tracking with Map data structure
+  - Automatic message truncation for analytics (100 chars)
+  - Recovery rate calculation (percentage of recovered errors)
+  - Time-range filtered error queries
+  - Critical error detection and filtering
+  - Unrecovered error identification
+  - Export error summary with formatted timestamps
+
+- **Documentation**: Complete error tracking documentation
+  - `ERROR_TRACKING.md` with full API documentation
+  - `INTEGRATION_EXAMPLE.md` with real-world usage examples
+  - Code examples for common scenarios
+  - Best practices guide for error handling
+  - Testing examples with simulated error scenarios
+
+### Performance
+- **Bundle Optimization**: Production build improvements
+  - Modern bundle: 1.8 MB (426 KB gzipped)
+  - Legacy bundle: 1.9 MB (421 KB gzipped)
+  - CSS optimization: 44.43 KB (7.16 KB gzipped)
+  - 152 optimized files for efficient caching
+  - Code splitting for improved initial load time
+
 ## [1.6.5] - 2025-09-29
 
 ### Fixed
