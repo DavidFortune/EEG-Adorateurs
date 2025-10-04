@@ -5,6 +5,7 @@ import { authService } from '@/firebase/auth';
 import { membersService } from '@/firebase/members';
 import { teamsService } from '@/firebase/teams';
 import { analyticsService } from '@/services/analyticsService';
+import { performanceService } from '@/services/performanceService';
 import { useOnboardingStore } from '@/stores/onboarding';
 import type { Team } from '@/types/team';
 
@@ -173,6 +174,14 @@ const router = createRouter({
   routes
 })
 
+// Track page load performance
+router.beforeEach((to, _from, next) => {
+  // Start performance tracking for this page
+  const pageName = to.name?.toString() || to.path.substring(1) || 'home';
+  performanceService.startPageTrace(pageName);
+  next();
+});
+
 // Navigation guard
 router.beforeEach(async (to, _from, next) => {
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
@@ -264,7 +273,7 @@ router.beforeEach(async (to, _from, next) => {
   }
 });
 
-// Track screen views for analytics
+// Track screen views for analytics and stop performance tracking
 router.afterEach((to) => {
   try {
     // Get a readable screen name from the route
@@ -280,6 +289,11 @@ router.afterEach((to) => {
 
     // Track the screen view
     analyticsService.trackScreenView(screenName, to.meta.screenClass as string);
+
+    // Stop performance tracking after a small delay to allow component mounting
+    setTimeout(() => {
+      performanceService.stopPageTrace(screenName);
+    }, 100);
   } catch (error) {
     console.error('Error tracking screen view:', error);
   }
