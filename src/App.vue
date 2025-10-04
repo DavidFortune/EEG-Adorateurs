@@ -10,8 +10,10 @@
 
 <script setup lang="ts">
 import { IonApp, IonRouterOutlet, IonSpinner } from '@ionic/vue';
-import { onBeforeMount, ref } from 'vue';
+import { onBeforeMount, onMounted, onUnmounted, ref } from 'vue';
+import { App as CapacitorApp } from '@capacitor/app';
 import { authService } from '@/firebase/auth';
+import { analyticsService } from '@/services/analyticsService';
 import { toastController } from '@ionic/vue';
 
 const isProcessingEmailLink = ref(false);
@@ -86,6 +88,23 @@ onBeforeMount(async () => {
     console.log('Not an email sign-in link, proceeding normally');
     isCheckingAuth.value = false;
   }
+});
+
+// Track app lifecycle events for session management
+onMounted(async () => {
+  // Handle app pause (going to background)
+  const pauseListener = await CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+    if (isActive) {
+      analyticsService.handleAppResume();
+    } else {
+      analyticsService.handleAppPause();
+    }
+  });
+
+  // Cleanup on unmount
+  onUnmounted(() => {
+    pauseListener.remove();
+  });
 });
 </script>
 

@@ -2,6 +2,7 @@ import { ref, computed, onMounted } from 'vue'
 import { authService } from '@/firebase/auth'
 import { membersService } from '@/firebase/members'
 import { teamsService } from '@/firebase/teams'
+import { analyticsService } from '@/services/analyticsService'
 import type { Member } from '@/types/member'
 import type { Team } from '@/types/team'
 
@@ -93,6 +94,17 @@ export function useUser() {
           } catch (error) {
             console.error('Error populating teams from team members:', error)
           }
+
+          // Initialize analytics with user data
+          try {
+            await analyticsService.initializeUser(member.value.id, {
+              is_admin: member.value.isAdmin,
+              team_count: memberTeams.value.length,
+              is_team_leader: isTeamLeaderOrOwner.value
+            })
+          } catch (error) {
+            console.error('Error initializing analytics:', error)
+          }
         }
       } catch (error) {
         console.error('Error loading member data:', error)
@@ -101,6 +113,9 @@ export function useUser() {
     } else {
       member.value = null
       memberTeams.value = []
+
+      // Cleanup analytics on logout
+      analyticsService.cleanup()
     }
   }
 

@@ -4,6 +4,7 @@ import TabsPage from '../views/TabsPage.vue'
 import { authService } from '@/firebase/auth';
 import { membersService } from '@/firebase/members';
 import { teamsService } from '@/firebase/teams';
+import { analyticsService } from '@/services/analyticsService';
 import { useOnboardingStore } from '@/stores/onboarding';
 import type { Team } from '@/types/team';
 
@@ -260,6 +261,27 @@ router.beforeEach(async (to, _from, next) => {
     }
   } else {
     next();
+  }
+});
+
+// Track screen views for analytics
+router.afterEach((to) => {
+  try {
+    // Get a readable screen name from the route
+    let screenName = to.name?.toString() || to.path;
+
+    // Clean up the screen name
+    if (screenName.startsWith('/')) {
+      screenName = screenName.substring(1);
+    }
+    if (!screenName) {
+      screenName = 'home';
+    }
+
+    // Track the screen view
+    analyticsService.trackScreenView(screenName, to.meta.screenClass as string);
+  } catch (error) {
+    console.error('Error tracking screen view:', error);
   }
 });
 
