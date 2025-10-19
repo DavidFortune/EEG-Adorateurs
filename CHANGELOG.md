@@ -2,6 +2,28 @@
 
 All notable changes to EEG Adorateurs will be documented in this file.
 
+## [1.7.2] - 2025-10-19
+
+### Added
+- **Section View Modal**: New popup for continuous display of section content
+  - Clickable section headers open modal showing all items with titles and lyrics
+  - Edge-to-edge layout maximizing screen space usage
+  - Streamlined display focusing on essential information (titles and lyrics)
+  - Works in non-edit mode only to avoid conflicts with editing actions
+
+### Enhanced
+- **Program Section Interaction**: Improved user experience for viewing section content
+  - Section headers now clickable (non-edit mode) with hover effect for visual feedback
+  - Edit/delete buttons use click.stop to prevent modal trigger during editing
+  - Clean, minimal styling for optimal readability of lyrics and titles
+
+### Technical
+- **Component Updates**: ServiceProgramPage enhancements
+  - Added section view modal state management
+  - Implemented showSectionView() and closeSectionView() functions
+  - Lean CSS styling for compact display without unnecessary padding
+  - Simple border separators between items for clean visual hierarchy
+
 ## [1.7.1] - 2025-10-04
 
 ### Added
