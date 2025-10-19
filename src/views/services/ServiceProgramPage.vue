@@ -91,7 +91,7 @@
           <!-- Render by sections if they exist -->
           <div v-if="program.sections.length > 0" class="sections-view">
             <div v-for="section in sortedSections" :key="section.id" class="program-section" :data-section-id="section.id">
-              <div class="section-header">
+              <div class="section-header" @click="!isEditMode && showSectionView(section)">
                 <div v-if="isEditMode" class="section-drag-handle" @mousedown="startSectionDrag($event, section)" @touchstart="startSectionDrag($event, section)">
                   <ion-icon :icon="reorderThreeOutline" />
                 </div>
@@ -100,16 +100,16 @@
                   {{ getSectionItemsCount(section.id) }} éléments
                   • {{ getSectionDuration(section.id) }} min
                 </div>
-                
+
                 <!-- Section Actions (Edit Mode Only) -->
                 <div v-if="isEditMode" class="section-actions">
-                  <ion-button @click="showEditSectionModal(section)" fill="clear" size="small" color="primary">
+                  <ion-button @click.stop="showEditSectionModal(section)" fill="clear" size="small" color="primary">
                     <ion-icon :icon="createOutline" slot="icon-only" />
                   </ion-button>
-                  <ion-button 
-                    @click="deleteSection(section.id)" 
-                    fill="clear" 
-                    size="small" 
+                  <ion-button
+                    @click.stop="deleteSection(section.id)"
+                    fill="clear"
+                    size="small"
                     color="danger"
                     :disabled="!canDeleteSection(section.id)"
                   >
@@ -571,6 +571,41 @@
         </ion-content>
       </ion-modal>
 
+      <!-- Section View Modal -->
+      <ion-modal :is-open="showSectionViewModal" @ionModalDidDismiss="closeSectionView">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>{{ selectedSection?.title }}</ion-title>
+            <ion-buttons slot="end">
+              <ion-button @click="closeSectionView">
+                <ion-icon :icon="closeOutline" />
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="section-view-modal-content">
+          <div v-if="selectedSection" class="section-view-container">
+            <!-- Section Items with Titles and Lyrics -->
+            <div
+              v-for="(item, index) in getSectionItems(selectedSection.id)"
+              :key="item.id"
+              class="section-item-card"
+            >
+              <!-- Item Header -->
+              <div class="item-header">
+                <div class="item-number">{{ index + 1 }}</div>
+                <h3 class="item-title">{{ item.resourceId && getLinkedResource(item.resourceId) ? getLinkedResource(item.resourceId)?.title : item.title }}</h3>
+              </div>
+
+              <!-- Lyrics -->
+              <div v-if="item.lyrics || (item.resourceId && getLinkedResource(item.resourceId)?.contents?.find(c => c.type === 'lyrics'))" class="lyrics-content">
+                {{ item.lyrics || getLinkedResource(item.resourceId)?.contents?.find(c => c.type === 'lyrics')?.content }}
+              </div>
+            </div>
+          </div>
+        </ion-content>
+      </ion-modal>
+
       <!-- Edit Program Modal -->
       <ion-modal :is-open="showEditProgramModalState" @ionModalDidDismiss="closeEditProgramModal">
         <ion-header>
@@ -990,6 +1025,8 @@ const editItemForm = ref({
   notes: '',
   resourceId: null as string | null
 });
+const showSectionViewModal = ref(false);
+const selectedSection = ref<ProgramSection | null>(null);
 
 const serviceId = computed(() => route.params.id as string);
 
@@ -1378,6 +1415,16 @@ const closeEditSectionModal = () => {
     id: '',
     title: ''
   };
+};
+
+const showSectionView = (section: ProgramSection) => {
+  selectedSection.value = section;
+  showSectionViewModal.value = true;
+};
+
+const closeSectionView = () => {
+  showSectionViewModal.value = false;
+  selectedSection.value = null;
 };
 
 const saveEditSection = async () => {
@@ -2674,6 +2721,15 @@ onMounted(async () => {
   gap: 8px;
 }
 
+.section-header:not(.edit-mode .section-header) {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.section-header:not(.edit-mode .section-header):hover {
+  background: var(--ion-color-light);
+}
+
 .section-title {
   flex: 1;
 }
@@ -3376,5 +3432,64 @@ onMounted(async () => {
   margin-top: 24px;
   padding-top: 16px;
   border-top: 1px solid var(--ion-color-light-shade);
+}
+
+/* Section View Modal Styles */
+.section-view-modal-content {
+  --padding-top: 0;
+  --padding-bottom: 0;
+  --padding-start: 0;
+  --padding-end: 0;
+}
+
+.section-view-container {
+  padding: 0;
+}
+
+.section-item-card {
+  padding: 16px 12px;
+  border-bottom: 1px solid var(--ion-color-light-shade);
+}
+
+.section-item-card:last-child {
+  border-bottom: none;
+}
+
+.section-item-card .item-header {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.section-item-card .item-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--ion-color-primary);
+  color: white;
+  font-weight: 700;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.section-item-card .item-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ion-color-dark);
+  margin: 0;
+  flex: 1;
+}
+
+.section-item-card .lyrics-content {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--ion-color-dark);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  margin: 0;
 }
 </style>
