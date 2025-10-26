@@ -149,7 +149,7 @@ const saveUserData = async () => {
 };
 
 const navigateToHome = () => {
-  router.replace('/tabs/accueil');
+  router.replace('/accueil');
 };
 
 onMounted(async () => {

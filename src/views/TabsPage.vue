@@ -4,27 +4,27 @@
     <ion-tabs id="main-content">
       <ion-router-outlet></ion-router-outlet>
       <ion-tab-bar slot="bottom">
-        <ion-tab-button tab="accueil" href="/tabs/accueil">
+        <ion-tab-button tab="accueil" href="/accueil">
           <ion-icon aria-hidden="true" :icon="home" />
           <ion-label>Accueil</ion-label>
         </ion-tab-button>
 
-        <ion-tab-button tab="disponibilites" href="/tabs/disponibilites">
+        <ion-tab-button tab="disponibilites" href="/disponibilites">
           <ion-icon aria-hidden="true" :icon="checkboxOutline" />
           <ion-label>Disponibilités</ion-label>
         </ion-tab-button>
 
-        <ion-tab-button tab="teams" href="/tabs/teams">
+        <ion-tab-button tab="teams" href="/teams">
           <ion-icon aria-hidden="true" :icon="people" />
           <ion-label>Équipes</ion-label>
         </ion-tab-button>
 
-        <ion-tab-button tab="services" href="/tabs/services">
+        <ion-tab-button tab="services" href="/services">
           <ion-icon aria-hidden="true" :icon="calendar" />
           <ion-label>Services</ion-label>
         </ion-tab-button>
 
-        <ion-tab-button tab="resources" href="/tabs/resources">
+        <ion-tab-button tab="resources" href="/resources">
           <ion-icon aria-hidden="true" :icon="libraryOutline" />
           <ion-label>Ressources</ion-label>
         </ion-tab-button>

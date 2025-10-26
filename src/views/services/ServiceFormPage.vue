@@ -245,7 +245,7 @@ const tempDeadlineDateTime = ref('');
 
 const isEditing = computed(() => !!route.params.id);
 const backUrl = computed(() => 
-  isEditing.value ? `/service-detail/${route.params.id}` : '/tabs/services'
+  isEditing.value ? `/service-detail/${route.params.id}` : '/services'
 );
 
 const categories = Object.values(ServiceCategory).map(category => ({

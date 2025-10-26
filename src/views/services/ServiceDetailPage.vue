@@ -3,7 +3,7 @@
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-back-button default-href="/tabs/services"></ion-back-button>
+          <ion-back-button default-href="/services"></ion-back-button>
         </ion-buttons>
         <ion-title>Détail du Service</ion-title>
         <ion-buttons slot="end">
@@ -301,7 +301,7 @@ const goToProgram = () => {
 };
 
 const goBack = () => {
-  router.push('/tabs/services');
+  router.push('/services');
 };
 
 const confirmDelete = async () => {
@@ -319,7 +319,7 @@ const confirmDelete = async () => {
         handler: async () => {
           if (service.value) {
             await serviceService.deleteService(service.value.id);
-            router.push('/tabs/services');
+            router.push('/services');
           }
         }
       }

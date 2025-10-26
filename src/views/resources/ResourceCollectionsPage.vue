@@ -3,7 +3,7 @@
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-back-button default-href="/tabs/resources"></ion-back-button>
+          <ion-back-button default-href="/resources"></ion-back-button>
         </ion-buttons>
         <ion-title>Collections de ressources</ion-title>
         <ion-buttons slot="end" v-if="isAdmin">
@@ -216,7 +216,7 @@ const editCollection = (collection: ResourceCollection) => {
 
 const viewCollection = (collection: ResourceCollection) => {
   router.push({
-    path: '/tabs/resources',
+    path: '/resources',
     query: { collection: collection.id }
   });
 };

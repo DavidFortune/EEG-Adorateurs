@@ -148,7 +148,7 @@ const handleGoogleSignIn = async () => {
     
     if (hasCompletedOnboarding) {
       await showToast('Connexion réussie !', 'success');
-      router.replace('/tabs/accueil');
+      router.replace('/accueil');
     } else {
       onboardingStore.updateFormData({ 
         email: user.email || '' 
@@ -200,7 +200,7 @@ onMounted(async () => {
       const hasCompletedOnboarding = await membersService.hasCompletedOnboarding(currentUser.uid);
       
       if (hasCompletedOnboarding) {
-        router.replace('/tabs/accueil');
+        router.replace('/accueil');
       } else {
         router.replace('/onboarding/welcome');
       }

@@ -3,7 +3,7 @@
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-back-button default-href="/tabs/resources"></ion-back-button>
+          <ion-back-button default-href="/resources"></ion-back-button>
         </ion-buttons>
         <ion-title>{{ isEditMode ? 'Modifier la ressource' : 'Nouvelle ressource' }}</ion-title>
         <ion-buttons slot="end">
@@ -774,7 +774,7 @@ const saveResource = async () => {
       selectedFile.value = null;
     }
 
-    router.push('/tabs/resources');
+    router.push('/resources');
   } catch (error) {
     console.error('Error saving resource:', error);
     const toast = await toastController.create({

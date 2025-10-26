@@ -11,10 +11,6 @@ import type { Team } from '@/types/team';
 
 const routes: Array<RouteRecordRaw> = [
   {
-    path: '/',
-    redirect: '/tabs/accueil'
-  },
-  {
     path: '/login',
     component: () => import('@/views/LoginPage.vue'),
     meta: { requiresGuest: true }
@@ -45,13 +41,13 @@ const routes: Array<RouteRecordRaw> = [
     meta: { requiresAuth: true }
   },
   {
-    path: '/tabs/',
+    path: '/',
     component: TabsPage,
     meta: { requiresAuth: true },
     children: [
       {
         path: '',
-        redirect: '/tabs/accueil'
+        redirect: '/accueil'
       },
       {
         path: 'accueil',
@@ -198,7 +194,7 @@ router.beforeEach(async (to, _from, next) => {
     next('/login');
   } else if (requiresGuest && user) {
     // Redirect to home if user is already logged in and trying to access guest-only pages
-    next('/tabs/accueil');
+    next('/accueil');
   } else if (user) {
     // Check onboarding status for authenticated users
     try {
@@ -221,7 +217,7 @@ router.beforeEach(async (to, _from, next) => {
         if (requiresAdmin) {
           if (!member || !member.isAdmin) {
             // Redirect non-admin users to home
-            next('/tabs/accueil');
+            next('/accueil');
             return;
           }
         }
@@ -229,7 +225,7 @@ router.beforeEach(async (to, _from, next) => {
         // Check service manager access (admin, owner, or leader)
         if (requiresServiceManager) {
           if (!member) {
-            next('/tabs/accueil');
+            next('/accueil');
             return;
           }
 
@@ -252,14 +248,14 @@ router.beforeEach(async (to, _from, next) => {
           });
 
           if (!isTeamLeaderOrOwner) {
-            next('/tabs/accueil');
+            next('/accueil');
             return;
           }
         }
 
         // Onboarding completed - prevent access to onboarding pages
         if (isOnboardingRoute) {
-          next('/tabs/accueil');
+          next('/accueil');
         } else {
           next();
         }

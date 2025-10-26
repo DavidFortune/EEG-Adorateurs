@@ -3,7 +3,7 @@
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-back-button :default-href="isEditing ? `/team-detail/${teamId}` : '/tabs/teams'"></ion-back-button>
+          <ion-back-button :default-href="isEditing ? `/team-detail/${teamId}` : '/teams'"></ion-back-button>
         </ion-buttons>
         <ion-title>{{ isEditing ? 'Modifier l\'équipe' : 'Nouvelle équipe' }}</ion-title>
       </ion-toolbar>
@@ -295,7 +295,7 @@ const handleCancel = () => {
   if (isEditing) {
     router.push(`/team-detail/${teamId}`);
   } else {
-    router.push('/tabs/teams');
+    router.push('/teams');
   }
 };
 

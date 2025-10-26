@@ -3,7 +3,7 @@
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-back-button default-href="/tabs/services"></ion-back-button>
+          <ion-back-button default-href="/services"></ion-back-button>
         </ion-buttons>
         <ion-title>Planning des services</ion-title>
         <ion-buttons slot="end">

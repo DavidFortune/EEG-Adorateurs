@@ -49,7 +49,7 @@
                 </p>
               </div>
               <ion-button
-                @click="() => router.push('/tabs/disponibilites')"
+                @click="() => router.push('/disponibilites')"
                 fill="solid"
                 color="primary"
                 class="encouragement-button"
@@ -155,7 +155,7 @@
                 fill="clear"
                 expand="block"
                 class="view-all-button"
-                @click="() => router.push('/tabs/services')"
+                @click="() => router.push('/services')"
               >
                 Voir tous les services
                 <ion-icon :icon="arrowForwardOutline" slot="end"></ion-icon>

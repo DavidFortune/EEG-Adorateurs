@@ -3,7 +3,7 @@
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-back-button default-href="/tabs/accueil"></ion-back-button>
+          <ion-back-button default-href="/accueil"></ion-back-button>
         </ion-buttons>
         <ion-title>À propos</ion-title>
       </ion-toolbar>

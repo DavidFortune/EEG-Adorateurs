@@ -77,7 +77,7 @@ onBeforeMount(async () => {
       await new Promise(resolve => setTimeout(resolve, 500));
       
       // Navigate directly to home page
-      window.location.href = '/tabs/accueil';
+      window.location.href = '/accueil';
     } catch (error) {
       console.error('Email sign-in error:', error);
       await showToast('Erreur lors de la connexion. Veuillez réessayer.', 'danger');

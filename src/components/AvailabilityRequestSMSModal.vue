@@ -236,7 +236,7 @@ const canSend = computed(() => {
 });
 
 const availabilityUrl = computed(() => {
-  return 'https://adorateurs.eglisegalilee.com/tabs/disponibilites';
+  return 'https://adorateurs.eglisegalilee.com/disponibilites';
 });
 
 const previewMessage = computed(() => {

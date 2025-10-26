@@ -3,7 +3,7 @@
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-back-button default-href="/tabs/teams"></ion-back-button>
+          <ion-back-button default-href="/teams"></ion-back-button>
         </ion-buttons>
         <ion-title>Assignations de l'équipe</ion-title>
         <ion-buttons slot="end">

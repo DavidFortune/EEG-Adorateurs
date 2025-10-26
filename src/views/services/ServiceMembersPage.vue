@@ -3,7 +3,7 @@
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-back-button default-href="/tabs/services"></ion-back-button>
+          <ion-back-button default-href="/services"></ion-back-button>
         </ion-buttons>
         <ion-title>Membres assignés</ion-title>
       </ion-toolbar>

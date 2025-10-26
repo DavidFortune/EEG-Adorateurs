@@ -3,7 +3,7 @@
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-back-button default-href="/tabs/resources"></ion-back-button>
+          <ion-back-button default-href="/resources"></ion-back-button>
         </ion-buttons>
         <ion-title>{{ resource?.title || 'Détail de la ressource' }}</ion-title>
         <ion-buttons slot="end" v-if="isAdmin && resource">
@@ -370,7 +370,7 @@ const confirmDelete = async () => {
           if (resource.value) {
             try {
               await deleteResource(resource.value.id);
-              router.push('/tabs/resources');
+              router.push('/resources');
             } catch (error) {
               console.error('Error deleting resource:', error);
             }
@@ -394,7 +394,7 @@ const closePdfViewer = () => {
 
 
 const goBack = () => {
-  router.push('/tabs/resources');
+  router.push('/resources');
 };
 
 

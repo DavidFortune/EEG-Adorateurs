@@ -3,7 +3,7 @@
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-back-button default-href="/tabs/teams"></ion-back-button>
+          <ion-back-button default-href="/teams"></ion-back-button>
         </ion-buttons>
         <ion-title>{{ team?.name || 'Équipe' }}</ion-title>
         <ion-buttons slot="end" v-if="team && canEdit">
@@ -23,7 +23,7 @@
         <ion-icon :icon="alertCircleOutline" color="danger"></ion-icon>
         <h2>Équipe introuvable</h2>
         <p>Cette équipe n'existe pas ou a été supprimée.</p>
-        <ion-button fill="solid" @click="() => router.push('/tabs/teams')">
+        <ion-button fill="solid" @click="() => router.push('/teams')">
           Retour aux équipes
         </ion-button>
       </div>
@@ -742,7 +742,7 @@ const confirmDelete = async () => {
               color: 'success'
             });
             toast.present();
-            router.push('/tabs/teams');
+            router.push('/teams');
           } catch (error: any) {
             console.error('Error deleting team:', error);
             const toast = await toastController.create({
