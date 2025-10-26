@@ -1,10 +1,10 @@
 <template>
-  <ion-modal :is-open="isOpen" @ionModalDidDismiss="$emit('close')">
+  <ion-modal :is-open="isOpen" @didDismiss="emit('close')">
     <ion-header>
       <ion-toolbar>
-        <ion-title>Envoyer une notification SMS</ion-title>
+        <ion-title>Demande de disponibilités</ion-title>
         <ion-buttons slot="end">
-          <ion-button @click="$emit('close')">
+          <ion-button @click="emit('close')">
             <ion-icon :icon="closeOutline" />
           </ion-button>
         </ion-buttons>
@@ -13,25 +13,37 @@
 
     <ion-content class="ion-padding">
       <div class="modal-content">
-        <!-- Service Info -->
-        <div class="service-info-section">
-          <h3>Service</h3>
-          <p class="service-title">{{ serviceTitle }}</p>
-          <p class="service-date">{{ serviceDate }}</p>
-        </div>
-
         <!-- Recipient Selection -->
-        <div class="recipients-section">
+        <div class="section">
           <h3>Destinataires</h3>
-
           <ion-segment v-model="recipientType" @ionChange="handleRecipientTypeChange">
             <ion-segment-button value="all">
               <ion-label>Tous les membres</ion-label>
+            </ion-segment-button>
+            <ion-segment-button value="team">
+              <ion-label>Équipe spécifique</ion-label>
             </ion-segment-button>
             <ion-segment-button value="specific">
               <ion-label>Membres spécifiques</ion-label>
             </ion-segment-button>
           </ion-segment>
+
+          <!-- Team Selection -->
+          <div v-if="recipientType === 'team'" class="team-selection">
+            <ion-list>
+              <ion-item>
+                <ion-select
+                  v-model="selectedTeamId"
+                  placeholder="Sélectionner une équipe"
+                  interface="popover"
+                >
+                  <ion-select-option v-for="team in teams" :key="team.id" :value="team.id">
+                    {{ team.name }}
+                  </ion-select-option>
+                </ion-select>
+              </ion-item>
+            </ion-list>
+          </div>
 
           <!-- Member Selection (when specific is selected) -->
           <div v-if="recipientType === 'specific'" class="member-selection">
@@ -93,7 +105,10 @@
           <div class="recipients-summary">
             <ion-icon :icon="peopleOutline" />
             <span v-if="recipientType === 'all'">
-              {{ availableMembers.length }} membre(s) recevront le SMS
+              {{ allMembersCount }} membre(s) recevront le SMS
+            </span>
+            <span v-else-if="recipientType === 'team'">
+              {{ teamMembersCount }} membre(s) de l'équipe recevront le SMS
             </span>
             <span v-else>
               {{ selectedMembers.length }} membre(s) sélectionné(s)
@@ -101,56 +116,53 @@
           </div>
         </div>
 
-        <!-- Custom Note -->
-        <div class="note-section">
-          <h3>Message personnalisé (optionnel)</h3>
+        <!-- Custom Message -->
+        <div class="message-section">
+          <h3>Message personnalisé</h3>
           <ion-textarea
-            v-model="customNote"
-            placeholder="Ajoutez une note personnelle..."
-            :rows="3"
-            :maxlength="100"
+            v-model="customMessage"
+            placeholder="Ajouter un message (optionnel)"
+            :rows="4"
+            :maxlength="200"
+            counter
           ></ion-textarea>
-          <p class="character-count">{{ customNote.length }}/100 caractères</p>
         </div>
 
-        <!-- Preview -->
+        <!-- Message Preview -->
         <div class="preview-section">
-          <h3>Aperçu du message</h3>
-          <div class="message-preview">
+          <h3>Aperçu du SMS</h3>
+          <div class="preview-box">
             {{ previewMessage }}
           </div>
         </div>
 
-        <!-- Actions -->
-        <div class="modal-actions">
-          <ion-button
-            expand="block"
-            @click="sendSMS"
-            :disabled="isSending || !canSend"
-          >
-            <ion-icon :icon="sendOutline" slot="start" />
-            {{ isSending ? 'Envoi en cours...' : 'Envoyer les SMS' }}
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+          <ion-button expand="block" @click="sendSMS" :disabled="!canSend || isSending">
+            <ion-icon slot="start" :icon="sendOutline" />
+            {{ isSending ? 'Envoi en cours...' : 'Envoyer le SMS' }}
           </ion-button>
         </div>
-
-        <!-- Status Messages -->
-        <ion-alert
-          :is-open="showSuccessAlert"
-          header="Succès"
-          :message="successMessage"
-          :buttons="['OK']"
-          @didDismiss="showSuccessAlert = false"
-        ></ion-alert>
-
-        <ion-alert
-          :is-open="showErrorAlert"
-          header="Erreur"
-          :message="errorMessage"
-          :buttons="['OK']"
-          @didDismiss="showErrorAlert = false"
-        ></ion-alert>
       </div>
     </ion-content>
+
+    <!-- Success Alert -->
+    <ion-alert
+      :is-open="showSuccessAlert"
+      header="SMS envoyés"
+      :message="successMessage"
+      :buttons="['OK']"
+      @didDismiss="showSuccessAlert = false"
+    />
+
+    <!-- Error Alert -->
+    <ion-alert
+      :is-open="showErrorAlert"
+      header="Erreur"
+      :message="errorMessage"
+      :buttons="['OK']"
+      @didDismiss="showErrorAlert = false"
+    />
   </ion-modal>
 </template>
 
@@ -159,7 +171,7 @@ import { ref, computed, watch } from 'vue';
 import {
   IonModal, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
   IonIcon, IonSegment, IonSegmentButton, IonLabel, IonList, IonItem,
-  IonCheckbox, IonTextarea, IonAlert, IonSearchbar
+  IonCheckbox, IonTextarea, IonAlert, IonSearchbar, IonSelect, IonSelectOption
 } from '@ionic/vue';
 import {
   closeOutline, peopleOutline, sendOutline
@@ -172,29 +184,34 @@ interface Member {
   phone: string;
 }
 
-interface Props {
-  isOpen: boolean;
-  serviceId: string;
-  serviceTitle: string;
-  serviceDate: string;
+interface Team {
+  id: string;
+  name: string;
 }
 
-const props = defineProps<Props>();
+const props = defineProps<{
+  isOpen: boolean;
+}>();
+
 const emit = defineEmits(['close', 'sent']);
 
 const functions = getFunctions();
 
 // State
-const recipientType = ref<'all' | 'specific'>('all');
+const recipientType = ref<'all' | 'team' | 'specific'>('all');
 const availableMembers = ref<Member[]>([]);
 const selectedMembers = ref<string[]>([]);
-const customNote = ref('');
+const teams = ref<Team[]>([]);
+const selectedTeamId = ref<string>('');
+const customMessage = ref('');
 const isSending = ref(false);
 const showSuccessAlert = ref(false);
 const showErrorAlert = ref(false);
 const successMessage = ref('');
 const errorMessage = ref('');
 const searchQuery = ref('');
+const allMembersCount = ref(0);
+const teamMembersCount = ref(0);
 
 // Computed
 const filteredMembers = computed(() => {
@@ -211,25 +228,25 @@ const filteredMembers = computed(() => {
 
 const canSend = computed(() => {
   if (recipientType.value === 'all') {
-    return availableMembers.value.length > 0;
+    return allMembersCount.value > 0;
+  } else if (recipientType.value === 'team') {
+    return selectedTeamId.value !== '' && teamMembersCount.value > 0;
   }
   return selectedMembers.value.length > 0;
 });
 
-const serviceUrl = computed(() => {
-  // Generate the public URL to the service program page
-  const baseUrl = 'https://adorateurs.eglisegalilee.com';
-  return `${baseUrl}/service-program/${props.serviceId}`;
+const availabilityUrl = computed(() => {
+  return 'https://adorateurs.eglisegalilee.com/tabs/disponibilites';
 });
 
 const previewMessage = computed(() => {
-  let message = `MàJ du programme ${props.serviceTitle}`;
+  let message = 'Demande de disponibilités';
 
-  if (customNote.value.trim()) {
-    message += `\n\n${customNote.value.trim()}`;
+  if (customMessage.value.trim()) {
+    message += `\n\n${customMessage.value.trim()}`;
   }
 
-  message += `\n\n${serviceUrl.value}`;
+  message += `\n\n${availabilityUrl.value}`;
 
   return message;
 });
@@ -237,19 +254,27 @@ const previewMessage = computed(() => {
 // Watchers
 watch(() => props.isOpen, async (isOpen) => {
   if (isOpen) {
-    await loadMembers();
+    await loadData();
   } else {
     // Reset form when closed
     recipientType.value = 'all';
     selectedMembers.value = [];
-    customNote.value = '';
+    selectedTeamId.value = '';
+    customMessage.value = '';
     searchQuery.value = '';
+  }
+});
+
+watch(() => selectedTeamId.value, async (teamId) => {
+  if (teamId) {
+    await loadTeamMembers(teamId);
   }
 });
 
 // Methods
 const handleRecipientTypeChange = () => {
   selectedMembers.value = [];
+  selectedTeamId.value = '';
 };
 
 const isSelected = (memberId: string): boolean => {
@@ -273,65 +298,78 @@ const deselectAll = () => {
   selectedMembers.value = [];
 };
 
-const loadMembers = async () => {
+const loadData = async () => {
   try {
-    const getMembers = httpsCallable(functions, 'getServiceMembersPhones');
-    const result = await getMembers({ serviceId: props.serviceId });
+    // Load all members with phone numbers
+    const getMembersFunction = httpsCallable(functions, 'getAllMembersPhones');
+    const result = await getMembersFunction();
+    const data = result.data as { members: Member[]; count: number };
 
-    availableMembers.value = (result.data as any).members || [];
+    availableMembers.value = data.members;
+    allMembersCount.value = data.count;
+
+    // Load teams
+    const getTeamsFunction = httpsCallable(functions, 'getTeams');
+    const teamsResult = await getTeamsFunction();
+    const teamsData = teamsResult.data as { teams: Team[] };
+    teams.value = teamsData.teams;
   } catch (error) {
-    console.error('Error loading members:', error);
-    errorMessage.value = 'Erreur lors du chargement des membres.';
+    console.error('Error loading data:', error);
+    errorMessage.value = 'Erreur lors du chargement des données';
     showErrorAlert.value = true;
   }
 };
 
+const loadTeamMembers = async (teamId: string) => {
+  try {
+    const getTeamMembersFunction = httpsCallable(functions, 'getTeamMembersPhones');
+    const result = await getTeamMembersFunction({ teamId });
+    const data = result.data as { count: number };
+    teamMembersCount.value = data.count;
+  } catch (error) {
+    console.error('Error loading team members:', error);
+    teamMembersCount.value = 0;
+  }
+};
+
 const sendSMS = async () => {
-  if (!canSend.value) return;
+  if (!canSend.value || isSending.value) return;
 
   isSending.value = true;
 
   try {
-    // Get phone numbers based on selection
-    let phoneNumbers: string[];
+    const sendFunction = httpsCallable(functions, 'sendAvailabilityRequestSMS');
 
-    if (recipientType.value === 'all') {
-      phoneNumbers = availableMembers.value.map(m => m.phone);
-    } else {
-      phoneNumbers = availableMembers.value
-        .filter(m => selectedMembers.value.includes(m.id))
-        .map(m => m.phone);
+    const payload: any = {
+      recipientType: recipientType.value,
+      customMessage: customMessage.value.trim(),
+      url: availabilityUrl.value
+    };
+
+    if (recipientType.value === 'team') {
+      payload.teamId = selectedTeamId.value;
+    } else if (recipientType.value === 'specific') {
+      payload.memberIds = selectedMembers.value;
     }
 
-    // Call cloud function
-    const sendProgramSMS = httpsCallable(functions, 'sendProgramAvailableSMS');
-    const result = await sendProgramSMS({
-      serviceId: props.serviceId,
-      serviceTitle: props.serviceTitle,
-      serviceDate: props.serviceDate,
-      phoneNumbers,
-      customNote: customNote.value.trim() || undefined,
-      serviceUrl: serviceUrl.value
-    });
+    const result = await sendFunction(payload);
+    const data = result.data as { sent: number; failed: number };
 
-    const data = result.data as any;
-
+    successMessage.value = `SMS envoyé avec succès à ${data.sent} membre(s)`;
     if (data.failed > 0) {
-      successMessage.value = `${data.sent} SMS envoyé(s) avec succès. ${data.failed} échec(s).`;
-    } else {
-      successMessage.value = `${data.sent} SMS envoyé(s) avec succès!`;
+      successMessage.value += `\n${data.failed} échec(s)`;
     }
 
     showSuccessAlert.value = true;
-    emit('sent', data);
+    emit('sent');
 
-    // Close modal after success
+    // Close modal after a short delay
     setTimeout(() => {
       emit('close');
     }, 2000);
   } catch (error: any) {
     console.error('Error sending SMS:', error);
-    errorMessage.value = error.message || 'Erreur lors de l\'envoi des SMS.';
+    errorMessage.value = error.message || 'Erreur lors de l\'envoi des SMS';
     showErrorAlert.value = true;
   } finally {
     isSending.value = false;
@@ -341,41 +379,27 @@ const sendSMS = async () => {
 
 <style scoped>
 .modal-content {
-  padding-bottom: 20px;
+  max-width: 600px;
+  margin: 0 auto;
 }
 
-.service-info-section,
-.recipients-section,
-.note-section,
-.preview-section {
+.section {
   margin-bottom: 24px;
 }
 
-.service-info-section h3,
-.recipients-section h3,
-.note-section h3,
-.preview-section h3 {
+h3 {
   font-size: 1rem;
   font-weight: 600;
+  margin-bottom: 12px;
   color: var(--ion-color-dark);
-  margin: 0 0 12px;
-}
-
-.service-title {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--ion-color-primary);
-  margin: 0 0 4px;
-}
-
-.service-date {
-  font-size: 0.9rem;
-  color: var(--ion-color-medium);
-  margin: 0;
 }
 
 ion-segment {
   margin-bottom: 16px;
+}
+
+.team-selection {
+  margin-top: 16px;
 }
 
 .member-selection {
@@ -432,8 +456,8 @@ ion-segment {
 .no-members {
   text-align: center;
   color: var(--ion-color-medium);
-  padding: 20px;
-  font-style: italic;
+  padding: 16px;
+  font-size: 0.9rem;
 }
 
 .recipients-summary {
@@ -444,39 +468,38 @@ ion-segment {
   background: var(--ion-color-light);
   border-radius: 8px;
   margin-top: 12px;
-  font-weight: 600;
-  color: var(--ion-color-dark);
 }
 
 .recipients-summary ion-icon {
-  font-size: 1.25rem;
+  font-size: 1.2rem;
   color: var(--ion-color-primary);
 }
 
-.character-count {
-  text-align: right;
-  font-size: 0.85rem;
-  color: var(--ion-color-medium);
-  margin: 4px 0 0;
+.recipients-summary span {
+  font-size: 0.9rem;
+  color: var(--ion-color-dark);
 }
 
-.message-preview {
+.message-section {
+  margin-bottom: 24px;
+}
+
+.preview-section {
+  margin-bottom: 24px;
+}
+
+.preview-box {
+  padding: 16px;
   background: var(--ion-color-light);
   border-radius: 8px;
-  padding: 16px;
+  border-left: 4px solid var(--ion-color-primary);
   white-space: pre-wrap;
-  word-wrap: break-word;
   font-size: 0.9rem;
-  line-height: 1.5;
+  line-height: 1.6;
   color: var(--ion-color-dark);
-  border: 1px solid var(--ion-color-light-shade);
 }
 
-.modal-actions {
+.action-buttons {
   margin-top: 24px;
-}
-
-.modal-actions ion-button {
-  margin: 0;
 }
 </style>

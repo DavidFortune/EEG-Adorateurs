@@ -3,6 +3,11 @@
     <ion-header>
       <ion-toolbar>
         <ion-title>Disponibilités</ion-title>
+        <ion-buttons slot="end" v-if="isAdmin">
+          <ion-button @click="openAvailabilitySMSModal">
+            <ion-icon slot="icon-only" :icon="chatbubbleEllipsesOutline"></ion-icon>
+          </ion-button>
+        </ion-buttons>
       </ion-toolbar>
     </ion-header>
     <ion-content :fullscreen="true">
@@ -101,6 +106,13 @@
 
       </div>
     </ion-content>
+
+    <!-- Availability Request SMS Modal -->
+    <AvailabilityRequestSMSModal
+      :is-open="showAvailabilitySMSModal"
+      @close="closeAvailabilitySMSModal"
+      @sent="onAvailabilitySMSSent"
+    />
   </ion-page>
 </template>
 
@@ -109,12 +121,13 @@ import { ref, onMounted, watch, computed } from 'vue';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButton,
   IonIcon, IonRefresher, IonRefresherContent, IonLoading, IonLabel,
-  IonChip, IonSegment, IonSegmentButton, toastController
+  IonChip, IonSegment, IonSegmentButton, IonButtons, toastController
 } from '@ionic/vue';
 import {
   thumbsUpOutline, thumbsDownOutline, calendarOutline,
-  checkmarkCircleOutline
+  checkmarkCircleOutline, chatbubbleEllipsesOutline
 } from 'ionicons/icons';
+import AvailabilityRequestSMSModal from '@/components/AvailabilityRequestSMSModal.vue';
 import { 
   collection, 
   getDocs, 
@@ -137,6 +150,10 @@ const userAssignments = ref<ServiceAssignment[]>([]);
 const currentAvailabilities = ref<{ [serviceId: string]: 'available' | 'unavailable' | 'maybe' | null }>({});
 const originalAvailabilities = ref<{ [serviceId: string]: 'available' | 'unavailable' | 'maybe' | null }>({});
 const selectedSegment = ref<'all' | 'answered' | 'unanswered'>('all');
+const showAvailabilitySMSModal = ref(false);
+
+// Check if current user is admin
+const isAdmin = computed(() => member.value?.isAdmin || false);
 
 // Helper functions
 const formatServiceDateTime = (date: string, time: string) => {
@@ -340,6 +357,25 @@ watch(() => member.value, (newMember) => {
     loadUserAssignments();
   }
 }, { immediate: true });
+
+// SMS Modal methods
+const openAvailabilitySMSModal = () => {
+  showAvailabilitySMSModal.value = true;
+};
+
+const closeAvailabilitySMSModal = () => {
+  showAvailabilitySMSModal.value = false;
+};
+
+const onAvailabilitySMSSent = async () => {
+  const toast = await toastController.create({
+    message: 'Demandes de disponibilités envoyées avec succès',
+    duration: 3000,
+    color: 'success',
+    position: 'top'
+  });
+  await toast.present();
+};
 
 onMounted(async () => {
   await Promise.all([
