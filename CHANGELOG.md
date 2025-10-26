@@ -2,6 +2,30 @@
 
 All notable changes to EEG Adorateurs will be documented in this file.
 
+## [1.8.1] - 2025-10-26
+
+### Changed
+- **URL Structure Simplification**: Removed `/tabs/` segment from all application URLs
+  - Simplified routing from `/tabs/accueil` to `/accueil`
+  - Updated all navigation guards and redirects
+  - Modified tab bar navigation to use direct paths
+  - Cleaner, more intuitive URL structure throughout the application
+  - Updated availability request SMS URLs to use new path structure
+
+### Added
+- **Availability Request SMS System**: New SMS notification feature for requesting member availability
+  - Admin-only SMS button in Disponibilités page
+  - AvailabilityRequestSMSModal component with flexible recipient selection
+  - Three recipient modes: All members, Specific team, or Specific members
+  - Search functionality for individual member selection
+  - Cloud Functions: `sendAvailabilityRequestSMS`, `getAllMembersPhones`, `getTeams`, `getTeamMembersPhones`
+  - Customizable message with availability URL link
+
+### Enhanced
+- **SMS Message Format**: Simplified program update SMS messages
+  - Changed to more concise format: "MàJ du programme [Nom] [Message] [Lien]"
+  - Updated service program URLs to use custom domain
+
 ## [1.8.0] - 2025-10-26
 
 ### Added
