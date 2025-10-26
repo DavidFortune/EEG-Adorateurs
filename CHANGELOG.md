@@ -2,6 +2,50 @@
 
 All notable changes to EEG Adorateurs will be documented in this file.
 
+## [1.8.0] - 2025-10-26
+
+### Added
+- **SMS Notification System**: Complete SMS notification functionality for service programs
+  - Cloud Function `sendProgramAvailableSMS` for sending SMS via Twilio
+  - Cloud Function `getServiceMembersPhones` to retrieve member phone numbers by service
+  - SMS modal component with member selection and message preview
+  - Search bar to filter members (appears with 5+ members)
+  - "Select All" / "Deselect All" quick selection buttons
+  - Visual selection counter showing selected/total members
+  - Custom note field for personalized messages (100 character limit)
+  - Real-time message preview with service details and URL
+  - Development mode for testing without Twilio credentials
+  - Production mode with real SMS sending via Twilio
+
+### Enhanced
+- **SMS Modal UX**: Improved user interface for SMS notifications
+  - Individual member selection with checkboxes
+  - Segment control for "All members" vs "Specific members"
+  - Responsive design with scrollable member list
+  - Success/error alerts with detailed feedback
+  - Phone number formatting (North American format support)
+  - Public URL generation using custom domain (adorateurs.eglisegalilee.com)
+
+### Fixed
+- **Cloud Functions Database Connection**: Fixed Firestore database configuration
+  - Functions now connect to correct named database `eeg-adorateurs-db`
+  - Fixed admin authentication using `firebaseUserId` field
+  - Resolved variable naming conflict in SMS sending logic
+  - Improved error handling and logging throughout functions
+
+### Technical
+- **Environment Configuration**: Proper setup for Twilio integration
+  - Firebase Functions v2 parameters with `defineString()`
+  - Environment variables loaded from `.env` file
+  - SMS_DEV_MODE flag for development/production switching
+  - Secure Twilio credentials configuration
+- **Phone Number Formatting**: Automatic formatting for international numbers
+  - E.164 format support with +1 prefix for North American numbers
+  - Validation and error handling for invalid phone numbers
+- **URL Generation**: Service program links in SMS
+  - Custom domain support (https://adorateurs.eglisegalilee.com)
+  - Direct links to `/service-program/[serviceId]` route
+
 ## [1.7.2] - 2025-10-19
 
 ### Added

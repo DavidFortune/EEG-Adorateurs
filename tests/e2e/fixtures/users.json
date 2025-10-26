@@ -1,0 +1,25 @@
+{
+  "testUser": {
+    "uid": "test-user-123",
+    "email": "test@example.com",
+    "emailVerified": true,
+    "displayName": "Test User",
+    "photoURL": null
+  },
+  "onboardingUser": {
+    "uid": "onboarding-user-456",
+    "email": "onboarding@example.com",
+    "emailVerified": true,
+    "displayName": null,
+    "photoURL": null
+  },
+  "memberData": {
+    "fullName": "Jean Dupont",
+    "phone": "5141234567",
+    "teams": [],
+    "ministries": []
+  },
+  "minimalMemberData": {
+    "fullName": "Marie Martin"
+  }
+}

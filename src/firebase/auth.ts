@@ -115,6 +115,10 @@ export const authService = {
    * Get current user
    */
   getCurrentUser(): User | null {
+    // Check if running in Cypress test environment
+    if (typeof window !== 'undefined' && (window as any).Cypress && (window as any).CYPRESS_MOCK_USER) {
+      return (window as any).CYPRESS_MOCK_USER as User;
+    }
     return auth.currentUser;
   },
 
@@ -122,6 +126,12 @@ export const authService = {
    * Listen to auth state changes
    */
   onAuthStateChanged(callback: (user: User | null) => void) {
+    // Check if running in Cypress test environment
+    if (typeof window !== 'undefined' && (window as any).Cypress && (window as any).CYPRESS_MOCK_USER) {
+      // Immediately call callback with mock user
+      setTimeout(() => callback((window as any).CYPRESS_MOCK_USER as User), 0);
+      return () => {}; // Return empty unsubscribe function
+    }
     return onAuthStateChanged(auth, callback);
   },
 
@@ -129,6 +139,10 @@ export const authService = {
    * Check if user is authenticated
    */
   isAuthenticated(): boolean {
+    // Check if running in Cypress test environment
+    if (typeof window !== 'undefined' && (window as any).Cypress && (window as any).CYPRESS_MOCK_USER) {
+      return true;
+    }
     return auth.currentUser !== null;
   },
 
@@ -143,6 +157,11 @@ export const authService = {
    * Wait for auth state to be initialized
    */
   waitForAuth(): Promise<User | null> {
+    // Check if running in Cypress test environment
+    if (typeof window !== 'undefined' && (window as any).Cypress && (window as any).CYPRESS_MOCK_USER) {
+      return Promise.resolve((window as any).CYPRESS_MOCK_USER as User);
+    }
+
     return new Promise((resolve) => {
       const unsubscribe = onAuthStateChanged(auth, (user) => {
         unsubscribe();

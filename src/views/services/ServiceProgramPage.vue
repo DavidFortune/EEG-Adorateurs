@@ -7,6 +7,9 @@
         </ion-buttons>
         <ion-title>{{ isEditMode ? 'Édition du programme' : 'Programme du service' }}</ion-title>
         <ion-buttons slot="end">
+          <ion-button v-if="isAdmin && !isEditMode" @click="showSMSModal" fill="clear" color="primary">
+            <ion-icon :icon="chatboxEllipsesOutline" />
+          </ion-button>
           <ion-button v-if="isAdmin" @click="toggleEditMode" fill="clear" :color="isEditMode ? 'primary' : undefined">
             <ion-icon :icon="isEditMode ? checkmarkOutline : createOutline" />
           </ion-button>
@@ -926,6 +929,16 @@
           </div>
         </ion-content>
       </ion-modal>
+
+      <!-- SMS Notification Modal -->
+      <SendProgramSMSModal
+        :is-open="showSMSModalState"
+        :service-id="serviceId"
+        :service-title="service?.title || ''"
+        :service-date="formatDateTime(service?.date, service?.time)"
+        @close="closeSMSModal"
+        @sent="onSMSSent"
+      />
     </ion-content>
   </ion-page>
 </template>
@@ -945,9 +958,10 @@ import {
   megaphoneOutline, giftOutline, handLeftOutline, personCircleOutline,
   checkmarkOutline, reorderThreeOutline, addOutline, trashOutline,
   playCircleOutline, volumeHighOutline, documentOutline, linkOutline,
-  downloadOutline
+  downloadOutline, chatboxEllipsesOutline
 } from 'ionicons/icons';
 import ResourceSelector from '@/components/ResourceSelector.vue';
+import SendProgramSMSModal from '@/components/SendProgramSMSModal.vue';
 import { serviceService } from '@/services/serviceService';
 import { timezoneUtils } from '@/utils/timezone';
 import { useUser } from '@/composables/useUser';
@@ -1027,6 +1041,7 @@ const editItemForm = ref({
 });
 const showSectionViewModal = ref(false);
 const selectedSection = ref<ProgramSection | null>(null);
+const showSMSModalState = ref(false);
 
 const serviceId = computed(() => route.params.id as string);
 
@@ -1040,7 +1055,8 @@ const addItemModalTitle = computed(() => {
   return 'Sélectionner un type d\'élément';
 });
 
-const formatDateTime = (dateStr: string, timeStr: string) => {
+const formatDateTime = (dateStr: string | undefined, timeStr: string | undefined): string => {
+  if (!dateStr || !timeStr) return '';
   return timezoneUtils.formatDateTimeForDisplay(dateStr, timeStr);
 };
 
@@ -1425,6 +1441,19 @@ const showSectionView = (section: ProgramSection) => {
 const closeSectionView = () => {
   showSectionViewModal.value = false;
   selectedSection.value = null;
+};
+
+const showSMSModal = () => {
+  showSMSModalState.value = true;
+};
+
+const closeSMSModal = () => {
+  showSMSModalState.value = false;
+};
+
+const onSMSSent = (data: any) => {
+  console.log('SMS sent successfully:', data);
+  // You can add a toast notification here if desired
 };
 
 const saveEditSection = async () => {
