@@ -3,7 +3,7 @@
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-back-button default-href="/resources"></ion-back-button>
+          <ion-back-button :default-href="isEditMode ? `/resource-detail/${route.params.id}` : '/resources'"></ion-back-button>
         </ion-buttons>
         <ion-title>{{ isEditMode ? 'Modifier la ressource' : 'Nouvelle ressource' }}</ion-title>
         <ion-buttons slot="end">

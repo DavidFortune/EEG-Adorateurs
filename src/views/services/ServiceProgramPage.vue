@@ -3,7 +3,7 @@
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-back-button default-href="/services"></ion-back-button>
+          <ion-back-button :default-href="`/service-detail/${route.params.id}`"></ion-back-button>
         </ion-buttons>
         <ion-title>{{ isEditMode ? 'Édition du programme' : 'Programme du service' }}</ion-title>
         <ion-buttons slot="end">
