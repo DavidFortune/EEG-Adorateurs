@@ -2,6 +2,17 @@
 
 All notable changes to EEG Adorateurs will be documented in this file.
 
+## [1.8.2] - 2025-10-26
+
+### Enhanced
+- **Navigation Hierarchy Optimization**: Improved back button navigation to reflect logical page hierarchy
+  - Service detail pages (members, program) now return to their parent service detail page
+  - Team detail pages (availability, assignments, scheduling) now return to their parent team detail page
+  - Resource edit form now returns to resource detail page
+  - Settings-related pages (about, privacy, terms) now return to settings page
+  - More intuitive navigation flow respecting parent-child relationships
+  - Better user orientation throughout the application
+
 ## [1.8.1] - 2025-10-26
 
 ### Changed
