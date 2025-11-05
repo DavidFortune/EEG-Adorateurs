@@ -277,8 +277,7 @@ const loadTeamData = async () => {
         parsedDateTime: new Date(`${service.date}T${service.time}`)
       }))
       .filter(s => s.parsedDateTime.getTime() >= nowTime)
-      .sort((a, b) => a.parsedDateTime.getTime() - b.parsedDateTime.getTime())
-      .slice(0, 5); // Show next 5 services
+      .sort((a, b) => a.parsedDateTime.getTime() - b.parsedDateTime.getTime());
 
   } catch (error) {
     console.error('Error loading team data:', error);

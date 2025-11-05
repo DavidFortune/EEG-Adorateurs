@@ -241,6 +241,24 @@ class UpdateService {
   async getReleaseNotes(): Promise<ReleaseNote[]> {
     return [
       {
+        version: '1.8.3',
+        date: '2025-01-04',
+        title: 'Correction des bugs de filtrage des services',
+        description: 'Correction de bugs critiques empêchant l\'affichage de tous les services futurs dans les pages d\'équipe',
+        features: [],
+        fixes: [
+          'Correction du filtrage des services dans TeamSchedulingView - tous les services futurs pour une équipe s\'affichent maintenant correctement',
+          'Amélioration de la comparaison des noms d\'équipe (insensible à la casse et aux espaces)',
+          'Correction du problème de synchronisation des données entre allServices et allEvents',
+          'Suppression de la limite artificielle de 5 services dans TeamAvailabilityPage'
+        ],
+        improvements: [
+          'Affichage de tous les services futurs dans la page de disponibilités d\'équipe',
+          'Rechargement automatique des services pour garantir la synchronisation des données',
+          'Utilisation de watch pour une mise à jour réactive des événements filtrés'
+        ]
+      },
+      {
         version: '1.7.0',
         date: '2025-01-10',
         title: 'Workflow d\'approbation des équipes',

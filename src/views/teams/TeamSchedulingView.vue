@@ -65,7 +65,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import {
@@ -83,6 +83,7 @@ import EventSelector from '@/components/scheduling/EventSelector.vue';
 import TeamCardNoPen from '@/components/scheduling/TeamCardNoPen.vue';
 import type { Team } from '@/types/team';
 import type { Service } from '@/types/service';
+import type { SchedulingEvent } from '@/types/scheduling';
 
 const route = useRoute();
 const schedulingStore = useSchedulingStore();
@@ -109,23 +110,28 @@ const {
 const teamId = computed(() => route.params.id as string);
 const team = ref<Team | null>(null);
 const allServices = ref<Service[]>([]);
+const events = ref<SchedulingEvent[]>([]);
 
 // Track if user has selected a service
 const hasSelectedService = computed(() => {
   return activeEventIndex.value >= 0 && events.value.length > 0 && filteredActiveEventIndex.value >= 0;
 });
 
-// Filter events to show only future services where this team is required
-const events = computed(() => {
+// Update filtered events when dependencies change
+const updateFilteredEvents = async () => {
   const now = new Date();
   const teamName = team.value?.name;
 
   if (!teamName) {
-    return allEvents.value.filter(event => {
+    events.value = allEvents.value.filter(event => {
       const eventDate = new Date(event.datetime);
       return eventDate >= now;
     });
+    return;
   }
+
+  // Reload services to ensure we have the latest data
+  await loadAllServices();
 
   // Filter to show only events where this team is required
   const filteredEventIds = allServices.value
@@ -135,20 +141,24 @@ const events = computed(() => {
         return false;
       }
 
-      // Check if this team is in the requirements
+      // Check if this team is in the requirements (case-insensitive and trimmed)
       const isTeamRequired = service.teamRequirements.some(
-        req => req.isActive && req.teamName === teamName
+        req => req.isActive &&
+               req.teamName?.trim().toLowerCase() === teamName.trim().toLowerCase()
       );
 
       return isTeamRequired;
     })
     .map(service => service.id);
 
-  return allEvents.value.filter(event => {
+  events.value = allEvents.value.filter(event => {
     const eventDate = new Date(event.datetime);
     return eventDate >= now && filteredEventIds.includes(event.id);
   });
-});
+};
+
+// Watch for changes and update filtered events
+watch([allEvents, team], updateFilteredEvents, { immediate: false });
 
 // Calculate the active event index relative to the filtered events
 const filteredActiveEventIndex = computed(() => {
@@ -220,14 +230,14 @@ onMounted(async () => {
       setCurrentUserId(user.uid);
     }
 
-    // Load team data and all services in parallel
-    await Promise.all([
-      loadTeamData(),
-      loadAllServices()
-    ]);
+    // Load team data first
+    await loadTeamData();
 
     // Load services and teams
     await loadServices();
+
+    // Update filtered events after all data is loaded
+    await updateFilteredEvents();
   } catch (error) {
     console.error('Error loading scheduling data:', error);
   }
