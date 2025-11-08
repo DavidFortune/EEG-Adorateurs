@@ -241,6 +241,19 @@ class UpdateService {
   async getReleaseNotes(): Promise<ReleaseNote[]> {
     return [
       {
+        version: '1.8.4',
+        date: '2025-01-08',
+        title: 'Mise à jour des pages d\'équipes',
+        description: 'Améliorations et mises à jour des composants Teams avec cache Firebase actualisé',
+        features: [],
+        fixes: [],
+        improvements: [
+          'Mise à jour des composants TeamDetailPage et TeamsPage',
+          'Actualisation du cache Firebase Hosting',
+          'Optimisation des performances de rendu'
+        ]
+      },
+      {
         version: '1.8.3',
         date: '2025-01-04',
         title: 'Correction des bugs de filtrage des services',
