@@ -83,7 +83,7 @@ const routes: Array<RouteRecordRaw> = [
   },
   {
     path: '/service-program/:id',
-    component: () => import('@/views/services/ServiceProgramPage.vue'),
+    component: () => import('@/views/services/ServiceProgramPageFlat.vue'),
     meta: { requiresAuth: true }
   },
   {
