@@ -876,19 +876,24 @@ const addItem = async () => {
         }
       : undefined;
 
+    // Build item object, excluding undefined values
+    const newItem: any = {
+      order: program.value.items.length,
+      type: itemForm.value.type,
+      title: itemForm.value.title
+    };
+
+    // Only add optional fields if they have values
+    if (itemForm.value.subtitle) newItem.subtitle = itemForm.value.subtitle;
+    if (itemForm.value.reference) newItem.reference = itemForm.value.reference;
+    if (participant) newItem.participant = participant;
+    if (itemForm.value.duration) newItem.duration = itemForm.value.duration;
+    if (itemForm.value.notes) newItem.notes = itemForm.value.notes;
+    if (itemForm.value.resourceId) newItem.resourceId = itemForm.value.resourceId;
+
     await addItemToProgram(
       program.value.id,
-      {
-        order: program.value.items.length,
-        type: itemForm.value.type,
-        title: itemForm.value.title,
-        subtitle: itemForm.value.subtitle || undefined,
-        reference: itemForm.value.reference || undefined,
-        participant,
-        duration: itemForm.value.duration || undefined,
-        notes: itemForm.value.notes || undefined,
-        resourceId: itemForm.value.resourceId || undefined
-      },
+      newItem,
       user.value.uid
     );
 
@@ -917,19 +922,24 @@ const updateItem = async () => {
         }
       : undefined;
 
+    // Build update object, excluding undefined values
+    const updates: any = {
+      type: itemForm.value.type,
+      title: itemForm.value.title
+    };
+
+    // Only add optional fields if they have values
+    if (itemForm.value.subtitle) updates.subtitle = itemForm.value.subtitle;
+    if (itemForm.value.reference) updates.reference = itemForm.value.reference;
+    if (participant) updates.participant = participant;
+    if (itemForm.value.duration) updates.duration = itemForm.value.duration;
+    if (itemForm.value.notes) updates.notes = itemForm.value.notes;
+    if (itemForm.value.resourceId) updates.resourceId = itemForm.value.resourceId;
+
     await updateItemInProgram(
       program.value.id,
       editingItemId.value,
-      {
-        type: itemForm.value.type,
-        title: itemForm.value.title,
-        subtitle: itemForm.value.subtitle || undefined,
-        reference: itemForm.value.reference || undefined,
-        participant,
-        duration: itemForm.value.duration || undefined,
-        notes: itemForm.value.notes || undefined,
-        resourceId: itemForm.value.resourceId || undefined
-      },
+      updates,
       user.value.uid
     );
 
@@ -990,15 +1000,20 @@ const addSubItem = async () => {
     const parentItem = program.value.items.find(i => i.id === parentItemIdForSubItem.value);
     const currentSubItems = parentItem?.subItems || [];
 
+    // Build sub-item object, excluding undefined values
+    const newSubItem: any = {
+      title: addSubItemForm.value.title,
+      order: currentSubItems.length
+    };
+
+    // Only add optional fields if they have values
+    if (addSubItemForm.value.resourceId) newSubItem.resourceId = addSubItemForm.value.resourceId;
+    if (addSubItemForm.value.notes) newSubItem.notes = addSubItemForm.value.notes;
+
     await addSubItemToItem(
       program.value.id,
       parentItemIdForSubItem.value,
-      {
-        title: addSubItemForm.value.title,
-        resourceId: addSubItemForm.value.resourceId || undefined,
-        notes: addSubItemForm.value.notes || undefined,
-        order: currentSubItems.length
-      },
+      newSubItem,
       user.value.uid
     );
 
@@ -1040,15 +1055,20 @@ const updateSubItem = async () => {
   try {
     loading.value = true;
 
+    // Build update object, excluding undefined values
+    const updates: any = {
+      title: editSubItemForm.value.title
+    };
+
+    // Only add optional fields if they have values
+    if (editSubItemForm.value.resourceId) updates.resourceId = editSubItemForm.value.resourceId;
+    if (editSubItemForm.value.notes) updates.notes = editSubItemForm.value.notes;
+
     await updateSubItemInItem(
       program.value.id,
       editSubItemForm.value.parentItemId,
       editSubItemForm.value.id,
-      {
-        title: editSubItemForm.value.title,
-        resourceId: editSubItemForm.value.resourceId || undefined,
-        notes: editSubItemForm.value.notes || undefined
-      },
+      updates,
       user.value.uid
     );
 
