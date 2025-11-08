@@ -800,14 +800,20 @@ const updateProgramInfo = async () => {
   try {
     loading.value = true;
 
-    const conductor: ProgramParticipant | undefined = editProgramForm.value.conductorName
-      ? {
-          id: `custom_${Date.now()}`,
-          name: editProgramForm.value.conductorName,
-          role: editProgramForm.value.conductorRole || undefined,
-          isCustom: true
-        }
-      : undefined;
+    // Build conductor object, excluding undefined values
+    let conductor: ProgramParticipant | undefined = undefined;
+    if (editProgramForm.value.conductorName) {
+      conductor = {
+        id: `custom_${Date.now()}`,
+        name: editProgramForm.value.conductorName,
+        isCustom: true
+      } as ProgramParticipant;
+
+      // Only add role if it has a value
+      if (editProgramForm.value.conductorRole) {
+        conductor.role = editProgramForm.value.conductorRole;
+      }
+    }
 
     await updateProgram(
       program.value.id,
