@@ -143,6 +143,32 @@
               </div>
             </div>
 
+            <!-- Spotify Display -->
+            <div v-if="selectedContentType === ResourceTypeEnum.SPOTIFY" class="spotify-content">
+              <div v-for="(content, index) in selectedContents" :key="index" class="content-item">
+                <div v-if="content.notes" class="content-notes">
+                  <ion-card>
+                    <ion-card-header>
+                      <ion-card-subtitle>Notes</ion-card-subtitle>
+                    </ion-card-header>
+                    <ion-card-content>
+                      {{ content.notes }}
+                    </ion-card-content>
+                  </ion-card>
+                </div>
+                <iframe
+                  v-if="content.url"
+                  :src="getSpotifyEmbedUrl(content.url) || ''"
+                  width="100%"
+                  height="352"
+                  frameborder="0"
+                  allowtransparency="true"
+                  allow="encrypted-media"
+                  class="spotify-player"
+                ></iframe>
+              </div>
+            </div>
+
             <!-- Music Sheet Display -->
             <div v-if="selectedContentType === ResourceTypeEnum.MUSIC_SHEET" class="chart-content">
               <div v-for="(content, index) in selectedContents" :key="index" class="content-item">
@@ -264,7 +290,7 @@ import {
   pencilOutline, folderOutline, calendarOutline, eyeOutline,
   downloadOutline, trashOutline, alertCircleOutline, logoYoutube
 } from 'ionicons/icons';
-import { getContentIcon, getContentLabel, formatFileSize, isYouTubeUrl, getYouTubeEmbedUrl, isPdfFile } from '@/utils/resource-utils';
+import { getContentIcon, getContentLabel, formatFileSize, isYouTubeUrl, getYouTubeEmbedUrl, isPdfFile, getSpotifyEmbedUrl } from '@/utils/resource-utils';
 import { Resource, ResourceCollection, ResourceType } from '@/types/resource';
 import { getResourceById, deleteResource, getResourceCollections } from '@/firebase/resources';
 import { useUser } from '@/composables/useUser';
@@ -309,6 +335,7 @@ const availableTypes = computed(() => {
     ResourceType.LYRICS,
     ResourceType.VIDEO,
     ResourceType.AUDIO,
+    ResourceType.SPOTIFY,
     ResourceType.MUSIC_SHEET,
     ResourceType.FILE
   ];

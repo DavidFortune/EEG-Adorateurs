@@ -4,6 +4,7 @@ export enum ResourceType {
   AUDIO = 'audio',
   MUSIC_SHEET = 'music_sheet',
   YOUTUBE = 'youtube',
+  SPOTIFY = 'spotify',
   FILE = 'file'
 }
 

@@ -116,7 +116,20 @@
                   <div v-if="content.type === ResourceTypeEnum.AUDIO && content.url" class="media-preview">
                     <audio :src="content.url" controls class="preview-audio"></audio>
                   </div>
-                  
+
+                  <!-- Spotify Preview -->
+                  <div v-if="content.type === ResourceTypeEnum.SPOTIFY && content.url" class="media-preview">
+                    <iframe
+                      :src="getSpotifyEmbedUrl(content.url) || ''"
+                      width="100%"
+                      height="152"
+                      frameborder="0"
+                      allowtransparency="true"
+                      allow="encrypted-media"
+                      class="preview-spotify"
+                    ></iframe>
+                  </div>
+
                   <!-- Music Sheet Preview -->
                   <div v-if="content.type === ResourceTypeEnum.MUSIC_SHEET && content.url" class="media-preview">
                     <div class="file-preview">
@@ -229,7 +242,7 @@
                   </div>
                 </ion-button>
                 
-                <ion-button 
+                <ion-button
                   @click="contentForm.type = ResourceTypeEnum.MUSIC_SHEET"
                   :fill="contentForm.type === ResourceTypeEnum.MUSIC_SHEET ? 'solid' : 'outline'"
                   :color="contentForm.type === ResourceTypeEnum.MUSIC_SHEET ? 'primary' : 'medium'"
@@ -240,7 +253,19 @@
                     <span>Partition</span>
                   </div>
                 </ion-button>
-                
+
+                <ion-button
+                  @click="contentForm.type = ResourceTypeEnum.SPOTIFY"
+                  :fill="contentForm.type === ResourceTypeEnum.SPOTIFY ? 'solid' : 'outline'"
+                  :color="contentForm.type === ResourceTypeEnum.SPOTIFY ? 'primary' : 'medium'"
+                  class="media-type-button"
+                >
+                  <div class="button-content">
+                    <ion-icon :icon="musicalNoteOutline" />
+                    <span>Spotify</span>
+                  </div>
+                </ion-button>
+
               </div>
             </ion-item>
             
@@ -339,8 +364,22 @@
                 ></ion-input>
               </ion-item>
             </div>
-            
-            
+
+            <!-- Spotify Link -->
+            <div v-if="contentForm.type === ResourceTypeEnum.SPOTIFY">
+              <ion-item>
+                <ion-label position="stacked">Lien Spotify *</ion-label>
+                <ion-input
+                  v-model="contentForm.url"
+                  placeholder="Ex: https://open.spotify.com/track/..."
+                ></ion-input>
+              </ion-item>
+              <ion-note class="spotify-note">
+                <ion-icon :icon="informationCircleOutline" />
+                Collez le lien Spotify d'une chanson, playlist, album ou podcast
+              </ion-note>
+            </div>
+
             <!-- Text Content for lyrics -->
             <ion-item v-if="contentForm.type === ResourceTypeEnum.LYRICS">
               <ion-label position="stacked">Contenu</ion-label>
@@ -493,9 +532,9 @@ import {
 import {
   checkmarkOutline, addOutline, pencilOutline, trashOutline,
   folderOutline, documentTextOutline, videocamOutline, volumeHighOutline,
-  musicalNotesOutline
+  musicalNotesOutline, musicalNoteOutline, informationCircleOutline
 } from 'ionicons/icons';
-import { getContentIcon, getContentLabel, formatFileSize, isYouTubeUrl, getYouTubeEmbedUrl, getFileName, getPreviewText } from '@/utils/resource-utils';
+import { getContentIcon, getContentLabel, formatFileSize, isYouTubeUrl, getYouTubeEmbedUrl, getFileName, getPreviewText, getSpotifyEmbedUrl } from '@/utils/resource-utils';
 import { Resource, ResourceMedia, ResourceType, ResourceCollection } from '@/types/resource';
 import { 
   createResource, 

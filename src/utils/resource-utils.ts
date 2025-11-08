@@ -1,7 +1,7 @@
 import { ResourceType } from '@/types/resource';
 import {
   documentTextOutline, videocamOutline, volumeHighOutline,
-  musicalNotesOutline, logoYoutube, documentOutline
+  musicalNotesOutline, logoYoutube, documentOutline, musicalNoteOutline
 } from 'ionicons/icons';
 
 /**
@@ -19,6 +19,8 @@ export function getContentIcon(type: ResourceType): string {
       return musicalNotesOutline;
     case ResourceType.YOUTUBE:
       return logoYoutube;
+    case ResourceType.SPOTIFY:
+      return musicalNoteOutline;
     case ResourceType.FILE:
       return documentOutline;
     default:
@@ -41,6 +43,8 @@ export function getContentLabel(type: ResourceType): string {
       return 'Partition';
     case ResourceType.YOUTUBE:
       return 'YouTube';
+    case ResourceType.SPOTIFY:
+      return 'Spotify';
     case ResourceType.FILE:
       return 'Fichier';
     default:
@@ -148,4 +152,41 @@ export function getPreviewText(content: string, maxLength: number = 50): string 
   if (!content) return '';
   const preview = content.trim().substring(0, maxLength);
   return preview + (content.length > maxLength ? '...' : '');
+}
+
+/**
+ * Check if URL is a Spotify URL
+ */
+export function isSpotifyUrl(url?: string): boolean {
+  if (!url) return false;
+  return url.includes('spotify.com/');
+}
+
+/**
+ * Get Spotify embed URL from various Spotify URL formats
+ */
+export function getSpotifyEmbedUrl(url?: string): string | null {
+  if (!url) return null;
+
+  // Extract Spotify URI from various URL formats
+  // Formats supported:
+  // - https://open.spotify.com/track/6rqhFgbbKwnb9MLmUQDhG6
+  // - https://open.spotify.com/album/4aawyAB9vmqN3uQ7FjRGTy
+  // - https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M
+  // - https://open.spotify.com/episode/7makk4oTQel546B0PZlDM5
+
+  const patterns = [
+    /spotify\.com\/(track|album|playlist|episode|show)\/([a-zA-Z0-9]+)/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match && match[1] && match[2]) {
+      const type = match[1];
+      const id = match[2];
+      return `https://open.spotify.com/embed/${type}/${id}`;
+    }
+  }
+
+  return null;
 }
