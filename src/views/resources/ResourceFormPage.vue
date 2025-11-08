@@ -598,16 +598,21 @@ const isFormValid = computed(() => {
 const isContentValid = computed(() => {
   const type = contentForm.value.type;
   if (!type) return false;
-  
+
   if (type === ResourceTypeEnum.AUDIO || type === ResourceTypeEnum.VIDEO || type === ResourceTypeEnum.MUSIC_SHEET) {
     // For audio, video, and music sheet, either a file is selected or a URL is provided
     return !!selectedFile.value || (!!contentForm.value.url && contentForm.value.url.trim().length > 0);
   }
-  
+
+  if (type === ResourceTypeEnum.SPOTIFY) {
+    // For Spotify, a URL is required
+    return !!contentForm.value.url && contentForm.value.url.trim().length > 0;
+  }
+
   if (type === ResourceTypeEnum.LYRICS) {
     return !!contentForm.value.content && contentForm.value.content.trim().length > 0;
   }
-  
+
   return false;
 });
 
