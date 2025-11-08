@@ -1243,6 +1243,12 @@ input[type="file"]:hover {
   height: 40px;
 }
 
+.preview-spotify {
+  width: 100%;
+  max-width: 100%;
+  border-radius: 12px;
+}
+
 .file-preview, .lyrics-preview, .fallback-preview {
   display: flex;
   align-items: center;
@@ -1291,6 +1297,21 @@ input[type="file"]:hover {
 .lyrics-preview ion-icon {
   font-size: 1rem;
   color: var(--ion-color-medium);
+}
+
+.spotify-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  margin-top: 8px;
+  font-size: 0.875rem;
+  color: var(--ion-color-medium);
+}
+
+.spotify-note ion-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
 }
 
 @media (max-width: 480px) {

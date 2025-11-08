@@ -156,16 +156,27 @@
                     </ion-card-content>
                   </ion-card>
                 </div>
-                <iframe
-                  v-if="content.url"
-                  :src="getSpotifyEmbedUrl(content.url) || ''"
-                  width="100%"
-                  height="352"
-                  frameborder="0"
-                  allowtransparency="true"
-                  allow="encrypted-media"
-                  class="spotify-player"
-                ></iframe>
+                <div v-if="content.url">
+                  <iframe
+                    :src="getSpotifyEmbedUrl(content.url) || ''"
+                    width="100%"
+                    height="352"
+                    frameborder="0"
+                    allowtransparency="true"
+                    allow="encrypted-media"
+                    class="spotify-player"
+                  ></iframe>
+                  <ion-button
+                    :href="content.url"
+                    target="_blank"
+                    expand="block"
+                    fill="outline"
+                    style="margin-top: 1rem;"
+                  >
+                    <ion-icon :icon="musicalNoteOutline" slot="start" />
+                    Ouvrir dans Spotify
+                  </ion-button>
+                </div>
               </div>
             </div>
 
@@ -288,7 +299,8 @@ import {
 import PdfViewer from '@/components/PdfViewer.vue';
 import {
   pencilOutline, folderOutline, calendarOutline, eyeOutline,
-  downloadOutline, trashOutline, alertCircleOutline, logoYoutube
+  downloadOutline, trashOutline, alertCircleOutline, logoYoutube,
+  musicalNoteOutline
 } from 'ionicons/icons';
 import { getContentIcon, getContentLabel, formatFileSize, isYouTubeUrl, getYouTubeEmbedUrl, isPdfFile, getSpotifyEmbedUrl } from '@/utils/resource-utils';
 import { Resource, ResourceCollection, ResourceType } from '@/types/resource';
@@ -508,6 +520,13 @@ onMounted(() => {
   width: 100%;
   aspect-ratio: 16/9;
   border-radius: 8px;
+}
+
+.spotify-player {
+  width: 100%;
+  max-width: 100%;
+  border-radius: 12px;
+  margin-top: 1rem;
 }
 
 .chart-preview {
