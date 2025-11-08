@@ -57,51 +57,70 @@ export const getProgramByServiceId = async (serviceId: string): Promise<ServiceP
  * Create a new program
  */
 export const createProgram = async (
-  program: Omit<ServiceProgram, 'id' | 'createdAt' | 'updatedAt'>, 
+  program: Omit<ServiceProgram, 'id' | 'createdAt' | 'updatedAt'>,
   userId: string
 ): Promise<ServiceProgram> => {
   console.log('Firebase createProgram called with:', { program, userId });
-  
+
   try {
     const programRef = doc(collection(db, PROGRAMS_COLLECTION));
     const now = serverTimestamp();
-    
+
     console.log('Program ref created:', programRef.id);
-    console.log('Program sections:', program.sections);
-    
-    // Generate IDs for sections that don't have them
+
+    // Generate IDs for items and their sub-items
+    const itemsWithIds = (program.items || []).map(item => {
+      const itemId = item.id || `item_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
+      // Generate IDs for sub-items if they exist
+      const subItemsWithIds = (item.subItems || []).map(subItem => ({
+        ...subItem,
+        id: subItem.id || `subitem_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
+      }));
+
+      return {
+        ...item,
+        id: itemId,
+        subItems: subItemsWithIds.length > 0 ? subItemsWithIds : undefined,
+        // Remove sectionId for new flat structure
+        sectionId: undefined
+      };
+    });
+
+    console.log('Items with IDs:', itemsWithIds);
+
+    // Sections are now optional and deprecated
     const sectionsWithIds = (program.sections || []).map(section => ({
       ...section,
       id: section.id || `section_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
     }));
-    
-    console.log('Sections with IDs:', sectionsWithIds);
-    
+
     const programData: any = {
       ...program,
-      sections: sectionsWithIds,
+      items: itemsWithIds,
+      sections: sectionsWithIds, // Keep for backward compatibility, but will be empty for new programs
       createdAt: now,
       updatedAt: now,
       createdBy: userId,
       updatedBy: userId
     };
-    
+
     console.log('Program data to save:', programData);
-    
+
     await setDoc(programRef, programData);
     console.log('Document saved successfully');
-    
+
     // Get the created document to return with proper timestamps
     const createdDoc = await getDoc(programRef);
     console.log('Document retrieved, exists:', createdDoc.exists());
-    
+
     if (!createdDoc.exists()) {
       throw new Error('Program document was not created');
     }
-    
+
     const createdData = createdDoc.data() as FirestoreProgram;
     console.log('Created data:', createdData);
-    
+
     return {
       ...createdData,
       id: programRef.id,
@@ -367,7 +386,7 @@ export const updateProgramOrder = async (
 ): Promise<void> => {
   try {
     const programRef = doc(db, PROGRAMS_COLLECTION, programId);
-    
+
     await updateDoc(programRef, {
       sections,
       items,
@@ -376,6 +395,137 @@ export const updateProgramOrder = async (
     });
   } catch (error) {
     console.error('Error updating program order:', error);
+    throw error;
+  }
+};
+
+/**
+ * Add sub-item to a program item
+ */
+export const addSubItemToItem = async (
+  programId: string,
+  itemId: string,
+  subItem: Omit<import('@/types/program').ProgramSubItem, 'id'>,
+  userId: string
+): Promise<import('@/types/program').ProgramSubItem> => {
+  try {
+    const programRef = doc(db, PROGRAMS_COLLECTION, programId);
+    const programDoc = await getDoc(programRef);
+
+    if (!programDoc.exists()) {
+      throw new Error('Program not found');
+    }
+
+    const programData = programDoc.data() as FirestoreProgram;
+    const newSubItem: import('@/types/program').ProgramSubItem = {
+      ...subItem,
+      id: `subitem_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
+    };
+
+    const updatedItems = programData.items.map(item => {
+      if (item.id === itemId) {
+        return {
+          ...item,
+          subItems: [...(item.subItems || []), newSubItem]
+        };
+      }
+      return item;
+    });
+
+    await updateDoc(programRef, {
+      items: updatedItems,
+      updatedAt: serverTimestamp(),
+      updatedBy: userId
+    });
+
+    return newSubItem;
+  } catch (error) {
+    console.error('Error adding sub-item:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update sub-item in a program item
+ */
+export const updateSubItemInItem = async (
+  programId: string,
+  itemId: string,
+  subItemId: string,
+  updates: Partial<Omit<import('@/types/program').ProgramSubItem, 'id'>>,
+  userId: string
+): Promise<void> => {
+  try {
+    const programRef = doc(db, PROGRAMS_COLLECTION, programId);
+    const programDoc = await getDoc(programRef);
+
+    if (!programDoc.exists()) {
+      throw new Error('Program not found');
+    }
+
+    const programData = programDoc.data() as FirestoreProgram;
+
+    const updatedItems = programData.items.map(item => {
+      if (item.id === itemId) {
+        return {
+          ...item,
+          subItems: (item.subItems || []).map(subItem =>
+            subItem.id === subItemId
+              ? { ...subItem, ...updates }
+              : subItem
+          )
+        };
+      }
+      return item;
+    });
+
+    await updateDoc(programRef, {
+      items: updatedItems,
+      updatedAt: serverTimestamp(),
+      updatedBy: userId
+    });
+  } catch (error) {
+    console.error('Error updating sub-item:', error);
+    throw error;
+  }
+};
+
+/**
+ * Delete sub-item from a program item
+ */
+export const deleteSubItemFromItem = async (
+  programId: string,
+  itemId: string,
+  subItemId: string,
+  userId: string
+): Promise<void> => {
+  try {
+    const programRef = doc(db, PROGRAMS_COLLECTION, programId);
+    const programDoc = await getDoc(programRef);
+
+    if (!programDoc.exists()) {
+      throw new Error('Program not found');
+    }
+
+    const programData = programDoc.data() as FirestoreProgram;
+
+    const updatedItems = programData.items.map(item => {
+      if (item.id === itemId) {
+        return {
+          ...item,
+          subItems: (item.subItems || []).filter(subItem => subItem.id !== subItemId)
+        };
+      }
+      return item;
+    });
+
+    await updateDoc(programRef, {
+      items: updatedItems,
+      updatedAt: serverTimestamp(),
+      updatedBy: userId
+    });
+  } catch (error) {
+    console.error('Error deleting sub-item:', error);
     throw error;
   }
 };
