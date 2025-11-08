@@ -55,42 +55,32 @@
         </ion-card>
 
         <!-- Quick Actions -->
-        <ion-card class="quick-actions-card">
-          <ion-card-header>
-            <ion-card-title class="section-title">
-              <ion-icon :icon="flashOutline" class="section-icon"></ion-icon>
-              Actions rapides
-            </ion-card-title>
-          </ion-card-header>
-          <ion-card-content>
-            <div class="action-buttons">
-              <ion-button
-                expand="block"
-                fill="solid"
-                @click="() => team && router.push(`/team-scheduling/${team.id}`)"
-              >
-                <ion-icon :icon="calendarOutline" slot="start"></ion-icon>
-                Planning de l'équipe
-              </ion-button>
-              <ion-button
-                expand="block"
-                fill="outline"
-                @click="() => team && router.push(`/team-availability/${team.id}`)"
-              >
-                <ion-icon :icon="calendarOutline" slot="start"></ion-icon>
-                Voir les disponibilités
-              </ion-button>
-              <ion-button
-                expand="block"
-                fill="outline"
-                @click="() => team && router.push(`/team-assignments/${team.id}`)"
-              >
-                <ion-icon :icon="checkmarkDoneOutline" slot="start"></ion-icon>
-                Voir les assignations
-              </ion-button>
-            </div>
-          </ion-card-content>
-        </ion-card>
+        <div class="quick-actions">
+          <ion-button
+            fill="clear"
+            size="small"
+            @click="() => team && router.push(`/team-scheduling/${team.id}`)"
+          >
+            <ion-icon :icon="calendarOutline" slot="start"></ion-icon>
+            Planning
+          </ion-button>
+          <ion-button
+            fill="clear"
+            size="small"
+            @click="() => team && router.push(`/team-availability/${team.id}`)"
+          >
+            <ion-icon :icon="calendarOutline" slot="start"></ion-icon>
+            Disponibilités
+          </ion-button>
+          <ion-button
+            fill="clear"
+            size="small"
+            @click="() => team && router.push(`/team-assignments/${team.id}`)"
+          >
+            <ion-icon :icon="checkmarkDoneOutline" slot="start"></ion-icon>
+            Assignations
+          </ion-button>
+        </div>
 
         <!-- Pending Members Section -->
         <ion-card v-if="pendingMembers.length > 0 && canManageMembers" class="pending-members-card">
@@ -230,56 +220,102 @@
       </div>
 
       <!-- Add Member Modal -->
-      <ion-modal :is-open="showAddMemberModal" @did-dismiss="showAddMemberModal = false">
+      <ion-modal :is-open="showAddMemberModal" @did-dismiss="closeAddMemberModal">
         <ion-header>
           <ion-toolbar>
-            <ion-title>Ajouter un membre</ion-title>
+            <ion-title>Ajouter un membre à l'équipe</ion-title>
             <ion-buttons slot="end">
-              <ion-button fill="clear" @click="showAddMemberModal = false">
+              <ion-button fill="clear" @click="closeAddMemberModal">
                 <ion-icon :icon="closeOutline"></ion-icon>
               </ion-button>
             </ion-buttons>
           </ion-toolbar>
         </ion-header>
-        <ion-content>
+        <ion-content class="ion-padding">
           <div class="modal-content">
-            <ion-item>
-              <ion-select 
-                v-model="selectedMemberId" 
-                placeholder="Sélectionner un membre"
-                interface="popover"
-              >
-                <ion-select-option 
-                  v-for="member in availableMembers" 
-                  :key="member.id" 
-                  :value="member.id"
+            <p class="modal-description">
+              Sélectionnez une ou plusieurs personnes à ajouter à cette équipe et choisissez leur rôle.
+            </p>
+
+            <div class="form-section">
+              <ion-label class="form-label">
+                <strong>Personnes</strong>
+                <span v-if="selectedMemberIds.length > 0" class="selection-count">
+                  ({{ selectedMemberIds.length }} sélectionné{{ selectedMemberIds.length > 1 ? 's' : '' }})
+                </span>
+              </ion-label>
+              <ion-item lines="none" class="form-item">
+                <ion-select
+                  v-model="selectedMemberIds"
+                  placeholder="Choisir une ou plusieurs personnes..."
+                  interface="alert"
+                  :multiple="true"
+                  :interface-options="{
+                    header: 'Sélectionner des personnes',
+                    subHeader: 'Vous pouvez en choisir plusieurs'
+                  }"
                 >
-                  {{ member.fullName }}
-                </ion-select-option>
-              </ion-select>
-              <ion-label>Membre</ion-label>
-            </ion-item>
-            
-            <ion-item>
-              <ion-select 
-                v-model="selectedRole" 
-                placeholder="Sélectionner un rôle"
-                interface="popover"
-              >
-                <ion-select-option value="member">Membre</ion-select-option>
-                <ion-select-option value="leader">Leader</ion-select-option>
-                <ion-select-option value="guest">Invité</ion-select-option>
-              </ion-select>
-              <ion-label>Rôle</ion-label>
-            </ion-item>
-            
+                  <ion-select-option
+                    v-for="member in availableMembers"
+                    :key="member.id"
+                    :value="member.id"
+                  >
+                    {{ member.fullName }}
+                  </ion-select-option>
+                </ion-select>
+              </ion-item>
+            </div>
+
+            <div class="form-section">
+              <ion-label class="form-label">
+                <strong>Rôle dans l'équipe</strong>
+              </ion-label>
+              <ion-item lines="none" class="form-item">
+                <ion-select
+                  v-model="selectedRole"
+                  placeholder="Choisir un rôle..."
+                  interface="action-sheet"
+                  :interface-options="{header: 'Quel sera son rôle ?'}"
+                >
+                  <ion-select-option value="member">
+                    Membre - Participe aux services
+                  </ion-select-option>
+                  <ion-select-option value="leader">
+                    Leader - Peut gérer l'équipe
+                  </ion-select-option>
+                  <ion-select-option value="guest">
+                    Invité - Accès limité
+                  </ion-select-option>
+                </ion-select>
+              </ion-item>
+              <p class="form-help-text" v-if="selectedRole === 'member'">
+                Un <strong>membre</strong> peut participer aux services et gérer ses disponibilités.
+              </p>
+              <p class="form-help-text" v-if="selectedRole === 'leader'">
+                Un <strong>leader</strong> peut gérer les membres et approuver les demandes d'adhésion.
+              </p>
+              <p class="form-help-text" v-if="selectedRole === 'guest'">
+                Un <strong>invité</strong> a un accès limité en lecture seule.
+              </p>
+            </div>
+
             <div class="modal-buttons">
-              <ion-button 
-                expand="block" 
-                @click="addMember"
-                :disabled="!selectedMemberId || !selectedRole"
+              <ion-button
+                expand="block"
+                @click="addMembers"
+                :disabled="selectedMemberIds.length === 0 || !selectedRole"
+                color="primary"
+                size="large"
               >
-                Ajouter
+                <ion-icon :icon="addOutline" slot="start"></ion-icon>
+                {{ selectedMemberIds.length > 1 ? `Ajouter ${selectedMemberIds.length} personnes` : 'Ajouter à l\'équipe' }}
+              </ion-button>
+              <ion-button
+                expand="block"
+                fill="clear"
+                @click="closeAddMemberModal"
+              >
+                Annuler
               </ion-button>
             </div>
           </div>
@@ -462,7 +498,7 @@ import {
 import {
   peopleOutline, createOutline, alertCircleOutline, calendarOutline,
   ellipsisVerticalOutline, trashOutline, closeOutline, addOutline,
-  swapHorizontalOutline, flashOutline, checkmarkDoneOutline, timeOutline
+  swapHorizontalOutline, checkmarkDoneOutline, timeOutline
 } from 'ionicons/icons';
 import { teamsService } from '@/firebase/teams';
 import { membersService } from '@/firebase/members';
@@ -482,7 +518,7 @@ const showAddMemberModal = ref(false);
 const showTransferOwnershipModal = ref(false);
 const showChangeRoleModal = ref(false);
 const showApproveMemberModal = ref(false);
-const selectedMemberId = ref('');
+const selectedMemberIds = ref<string[]>([]);
 const selectedRole = ref<'member' | 'leader' | 'guest'>('member');
 const selectedNewOwnerId = ref('');
 const memberToChangeRole = ref<TeamMember | null>(null);
@@ -626,38 +662,48 @@ const loadTeam = async () => {
   }
 };
 
-const addMember = async () => {
-  if (!selectedMemberId.value || !selectedRole.value) return;
+const closeAddMemberModal = () => {
+  showAddMemberModal.value = false;
+  selectedMemberIds.value = [];
+  selectedRole.value = 'member';
+};
+
+const addMembers = async () => {
+  if (selectedMemberIds.value.length === 0 || !selectedRole.value) return;
 
   try {
-    await teamsService.addMemberToTeam(teamId, selectedMemberId.value, selectedRole.value);
+    // Add all selected members with the same role
+    const addPromises = selectedMemberIds.value.map(async (memberId) => {
+      await teamsService.addMemberToTeam(teamId, memberId, selectedRole.value);
 
-    // Update member's teams array
-    const memberToUpdate = await membersService.getMemberById(selectedMemberId.value);
-    if (memberToUpdate) {
-      const currentTeams = memberToUpdate.teams || [];
-      if (!currentTeams.includes(teamId)) {
-        await membersService.updateMember(selectedMemberId.value, {
-          teams: [...currentTeams, teamId]
-        });
+      // Update member's teams array
+      const memberToUpdate = await membersService.getMemberById(memberId);
+      if (memberToUpdate) {
+        const currentTeams = memberToUpdate.teams || [];
+        if (!currentTeams.includes(teamId)) {
+          await membersService.updateMember(memberId, {
+            teams: [...currentTeams, teamId]
+          });
+        }
       }
-    }
+    });
 
+    await Promise.all(addPromises);
     await loadTeam();
-    showAddMemberModal.value = false;
-    selectedMemberId.value = '';
-    selectedRole.value = 'member';
 
+    closeAddMemberModal();
+
+    const count = addPromises.length;
     const toast = await toastController.create({
-      message: 'Membre ajouté avec succès',
+      message: count > 1 ? `${count} membres ajoutés avec succès` : 'Membre ajouté avec succès',
       duration: 3000,
       color: 'success'
     });
     toast.present();
   } catch (error) {
-    console.error('Error adding member:', error);
+    console.error('Error adding members:', error);
     const toast = await toastController.create({
-      message: 'Erreur lors de l\'ajout du membre',
+      message: 'Erreur lors de l\'ajout des membres',
       duration: 3000,
       color: 'danger'
     });
@@ -983,20 +1029,23 @@ onMounted(() => {
   color: var(--ion-color-primary);
 }
 
-.members-card, .actions-card, .quick-actions-card {
+.members-card, .actions-card {
   margin-bottom: 1.5rem;
 }
 
-.quick-actions-card .action-buttons {
+.quick-actions {
   display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.5rem;
+  padding: 0 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
-.quick-actions-card ion-button {
-  --padding-top: 1rem;
-  --padding-bottom: 1rem;
-  font-weight: 500;
+.quick-actions ion-button {
+  flex: 1;
+  min-width: 120px;
+  max-width: 200px;
 }
 
 .card-header-with-action {
@@ -1111,8 +1160,51 @@ onMounted(() => {
   padding: 1rem;
 }
 
+.modal-description {
+  font-size: 0.9375rem;
+  color: var(--ion-color-step-600);
+  line-height: 1.5;
+  margin: 0 0 1.5rem 0;
+}
+
+.form-section {
+  margin-bottom: 1.5rem;
+}
+
+.form-label {
+  display: block;
+  font-size: 0.875rem;
+  color: var(--ion-color-step-850);
+  margin-bottom: 0.5rem;
+}
+
+.selection-count {
+  color: var(--ion-color-primary);
+  font-weight: 600;
+  margin-left: 0.5rem;
+}
+
+.form-item {
+  --background: var(--ion-color-light);
+  --border-radius: 8px;
+  --padding-start: 1rem;
+  --padding-end: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.form-help-text {
+  font-size: 0.8125rem;
+  color: var(--ion-color-step-600);
+  line-height: 1.4;
+  margin: 0.5rem 0 0 0;
+  padding-left: 0.25rem;
+}
+
 .modal-buttons {
-  padding: 1rem 0;
+  padding: 1.5rem 0 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
 .actions-list {
@@ -1187,17 +1279,26 @@ onMounted(() => {
     text-align: center;
     gap: 1rem;
   }
-  
+
   .team-stats {
     justify-content: center;
   }
-  
+
+  .quick-actions {
+    padding: 0 0.75rem;
+  }
+
+  .quick-actions ion-button {
+    min-width: 100px;
+    font-size: 0.875rem;
+  }
+
   .member-item {
     flex-direction: column;
     align-items: flex-start;
     gap: 1rem;
   }
-  
+
   .member-actions {
     align-self: flex-end;
   }

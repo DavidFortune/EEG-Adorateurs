@@ -37,55 +37,48 @@
           </ion-button>
         </div>
 
-        <div v-else class="teams-grid">
-          <ion-card 
-            v-for="team in teams" 
-            :key="team.id" 
-            class="team-card" 
+        <div v-else class="teams-list">
+          <ion-card
+            v-for="team in teams"
+            :key="team.id"
+            class="team-card"
             @click="() => router.push(`/team-detail/${team.id}`)"
             button
           >
-            <ion-card-content>
-              <div class="team-header">
+            <ion-card-header>
+              <div class="card-header-content">
                 <div class="team-icon">
                   <ion-icon :icon="team.icon || peopleOutline"></ion-icon>
                 </div>
-                <div class="member-count">
-                  <ion-icon :icon="peopleOutline" class="member-icon"></ion-icon>
-                  <span>{{ team.members.length }} member{{ team.members.length > 1 ? 's' : '' }}</span>
+                <div class="team-details">
+                  <ion-card-title>{{ team.name }}</ion-card-title>
+                  <ion-card-subtitle>
+                    <div class="team-meta">
+                      <span class="member-count">
+                        <ion-icon :icon="peopleOutline"></ion-icon>
+                        {{ team.members.length }} membre{{ team.members.length > 1 ? 's' : '' }}
+                      </span>
+                      <span class="separator">•</span>
+                      <span class="owner-info">
+                        <ion-icon :icon="personCircleOutline"></ion-icon>
+                        {{ getOwnerName(team.ownerId) }}
+                      </span>
+                    </div>
+                  </ion-card-subtitle>
+                  <p v-if="team.description" class="team-description">{{ team.description }}</p>
                 </div>
+                <ion-button
+                  v-if="!isUserMemberOfTeam(team)"
+                  fill="outline"
+                  size="small"
+                  @click.stop="joinTeam(team)"
+                  class="join-button"
+                >
+                  <ion-icon :icon="personAddOutline" slot="start"></ion-icon>
+                  Joindre
+                </ion-button>
               </div>
-              
-              <h3 class="team-name">{{ team.name }}</h3>
-              <p class="team-description">{{ team.description }}</p>
-              
-              <div class="team-footer">
-                <div class="owner-info">
-                  <ion-icon :icon="personCircleOutline" class="owner-icon"></ion-icon>
-                  <span class="owner-name">{{ getOwnerName(team.ownerId) }}</span>
-                </div>
-                <div class="team-actions">
-                  <ion-button 
-                    fill="clear" 
-                    size="small" 
-                    class="availability-button"
-                    @click.stop="() => router.push(`/team-availability/${team.id}`)"
-                  >
-                    <ion-icon :icon="calendarOutline" slot="start"></ion-icon>
-                    Disponibilités
-                  </ion-button>
-                  <ion-button 
-                    fill="clear" 
-                    size="small" 
-                    class="assignments-button"
-                    @click.stop="() => router.push(`/team-assignments/${team.id}`)"
-                  >
-                    <ion-icon :icon="checkmarkDoneOutline" slot="start"></ion-icon>
-                    Assignations
-                  </ion-button>
-                </div>
-              </div>
-            </ion-card-content>
+            </ion-card-header>
           </ion-card>
         </div>
       </div>
@@ -97,12 +90,12 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import {
-  IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonCard, IonCardContent, 
-  IonButtons, IonButton, IonIcon, IonRefresher, IonRefresherContent, IonSpinner
+  IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonCard, IonCardHeader,
+  IonCardTitle, IonCardSubtitle, IonButtons, IonButton, IonIcon,
+  IonRefresher, IonRefresherContent, IonSpinner, toastController
 } from '@ionic/vue';
 import {
-  addOutline, peopleOutline, personCircleOutline, calendarOutline,
-  checkmarkDoneOutline
+  addOutline, peopleOutline, personCircleOutline, personAddOutline
 } from 'ionicons/icons';
 import { teamsService } from '@/firebase/teams';
 import { membersService } from '@/firebase/members';
@@ -115,6 +108,7 @@ const teams = ref<Team[]>([]);
 const members = ref<Member[]>([]);
 const loading = ref(true);
 const isAdmin = ref(false);
+const currentMember = ref<Member | null>(null);
 
 // Memoize member lookup for better performance
 const membersMap = computed(() => {
@@ -126,12 +120,55 @@ const getOwnerName = (ownerId: string) => {
   return owner ? owner.fullName : 'Propriétaire inconnu';
 };
 
+const isUserMemberOfTeam = (team: Team): boolean => {
+  if (!currentMember.value) return false;
+  return team.members.some(m => m.memberId === currentMember.value!.id);
+};
+
+const joinTeam = async (team: Team) => {
+  if (!currentMember.value) {
+    const toast = await toastController.create({
+      message: 'Vous devez être connecté pour rejoindre une équipe',
+      duration: 3000,
+      color: 'warning'
+    });
+    await toast.present();
+    return;
+  }
+
+  try {
+    // Request to join team with pending status
+    await teamsService.requestToJoinTeam(team.id, currentMember.value.id);
+
+    const toast = await toastController.create({
+      message: 'Demande envoyée! En attente d\'approbation.',
+      duration: 3000,
+      color: 'success'
+    });
+    await toast.present();
+
+    // Reload teams to update UI
+    await loadTeams();
+  } catch (error) {
+    console.error('Error joining team:', error);
+    const toast = await toastController.create({
+      message: 'Erreur lors de l\'envoi de la demande',
+      duration: 3000,
+      color: 'danger'
+    });
+    await toast.present();
+  }
+};
+
 const checkAdminStatus = async () => {
   try {
     const user = authService.getCurrentUser();
     if (user) {
       const member = await membersService.getMemberByFirebaseUserId(user.uid);
-      isAdmin.value = member?.isAdmin || false;
+      if (member) {
+        currentMember.value = member;
+        isAdmin.value = member.isAdmin || false;
+      }
     }
   } catch (error) {
     console.error('Error checking admin status:', error);
@@ -226,170 +263,107 @@ onMounted(async () => {
   font-size: 1rem;
 }
 
-.teams-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+/* Teams List - Vertical Layout */
+.teams-list {
+  display: flex;
+  flex-direction: column;
   gap: 1rem;
-  margin-top: 1rem;
+  margin-top: 0.5rem;
 }
 
 .team-card {
   margin: 0;
   cursor: pointer;
   transition: all 0.2s ease;
-  height: 200px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .team-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.team-card ion-card-content {
-  height: 100%;
+/* Card Header */
+.card-header-content {
   display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 1.25rem;
-}
-
-.team-header {
-  display: flex;
-  justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 1rem;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .team-icon {
   width: 48px;
   height: 48px;
-  border-radius: 50%;
-  background: #F3F4F6;
+  border-radius: 12px;
+  background: rgba(var(--ion-color-primary-rgb), 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .team-icon ion-icon {
-  font-size: 1.5rem;
+  font-size: 1.75rem;
   color: var(--ion-color-primary);
 }
 
-.member-count {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  font-size: 0.875rem;
-  color: #6B7280;
-}
-
-.member-icon {
-  font-size: 1rem;
-}
-
-.team-name {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: #111827;
-  margin: 0 0 0.5rem 0;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-}
-
-.team-description {
-  font-size: 0.875rem;
-  color: #6B7280;
-  line-height: 1.4;
-  margin: 0 0 1rem 0;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  flex: 1;
-}
-
-.team-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: auto;
-}
-
-.team-actions {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-.owner-info {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
-  color: #6B7280;
+.team-details {
   flex: 1;
   min-width: 0;
 }
 
-.owner-icon {
+.team-details ion-card-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--ion-text-color);
+  margin-bottom: 0.25rem;
+}
+
+.team-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.875rem;
+  color: var(--ion-color-medium);
+}
+
+.member-count,
+.owner-info {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.member-count ion-icon,
+.owner-info ion-icon {
   font-size: 1rem;
+}
+
+.separator {
+  color: var(--ion-color-medium-tint);
+}
+
+.join-button {
+  margin-left: auto;
   flex-shrink: 0;
 }
 
-.owner-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.team-description {
+  font-size: 0.875rem;
+  color: var(--ion-color-step-600);
+  line-height: 1.5;
+  margin: 0.75rem 0 0 0;
 }
 
-.view-button {
-  --color: var(--ion-color-primary);
-  --padding-start: 0.5rem;
-  --padding-end: 0.5rem;
-  flex-shrink: 0;
-  margin-left: 1rem;
-}
-
-/* Mobile responsive */
+/* Mobile Responsive */
 @media (max-width: 768px) {
-  .teams-grid {
-    grid-template-columns: 1fr;
-  }
-  
   .content-container {
     padding: 0.75rem;
   }
-  
-  .team-card {
-    height: auto;
-    min-height: 180px;
-  }
-  
-  .team-footer {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.75rem;
-  }
-  
-  .team-actions {
-    align-self: stretch;
-    flex-direction: row;
-    justify-content: space-between;
-    gap: 0.5rem;
+
+  .join-button {
     width: 100%;
-  }
-  
-  .availability-button,
-  .assignments-button {
     margin-left: 0;
-    justify-content: center;
-    flex: 1;
-    --padding-start: 0.5rem;
-    --padding-end: 0.5rem;
-    font-size: 0.8rem;
   }
 }
 
@@ -397,11 +371,11 @@ onMounted(async () => {
   .empty-state {
     padding: 2rem 1rem;
   }
-  
+
   .empty-state ion-icon {
     font-size: 3rem;
   }
-  
+
   .empty-state h2 {
     font-size: 1.25rem;
   }
