@@ -113,20 +113,21 @@ export const teamsService = {
     try {
       const docRef = doc(db, TEAMS_COLLECTION, teamId);
       const docSnap = await getDoc(docRef);
-      
+
       if (!docSnap.exists()) {
         return null;
       }
-      
+
       const existingTeam = convertFirestoreToTeam({ id: docSnap.id, ...docSnap.data() } as FirestoreTeam);
       const updatedTeam: Team = {
         ...existingTeam,
         ...updates,
         updatedAt: new Date().toISOString()
       };
-      
-      await updateDoc(docRef, convertTeamToFirestore(updatedTeam));
-      
+
+      const { id, ...teamDataWithoutId } = updatedTeam;
+      await updateDoc(docRef, convertTeamToFirestore(teamDataWithoutId));
+
       return updatedTeam;
     } catch (error) {
       console.error('Error updating team:', error);
@@ -193,7 +194,8 @@ export const teamsService = {
       };
 
       const docRef = doc(db, TEAMS_COLLECTION, teamId);
-      await updateDoc(docRef, convertTeamToFirestore(updatedTeam));
+      const { id, ...teamDataWithoutId } = updatedTeam;
+      await updateDoc(docRef, convertTeamToFirestore(teamDataWithoutId));
 
       return updatedTeam;
     } catch (error) {
@@ -234,7 +236,8 @@ export const teamsService = {
       };
 
       const docRef = doc(db, TEAMS_COLLECTION, teamId);
-      await updateDoc(docRef, convertTeamToFirestore(updatedTeam));
+      const { id, ...teamDataWithoutId } = updatedTeam;
+      await updateDoc(docRef, convertTeamToFirestore(teamDataWithoutId));
 
       return updatedTeam;
     } catch (error) {
@@ -267,7 +270,8 @@ export const teamsService = {
       };
 
       const docRef = doc(db, TEAMS_COLLECTION, teamId);
-      await updateDoc(docRef, convertTeamToFirestore(updatedTeam));
+      const { id, ...teamDataWithoutId } = updatedTeam;
+      await updateDoc(docRef, convertTeamToFirestore(teamDataWithoutId));
 
       return updatedTeam;
     } catch (error) {
@@ -298,7 +302,8 @@ export const teamsService = {
       };
 
       const docRef = doc(db, TEAMS_COLLECTION, teamId);
-      await updateDoc(docRef, convertTeamToFirestore(updatedTeam));
+      const { id, ...teamDataWithoutId } = updatedTeam;
+      await updateDoc(docRef, convertTeamToFirestore(teamDataWithoutId));
 
       return updatedTeam;
     } catch (error) {
@@ -313,26 +318,27 @@ export const teamsService = {
   async removeMemberFromTeam(teamId: string, memberId: string): Promise<Team | null> {
     try {
       const team = await this.getTeamById(teamId);
-      
+
       if (!team) {
         return null;
       }
-      
+
       // Cannot remove owner
       const memberToRemove = team.members.find(m => m.memberId === memberId);
       if (memberToRemove?.role === 'owner') {
         throw new Error('Cannot remove team owner');
       }
-      
+
       const updatedTeam: Team = {
         ...team,
         members: team.members.filter(m => m.memberId !== memberId),
         updatedAt: new Date().toISOString()
       };
-      
+
       const docRef = doc(db, TEAMS_COLLECTION, teamId);
-      await updateDoc(docRef, convertTeamToFirestore(updatedTeam));
-      
+      const { id, ...teamDataWithoutId } = updatedTeam;
+      await updateDoc(docRef, convertTeamToFirestore(teamDataWithoutId));
+
       return updatedTeam;
     } catch (error) {
       console.error('Error removing member from team:', error);
@@ -346,32 +352,33 @@ export const teamsService = {
   async updateMemberRole(teamId: string, memberId: string, newRole: 'leader' | 'member' | 'guest'): Promise<Team | null> {
     try {
       const team = await this.getTeamById(teamId);
-      
+
       if (!team) {
         return null;
       }
-      
+
       // Cannot change owner role
       const memberToUpdate = team.members.find(m => m.memberId === memberId);
       if (memberToUpdate?.role === 'owner') {
         throw new Error('Cannot change owner role');
       }
-      
+
       const updatedMembers = team.members.map(member =>
         member.memberId === memberId
           ? { ...member, role: newRole }
           : member
       );
-      
+
       const updatedTeam: Team = {
         ...team,
         members: updatedMembers,
         updatedAt: new Date().toISOString()
       };
-      
+
       const docRef = doc(db, TEAMS_COLLECTION, teamId);
-      await updateDoc(docRef, convertTeamToFirestore(updatedTeam));
-      
+      const { id, ...teamDataWithoutId } = updatedTeam;
+      await updateDoc(docRef, convertTeamToFirestore(teamDataWithoutId));
+
       return updatedTeam;
     } catch (error) {
       console.error('Error updating member role:', error);
@@ -421,7 +428,8 @@ export const teamsService = {
       };
 
       const docRef = doc(db, TEAMS_COLLECTION, teamId);
-      await updateDoc(docRef, convertTeamToFirestore(updatedTeam));
+      const { id, ...teamDataWithoutId } = updatedTeam;
+      await updateDoc(docRef, convertTeamToFirestore(teamDataWithoutId));
 
       return updatedTeam;
     } catch (error) {
