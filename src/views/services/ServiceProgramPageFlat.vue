@@ -658,7 +658,8 @@ const getMediaTypeIcon = (type: string) => {
     'video': playCircleOutline,
     'audio': volumeHighOutline,
     'lyrics': documentTextOutline,
-    'music_sheet': documentOutline
+    'music_sheet': documentOutline,
+    'spotify': musicalNoteOutline
   };
   return iconMap[type] || documentOutline;
 };
@@ -668,7 +669,8 @@ const formatMediaType = (type: string): string => {
     'lyrics': 'Paroles',
     'video': 'Vidéo',
     'audio': 'Audio',
-    'music_sheet': 'Partition'
+    'music_sheet': 'Partition',
+    'spotify': 'Spotify'
   };
   return typeMap[type] || type;
 };
