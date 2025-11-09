@@ -445,9 +445,33 @@
           </ion-toolbar>
         </ion-header>
         <ion-content v-if="selectedMediaContent">
-          <!-- Video Content -->
-          <div v-if="selectedMediaContent.type === 'video' && selectedMediaContent.url" class="video-container">
+          <!-- YouTube Video -->
+          <div v-if="selectedMediaContent.type === 'video' && selectedMediaContent.url && isYouTubeUrl(selectedMediaContent.url)" class="video-container">
+            <iframe
+              :src="getYouTubeEmbedUrl(selectedMediaContent.url) || ''"
+              frameborder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowfullscreen
+              class="youtube-iframe"
+            ></iframe>
+          </div>
+
+          <!-- Regular Video Content -->
+          <div v-else-if="selectedMediaContent.type === 'video' && selectedMediaContent.url" class="video-container">
             <video controls :src="selectedMediaContent.url" class="full-width-video"></video>
+          </div>
+
+          <!-- Spotify Content -->
+          <div v-if="selectedMediaContent.type === 'spotify' && selectedMediaContent.url" class="spotify-container">
+            <iframe
+              :src="getSpotifyEmbedUrl(selectedMediaContent.url) || ''"
+              width="100%"
+              height="352"
+              frameborder="0"
+              allowtransparency="true"
+              allow="encrypted-media"
+              class="spotify-iframe"
+            ></iframe>
           </div>
 
           <!-- Audio Content -->
@@ -521,8 +545,9 @@ import {
 import type { Service } from '@/types/service';
 import type { ServiceProgram, ProgramItem, ProgramParticipant, ProgramSubItem } from '@/types/program';
 import { ProgramItemType } from '@/types/program';
-import type { Resource } from '@/types/resource';
+import type { Resource, ResourceMedia } from '@/types/resource';
 import { getResourceById } from '@/firebase/resources';
+import { isYouTubeUrl, getYouTubeEmbedUrl, isSpotifyUrl, getSpotifyEmbedUrl } from '@/utils/resource-utils';
 
 const route = useRoute();
 const router = useRouter();
@@ -1591,6 +1616,7 @@ onMounted(async () => {
 
 .video-container,
 .audio-container,
+.spotify-container,
 .lyrics-container,
 .document-container {
   padding: 1rem;
@@ -1599,6 +1625,18 @@ onMounted(async () => {
 .full-width-video,
 .full-width-audio {
   width: 100%;
+}
+
+.youtube-iframe {
+  width: 100%;
+  aspect-ratio: 16/9;
+  min-height: 315px;
+  border-radius: 8px;
+}
+
+.spotify-iframe {
+  width: 100%;
+  border-radius: 12px;
 }
 
 .lyrics-content {
