@@ -2,6 +2,16 @@
 
 All notable changes to EEG Adorateurs will be documented in this file.
 
+## [1.9.1] - 2025-11-09
+
+### Fixed
+- **Team Member Management**: Critical bug fix for team member acceptance and role assignment
+  - Fixed Firestore update operations that were failing due to 'id' field being included in update calls
+  - Member acceptance now works correctly when approving pending requests
+  - Role assignment during approval process now persists properly to database
+  - All team member operations now update successfully in Firestore
+  - Affected operations: updateTeam, addMemberToTeam, requestToJoinTeam, approvePendingMember, rejectPendingMember, removeMemberFromTeam, updateMemberRole, transferOwnership
+
 ## [1.9.0] - 2025-11-08
 
 ### Added
