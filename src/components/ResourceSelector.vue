@@ -273,6 +273,7 @@ const getResourceTypeList = (resource: Resource) => {
     audio: 'Audio',
     music_sheet: 'Partition',
     youtube: 'YouTube',
+    spotify: 'Spotify',
     file: 'Fichier'
   };
   

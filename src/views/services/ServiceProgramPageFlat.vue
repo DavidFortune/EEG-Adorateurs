@@ -164,7 +164,7 @@
                         <button
                           v-for="content in getLinkedResource(item.resourceId)?.contents"
                           :key="content.type"
-                          @click="showMediaContent(content, getLinkedResource(item.resourceId)?.title)"
+                          @click="showMediaContent(content, getLinkedResource(item.resourceId)?.title || '')"
                           class="media-chip-button"
                         >
                           <ion-icon :icon="getMediaTypeIcon(content.type)" />
@@ -237,7 +237,7 @@
                           <button
                             v-for="content in getLinkedResource(subItem.resourceId)?.contents"
                             :key="content.type"
-                            @click="showMediaContent(content, getLinkedResource(subItem.resourceId)?.title)"
+                            @click="showMediaContent(content, getLinkedResource(subItem.resourceId)?.title || '')"
                             class="media-chip-button small"
                           >
                             <ion-icon :icon="getMediaTypeIcon(content.type)" />
@@ -354,7 +354,7 @@
 
           <ion-item>
             <ion-label position="stacked">Notes (optionnel)</ion-label>
-            <ion-textarea v-model="itemForm.notes" rows="3"></ion-textarea>
+            <ion-textarea v-model="itemForm.notes" :rows="3"></ion-textarea>
           </ion-item>
 
           <ion-button
@@ -393,7 +393,7 @@
 
           <ion-item>
             <ion-label position="stacked">Notes (optionnel)</ion-label>
-            <ion-textarea v-model="addSubItemForm.notes" rows="3"></ion-textarea>
+            <ion-textarea v-model="addSubItemForm.notes" :rows="3"></ion-textarea>
           </ion-item>
 
           <ion-button
@@ -432,7 +432,7 @@
 
           <ion-item>
             <ion-label position="stacked">Notes (optionnel)</ion-label>
-            <ion-textarea v-model="editSubItemForm.notes" rows="3"></ion-textarea>
+            <ion-textarea v-model="editSubItemForm.notes" :rows="3"></ion-textarea>
           </ion-item>
 
           <ion-button

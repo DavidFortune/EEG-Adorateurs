@@ -2,6 +2,50 @@
 
 All notable changes to EEG Adorateurs will be documented in this file.
 
+## [1.9.0] - 2025-11-08
+
+### Added
+- **Spotify Integration**: Full support for Spotify content across the application
+  - Added Spotify resource type to resource types enum
+  - Spotify URL detection and embed URL conversion utilities
+  - Spotify player display in resource detail pages
+  - Spotify playback support in service program media modals
+  - Spotify embed iframes with "Open in Spotify" fallback buttons
+
+- **Program Structure Refactoring**: New flat program structure with sub-items
+  - Created ServiceProgramPageFlat.vue component with simplified hierarchy
+  - Program items can now contain optional sub-items for nested content
+  - Updated Firebase program operations to support flat structure
+  - Migrated from section-based to item-based program organization
+
+- **Lyrics View Modal**: New feature for viewing all lyrics in program items
+  - "View All Lyrics" button for items with sub-items containing lyrics
+  - Modal displays all sub-item lyrics in numbered card layout
+  - Prominent primary-colored button for easy access
+  - Clean, organized display of lyrics for worship leaders
+
+### Enhanced
+- **YouTube Video Support**: Improved YouTube playback in service programs
+  - YouTube URL detection and embed conversion
+  - iframe-based playback replacing standard video tags
+  - 16:9 aspect ratio optimization for YouTube embeds
+
+- **Media Display Improvements**: Better visual organization of program resources
+  - Horizontal flexbox layout for sub-item media buttons
+  - Proper wrapping and spacing for media type buttons
+  - Improved alignment and visual hierarchy
+
+### Fixed
+- Spotify resource validation enabling save button
+- Media type icon and label mappings for Spotify content
+- Horizontal alignment for media buttons in program sub-items
+
+### Technical
+- Updated router to use ServiceProgramPageFlat.vue component
+- Enhanced resource utilities with Spotify and YouTube helpers
+- Comprehensive CSS styling for new modal components
+- TypeScript type updates for program sub-items structure
+
 ## [1.8.2] - 2025-10-26
 
 ### Enhanced

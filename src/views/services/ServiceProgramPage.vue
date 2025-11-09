@@ -1073,7 +1073,7 @@ const formatDuration = (minutes: number): string => {
 };
 
 const getItemIcon = (type: ProgramItemType) => {
-  const iconMap = {
+  const iconMap: Record<ProgramItemType, string> = {
     'Chant': musicalNoteOutline,
     'Prière': handLeftOutline,
     'Lecture biblique': libraryOutline,
@@ -1081,7 +1081,16 @@ const getItemIcon = (type: ProgramItemType) => {
     'Titre': documentTextOutline,
     'Annonce': megaphoneOutline,
     'Offrande': giftOutline,
-    'Bénédiction': handLeftOutline
+    'Bénédiction': handLeftOutline,
+    'Mot de bienvenue': handLeftOutline,
+    'Salutations': handLeftOutline,
+    'Numéro spécial': musicalNoteOutline,
+    'Collecte': giftOutline,
+    'Adoration': musicalNoteOutline,
+    'Louange': musicalNoteOutline,
+    'Chant final': musicalNoteOutline,
+    'Chant de clôture': musicalNoteOutline,
+    'Autre': documentTextOutline
   };
   return iconMap[type] || documentTextOutline;
 };
