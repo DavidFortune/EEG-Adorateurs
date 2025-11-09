@@ -172,6 +172,20 @@
                         </button>
                       </div>
                     </div>
+
+                    <!-- View All Lyrics Button (for items with sub-items) -->
+                    <div v-if="hasSubItems(item) && hasLyricsInSubItems(item)" class="item-lyrics-button">
+                      <ion-button
+                        @click="showItemLyricsView(item)"
+                        fill="solid"
+                        color="primary"
+                        size="small"
+                        class="view-lyrics-btn"
+                      >
+                        <ion-icon :icon="documentTextOutline" slot="start" />
+                        Voir toutes les paroles
+                      </ion-button>
+                    </div>
                   </div>
 
                   <!-- Duration and Participant -->
@@ -513,6 +527,46 @@
         </ion-content>
       </ion-modal>
 
+      <!-- Item Lyrics View Modal -->
+      <ion-modal :is-open="showItemLyricsModalState" @ionModalDidDismiss="closeItemLyricsView" class="lyrics-view-modal">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>{{ selectedItemForLyrics?.title }}</ion-title>
+            <ion-buttons slot="end">
+              <ion-button @click="closeItemLyricsView">
+                <ion-icon :icon="closeOutline" />
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="lyrics-view-modal-content">
+          <div v-if="selectedItemForLyrics" class="lyrics-view-container">
+            <!-- Sub-Items with Titles and Lyrics -->
+            <div
+              v-for="(subItem, index) in getSortedSubItems(selectedItemForLyrics)"
+              :key="subItem.id"
+              class="lyrics-item-card"
+            >
+              <!-- Item Header -->
+              <div class="lyrics-item-header">
+                <div class="lyrics-item-number">{{ index + 1 }}</div>
+                <h3 class="lyrics-item-title">
+                  {{ subItem.resourceId && getLinkedResource(subItem.resourceId) ? getLinkedResource(subItem.resourceId)?.title : subItem.title }}
+                </h3>
+              </div>
+
+              <!-- Lyrics -->
+              <div v-if="getSubItemLyrics(subItem)" class="lyrics-content-display">
+                <pre>{{ getSubItemLyrics(subItem) }}</pre>
+              </div>
+              <div v-else class="no-lyrics">
+                Aucune parole disponible
+              </div>
+            </div>
+          </div>
+        </ion-content>
+      </ion-modal>
+
       <!-- SMS Notification Modal -->
       <SendProgramSMSModal
         :is-open="showSMSModalState"
@@ -626,6 +680,10 @@ const selectedMediaTitle = ref('');
 // SMS Modal
 const showSMSModalState = ref(false);
 
+// Item Lyrics View Modal
+const showItemLyricsModalState = ref(false);
+const selectedItemForLyrics = ref<ProgramItem | null>(null);
+
 // Computed Properties
 const serviceId = computed(() => route.params.id as string);
 
@@ -715,6 +773,41 @@ const toggleItemExpansion = (itemId: string) => {
 const getSortedSubItems = (item: ProgramItem): ProgramSubItem[] => {
   if (!item.subItems) return [];
   return [...item.subItems].sort((a, b) => a.order - b.order);
+};
+
+// Check if item has lyrics in any sub-items
+const hasLyricsInSubItems = (item: ProgramItem): boolean => {
+  if (!item.subItems || item.subItems.length === 0) return false;
+
+  return item.subItems.some(subItem => {
+    if (subItem.resourceId) {
+      const resource = getLinkedResource(subItem.resourceId);
+      return resource?.contents?.some(c => c.type === 'lyrics' && c.content);
+    }
+    return false;
+  });
+};
+
+// Get lyrics from a sub-item
+const getSubItemLyrics = (subItem: ProgramSubItem): string | null => {
+  if (subItem.resourceId) {
+    const resource = getLinkedResource(subItem.resourceId);
+    const lyricsContent = resource?.contents?.find(c => c.type === 'lyrics');
+    return lyricsContent?.content || null;
+  }
+  return null;
+};
+
+// Show item lyrics view
+const showItemLyricsView = (item: ProgramItem) => {
+  selectedItemForLyrics.value = item;
+  showItemLyricsModalState.value = true;
+};
+
+// Close item lyrics view
+const closeItemLyricsView = () => {
+  showItemLyricsModalState.value = false;
+  selectedItemForLyrics.value = null;
 };
 
 // Toast Helper
@@ -1670,6 +1763,96 @@ onMounted(async () => {
   font-size: 1rem;
   line-height: 1.6;
   margin: 0;
+}
+
+/* Lyrics View Button */
+.item-lyrics-button {
+  margin-top: 0.75rem;
+}
+
+.view-lyrics-btn {
+  --padding-top: 8px;
+  --padding-bottom: 8px;
+  --padding-start: 16px;
+  --padding-end: 16px;
+  font-weight: 600;
+}
+
+/* Lyrics View Modal */
+.lyrics-view-modal {
+  --width: 90%;
+  --height: 80%;
+  --border-radius: 12px;
+}
+
+.lyrics-view-modal-content {
+  --padding-top: 1rem;
+}
+
+.lyrics-view-container {
+  padding: 1rem;
+}
+
+.lyrics-item-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.lyrics-item-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--ion-color-primary);
+}
+
+.lyrics-item-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: var(--ion-color-primary);
+  color: white;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.lyrics-item-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--ion-color-dark);
+  flex: 1;
+}
+
+.lyrics-content-display {
+  background: var(--ion-color-light);
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-top: 1rem;
+}
+
+.lyrics-content-display pre {
+  white-space: pre-wrap;
+  font-family: var(--ion-font-family);
+  font-size: 1rem;
+  line-height: 1.8;
+  margin: 0;
+  color: var(--ion-color-dark);
+}
+
+.no-lyrics {
+  text-align: center;
+  padding: 2rem;
+  color: var(--ion-color-medium);
+  font-style: italic;
 }
 
 /* Responsive Design */
