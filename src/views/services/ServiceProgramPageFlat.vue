@@ -1568,7 +1568,12 @@ onMounted(async () => {
 }
 
 .sub-item-resources {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0.5rem;
   margin-top: 0.5rem;
+  align-items: center;
 }
 
 .sub-item-actions {
