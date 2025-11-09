@@ -472,6 +472,16 @@
               allow="encrypted-media"
               class="spotify-iframe"
             ></iframe>
+            <ion-button
+              :href="selectedMediaContent.url"
+              target="_blank"
+              expand="block"
+              fill="outline"
+              style="margin-top: 1rem;"
+            >
+              <ion-icon :icon="musicalNoteOutline" slot="start" />
+              Ouvrir dans Spotify
+            </ion-button>
           </div>
 
           <!-- Audio Content -->
@@ -492,6 +502,13 @@
               <ion-icon :icon="documentOutline" slot="start" />
               Ouvrir la partition
             </ion-button>
+          </div>
+
+          <!-- Debug/Fallback - Show if no content matched -->
+          <div v-if="!['video', 'spotify', 'audio', 'lyrics', 'music_sheet'].includes(selectedMediaContent.type)" class="debug-container" style="padding: 1rem;">
+            <p><strong>Type:</strong> {{ selectedMediaContent.type }}</p>
+            <p><strong>URL:</strong> {{ selectedMediaContent.url }}</p>
+            <p><strong>Content:</strong> {{ selectedMediaContent.content }}</p>
           </div>
         </ion-content>
       </ion-modal>
