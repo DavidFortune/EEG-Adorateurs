@@ -40,6 +40,7 @@ export interface Resource {
   id: string;
   title: string;
   description?: string;
+  reference?: string; // Bible reference, song number, etc.
   collectionIds: string[]; // Can belong to multiple collections
   contents: ResourceMedia[]; // Can have multiple media types
   tags?: string[]; // For better search

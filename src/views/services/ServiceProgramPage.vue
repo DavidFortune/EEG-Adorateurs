@@ -2183,7 +2183,6 @@ const loadMockProgram = async () => {
       subtitle: 'Chant d\'ouverture',
       participant: mockParticipants[4],
       duration: 4,
-      reference: 'Chant #125',
       sectionId: 'worship',
       lyrics: `Jésus, que ton nom soit élevé
 Jésus, que ton nom soit élevé
@@ -2202,7 +2201,6 @@ Nous proclamons le nom de Jésus`
       title: 'Mon Rédempteur est vivant',
       participant: mockParticipants[3],
       duration: 5,
-      reference: 'Chant #78',
       sectionId: 'worship',
       lyrics: `Mon Rédempteur est vivant
 Mon Sauveur tout-puissant
@@ -2241,7 +2239,6 @@ Mon Rédempteur est vivant`
       title: 'Lecture de la Parole',
       participant: mockParticipants[1],
       duration: 3,
-      reference: 'Matthieu 5:3-12',
       sectionId: 'word',
       notes: 'Les Béatitudes'
     },
@@ -2253,7 +2250,6 @@ Mon Rédempteur est vivant`
       subtitle: 'Série : Vivre selon le Royaume',
       participant: mockParticipants[0],
       duration: 25,
-      reference: 'Matthieu 5:3-12',
       sectionId: 'word',
       notes: 'Points clés : Pauvreté en esprit, Consolation, Héritage, Justice'
     },
@@ -2265,7 +2261,6 @@ Mon Rédempteur est vivant`
       subtitle: 'Chant de réponse',
       participant: mockParticipants[4],
       duration: 4,
-      reference: 'Chant #203',
       sectionId: 'closing'
     },
     {
@@ -2285,7 +2280,6 @@ Mon Rédempteur est vivant`
       title: 'Bénédiction finale',
       participant: mockParticipants[0],
       duration: 2,
-      reference: 'Nombres 6:24-26',
       sectionId: 'closing'
     }
   ];

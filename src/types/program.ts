@@ -3,19 +3,7 @@ export enum ProgramItemType {
   PRAYER = 'Prière',
   SCRIPTURE = 'Lecture biblique',
   SERMON = 'Prédication',
-  TITLE = 'Titre',
-  ANNOUNCEMENT = 'Annonce',
-  OFFERING = 'Offrande',
-  BLESSING = 'Bénédiction',
-  WELCOME = 'Mot de bienvenue',
-  GREETING = 'Salutations',
-  SPECIAL_NUMBER = 'Numéro spécial',
-  COLLECTION = 'Collecte',
-  WORSHIP = 'Adoration',
-  PRAISE = 'Louange',
-  FINAL_SONG = 'Chant final',
-  CLOSING_SONG = 'Chant de clôture',
-  OTHER = 'Autre'
+  TITLE = 'Titre'
 }
 
 export interface ProgramParticipant {
@@ -43,7 +31,6 @@ export interface ProgramItem {
   notes?: string;
   participant?: ProgramParticipant;
   duration?: number; // in minutes
-  reference?: string; // Bible reference, song number, etc.
   lyrics?: string; // For songs
   resourceId?: string; // Link to a single resource (1:1 relationship)
   subItems?: ProgramSubItem[]; // Optional sub-items (e.g., list of songs)

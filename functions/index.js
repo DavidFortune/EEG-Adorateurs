@@ -513,3 +513,9 @@ exports.getTeamMembersPhones = https.onCall(async (request) => {
     throw new https.HttpsError('internal', 'Failed to retrieve team members');
   }
 });
+
+// Export YouTube search functions
+const youtubeSearch = require('./youtube-search');
+exports.searchYouTube = youtubeSearch.searchYouTube;
+exports.getVideoMetadata = youtubeSearch.getVideoMetadata;
+exports.createResourceFromYouTube = youtubeSearch.createResourceFromYouTube;

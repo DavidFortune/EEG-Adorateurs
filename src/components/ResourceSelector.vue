@@ -24,10 +24,10 @@
     </div>
 
     <div class="resource-search">
-      <ion-button 
-        @click="openResourceModal" 
-        fill="outline" 
-        size="default"
+      <ion-button
+        @click="openResourceModal"
+        :fill="buttonFill"
+        :size="buttonSize"
         :disabled="loading"
       >
         <ion-icon :icon="addOutline" slot="start" />
@@ -50,32 +50,44 @@
       
       <ion-content>
         <div class="modal-content">
-          <!-- Search Bar -->
-          <ion-searchbar
-            v-model="searchQuery"
-            placeholder="Rechercher une ressource..."
-            :debounce="300"
-            @ion-input="searchResources"
-          />
+          <!-- Tab Selector -->
+          <ion-segment :value="activeTab" @ion-change="changeTab">
+            <ion-segment-button value="existing">
+              <ion-label>Ressources existantes</ion-label>
+            </ion-segment-button>
+            <ion-segment-button value="youtube">
+              <ion-label>Recherche YouTube</ion-label>
+            </ion-segment-button>
+          </ion-segment>
 
-          <!-- Collection Filter -->
-          <div class="filter-section" v-if="collections.length > 0">
-            <ion-segment :value="selectedCollectionId" @ion-change="filterByCollection">
-              <ion-segment-button value="">
-                <ion-label>Toutes</ion-label>
-              </ion-segment-button>
-              <ion-segment-button 
-                v-for="collection in collections" 
-                :key="collection.id" 
-                :value="collection.id"
-              >
-                <ion-label>{{ collection.symbol }}</ion-label>
-              </ion-segment-button>
-            </ion-segment>
-          </div>
+          <!-- Existing Resources Tab -->
+          <div v-if="activeTab === 'existing'" class="tab-content">
+            <!-- Search Bar -->
+            <ion-searchbar
+              v-model="searchQuery"
+              placeholder="Rechercher une ressource..."
+              :debounce="300"
+              @ion-input="searchResources"
+            />
 
-          <!-- Resource List -->
-          <div class="resource-list">
+            <!-- Collection Filter -->
+            <div class="filter-section" v-if="collections.length > 0">
+              <ion-segment :value="selectedCollectionId" @ion-change="filterByCollection">
+                <ion-segment-button value="">
+                  <ion-label>Toutes</ion-label>
+                </ion-segment-button>
+                <ion-segment-button
+                  v-for="collection in collections"
+                  :key="collection.id"
+                  :value="collection.id"
+                >
+                  <ion-label>{{ collection.symbol }}</ion-label>
+                </ion-segment-button>
+              </ion-segment>
+            </div>
+
+            <!-- Resource List -->
+            <div class="resource-list">
             <ion-loading :is-open="loading" message="Chargement..."></ion-loading>
             
             <div 
@@ -108,10 +120,19 @@
               </div>
             </div>
 
-            <div v-if="filteredResources.length === 0 && !loading" class="no-resources">
-              <ion-icon :icon="documentOutline" />
-              <p>Aucune ressource trouvée</p>
+              <div v-if="filteredResources.length === 0 && !loading" class="no-resources">
+                <ion-icon :icon="documentOutline" />
+                <p>Aucune ressource trouvée</p>
+              </div>
             </div>
+          </div>
+
+          <!-- YouTube Search Tab -->
+          <div v-if="activeTab === 'youtube'" class="tab-content">
+            <NaturalResourceSelector
+              v-model="tempSelectedId"
+              @resource-created="onResourceCreated"
+            />
           </div>
         </div>
       </ion-content>
@@ -144,16 +165,22 @@ import {
 } from 'ionicons/icons';
 import type { Resource, ResourceCollection, ResourceType } from '@/types/resource';
 import { getResources, getResourceCollections } from '@/firebase/resources';
+import NaturalResourceSelector from '@/components/NaturalResourceSelector.vue';
 
 interface Props {
   modelValue: string | null;
+  buttonFill?: 'clear' | 'outline' | 'solid';
+  buttonSize?: 'small' | 'default' | 'large';
 }
 
 interface Emits {
   (event: 'update:modelValue', value: string | null): void;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  buttonFill: 'outline',
+  buttonSize: 'default'
+});
 const emit = defineEmits<Emits>();
 
 // Component state
@@ -161,6 +188,7 @@ const isModalOpen = ref(false);
 const loading = ref(false);
 const searchQuery = ref('');
 const selectedCollectionId = ref('');
+const activeTab = ref<'existing' | 'youtube'>('existing');
 
 // Data
 const resources = ref<Resource[]>([]);
@@ -208,6 +236,11 @@ const closeResourceModal = () => {
   searchQuery.value = '';
   selectedCollectionId.value = '';
   tempSelectedId.value = null;
+  activeTab.value = 'existing';
+};
+
+const changeTab = (event: CustomEvent) => {
+  activeTab.value = event.detail.value;
 };
 
 const loadResources = async () => {
@@ -287,6 +320,15 @@ const getResourceCollectionNames = (resource: Resource) => {
   return resource.collectionIds
     .map(id => collections.value.find(c => c.id === id)?.name)
     .filter(Boolean) as string[];
+};
+
+const onResourceCreated = async (resource: Resource) => {
+  // Reload resources to include the newly created one
+  await loadResources();
+  // Auto-select the new resource
+  tempSelectedId.value = resource.id;
+  // Switch back to existing resources tab to show selection
+  activeTab.value = 'existing';
 };
 
 // Load initial data if needed
@@ -444,5 +486,9 @@ onMounted(() => {
   justify-content: space-between;
   width: 100%;
   padding: 12px 16px;
+}
+
+.tab-content {
+  margin-top: 1rem;
 }
 </style>

@@ -150,7 +150,7 @@
                       {{ item.resourceId && getLinkedResource(item.resourceId) ? getLinkedResource(item.resourceId)?.title : item.title }}
                     </h4>
                     <p v-if="item.subtitle" class="item-subtitle">{{ item.subtitle }}</p>
-                    <p v-if="item.reference" class="item-reference">{{ item.reference }}</p>
+                    <p v-if="item.resourceId && getLinkedResource(item.resourceId)?.reference" class="item-reference">{{ getLinkedResource(item.resourceId)?.reference }}</p>
 
                     <!-- Notes -->
                     <div v-if="item.notes" class="item-notes">
@@ -261,14 +261,6 @@
             </div>
           </div>
         </div>
-
-        <!-- Add Item Button (Bottom) -->
-        <div v-if="isEditMode && program" class="add-item-container">
-          <ion-button @click="showAddItemModal" fill="outline" size="default" class="add-item-button">
-            <ion-icon :icon="addOutline" slot="start" />
-            Ajouter un élément
-          </ion-button>
-        </div>
       </div>
 
       <!-- Edit Program Modal -->
@@ -304,42 +296,52 @@
       <ion-modal :is-open="showItemFormModal" @ionModalDidDismiss="closeItemFormModal">
         <ion-header>
           <ion-toolbar>
+            <ion-buttons slot="start">
+              <ion-button @click="closeItemFormModal">
+                <ion-icon :icon="arrowBackOutline" />
+              </ion-button>
+            </ion-buttons>
             <ion-title>{{ editingItemId ? 'Modifier l\'élément' : 'Ajouter un élément' }}</ion-title>
             <ion-buttons slot="end">
-              <ion-button @click="closeItemFormModal">
-                <ion-icon :icon="closeOutline" />
+              <ion-button
+                @click="editingItemId ? updateItem() : addItem()"
+                :disabled="!itemForm.type || !itemForm.title"
+                :strong="true"
+              >
+                {{ editingItemId ? 'Modifier' : 'Ajouter' }}
               </ion-button>
             </ion-buttons>
           </ion-toolbar>
         </ion-header>
         <ion-content class="ion-padding">
-          <ion-item>
-            <ion-label position="stacked">Type *</ion-label>
-            <ion-select v-model="itemForm.type" placeholder="Sélectionner un type">
-              <ion-select-option v-for="type in programItemTypes" :key="type" :value="type">
-                {{ type }}
-              </ion-select-option>
-            </ion-select>
-          </ion-item>
+          <!-- Type Selection with Icon Buttons -->
+          <div class="type-selection-section">
+            <ion-label class="type-label">Type *</ion-label>
+            <div class="type-buttons-grid">
+              <button
+                v-for="type in programItemTypes"
+                :key="type"
+                @click="itemForm.type = type"
+                :class="['type-button', { 'selected': itemForm.type === type }]"
+                type="button"
+              >
+                <ion-icon :icon="getItemIcon(type)" class="type-icon" />
+                <span class="type-text">{{ type }}</span>
+              </button>
+            </div>
+          </div>
 
-          <ion-item>
+          <ion-item class="title-field-with-button">
             <ion-label position="stacked">Titre *</ion-label>
             <ion-input v-model="itemForm.title" placeholder="Ex: Moment d'adoration"></ion-input>
+            <div slot="end" class="resource-selector-inline">
+              <ResourceSelector v-model="itemForm.resourceId" button-fill="solid" button-size="small" />
+            </div>
           </ion-item>
 
           <ion-item>
             <ion-label position="stacked">Sous-titre (optionnel)</ion-label>
             <ion-input v-model="itemForm.subtitle"></ion-input>
-          </ion-item>
-
-          <ion-item>
-            <ion-label position="stacked">Référence (optionnel)</ion-label>
-            <ion-input v-model="itemForm.reference" placeholder="Ex: Mathieu 11v25-30"></ion-input>
-          </ion-item>
-
-          <ion-item>
-            <ion-label position="stacked">Lier à une ressource (optionnel)</ion-label>
-            <ResourceSelector v-model="itemForm.resourceId" />
           </ion-item>
 
           <ion-item>
@@ -356,15 +358,6 @@
             <ion-label position="stacked">Notes (optionnel)</ion-label>
             <ion-textarea v-model="itemForm.notes" :rows="3"></ion-textarea>
           </ion-item>
-
-          <ion-button
-            @click="editingItemId ? updateItem() : addItem()"
-            expand="block"
-            class="ion-margin-top"
-            :disabled="!itemForm.type || !itemForm.title"
-          >
-            {{ editingItemId ? 'Mettre à jour' : 'Ajouter' }}
-          </ion-button>
         </ion-content>
       </ion-modal>
 
@@ -581,11 +574,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonBackButton,
-  IonButton, IonIcon, IonCard, IonCardContent, IonLoading, IonModal, IonSelect, IonSelectOption,
+  IonButton, IonIcon, IonCard, IonCardContent, IonLoading, IonModal,
   IonItem, IonLabel, IonInput, IonTextarea, toastController, alertController
 } from '@ionic/vue';
 import {
@@ -595,7 +588,8 @@ import {
   megaphoneOutline, giftOutline, handLeftOutline, personCircleOutline,
   checkmarkOutline, reorderThreeOutline, addOutline, trashOutline,
   playCircleOutline, volumeHighOutline, documentOutline,
-  chatboxEllipsesOutline, chevronDownOutline, chevronForwardOutline
+  chatboxEllipsesOutline, chevronDownOutline, chevronForwardOutline,
+  arrowBackOutline
 } from 'ionicons/icons';
 import ResourceSelector from '@/components/ResourceSelector.vue';
 import SendProgramSMSModal from '@/components/SendProgramSMSModal.vue';
@@ -616,12 +610,11 @@ import {
 import type { Service } from '@/types/service';
 import type { ServiceProgram, ProgramItem, ProgramParticipant, ProgramSubItem } from '@/types/program';
 import { ProgramItemType } from '@/types/program';
-import type { Resource, ResourceMedia } from '@/types/resource';
+import type { Resource } from '@/types/resource';
 import { getResourceById } from '@/firebase/resources';
-import { isYouTubeUrl, getYouTubeEmbedUrl, isSpotifyUrl, getSpotifyEmbedUrl } from '@/utils/resource-utils';
+import { isYouTubeUrl, getYouTubeEmbedUrl, getSpotifyEmbedUrl } from '@/utils/resource-utils';
 
 const route = useRoute();
-const router = useRouter();
 const { user, isAdmin } = useUser();
 
 // Reactive State
@@ -645,7 +638,6 @@ const itemForm = ref({
   type: '' as ProgramItemType,
   title: '',
   subtitle: '',
-  reference: '',
   participantName: '',
   duration: 5,
   notes: '',
@@ -976,7 +968,6 @@ const showAddItemModal = () => {
     type: '' as ProgramItemType,
     title: '',
     subtitle: '',
-    reference: '',
     participantName: '',
     duration: 5,
     notes: '',
@@ -991,7 +982,6 @@ const showEditItemModalForItem = (item: ProgramItem) => {
     type: item.type,
     title: item.title,
     subtitle: item.subtitle || '',
-    reference: item.reference || '',
     participantName: item.participant?.name || '',
     duration: item.duration || 5,
     notes: item.notes || '',
@@ -1028,7 +1018,6 @@ const addItem = async () => {
 
     // Only add optional fields if they have values
     if (itemForm.value.subtitle) newItem.subtitle = itemForm.value.subtitle;
-    if (itemForm.value.reference) newItem.reference = itemForm.value.reference;
     if (participant) newItem.participant = participant;
     if (itemForm.value.duration) newItem.duration = itemForm.value.duration;
     if (itemForm.value.notes) newItem.notes = itemForm.value.notes;
@@ -1073,7 +1062,6 @@ const updateItem = async () => {
 
     // Only add optional fields if they have values
     if (itemForm.value.subtitle) updates.subtitle = itemForm.value.subtitle;
-    if (itemForm.value.reference) updates.reference = itemForm.value.reference;
     if (participant) updates.participant = participant;
     if (itemForm.value.duration) updates.duration = itemForm.value.duration;
     if (itemForm.value.notes) updates.notes = itemForm.value.notes;
@@ -1281,6 +1269,27 @@ const closeSMSModal = () => {
 const onSMSSent = () => {
   showToast('SMS envoyé avec succès', 'success');
 };
+
+// Watch for resource selection to auto-populate title
+watch(() => itemForm.value.resourceId, async (newResourceId) => {
+  if (newResourceId && !itemForm.value.title) {
+    const resource = getLinkedResource(newResourceId);
+    if (resource) {
+      itemForm.value.title = resource.title;
+    } else {
+      // If resource not yet loaded, load it
+      try {
+        const resource = await getResourceById(newResourceId);
+        if (resource && !itemForm.value.title) {
+          itemForm.value.title = resource.title;
+          linkedResources.value.set(newResourceId, resource);
+        }
+      } catch (error) {
+        console.error('Error loading resource:', error);
+      }
+    }
+  }
+});
 
 // Lifecycle
 onMounted(async () => {
@@ -1899,5 +1908,82 @@ onMounted(async () => {
 
 .edit-mode .program-item-wrapper:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Title Field with Resource Button */
+.title-field-with-button {
+  --padding-end: 0;
+}
+
+.resource-selector-inline {
+  display: flex;
+  align-items: center;
+  margin-left: 0.5rem;
+}
+
+/* Type Selection Section */
+.type-selection-section {
+  margin-bottom: 1.5rem;
+}
+
+.type-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--ion-color-medium);
+  margin-bottom: 0.75rem;
+}
+
+.type-buttons-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.type-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem 0.75rem;
+  min-width: 90px;
+  border: 2px solid var(--ion-color-light);
+  border-radius: 8px;
+  background: var(--ion-color-light-tint);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--ion-color-danger);
+}
+
+.type-button:hover {
+  border-color: var(--ion-color-primary-tint);
+  background: var(--ion-color-primary-tint);
+  color: white;
+}
+
+.type-button.selected {
+  border-color: var(--ion-color-primary);
+  background: var(--ion-color-primary);
+  color: white;
+}
+
+.type-icon {
+  font-size: 1.75rem;
+}
+
+.type-button:hover .type-icon {
+  color: white;
+}
+
+.type-button.selected .type-icon {
+  color: white;
+}
+
+.type-text {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.2;
 }
 </style>
