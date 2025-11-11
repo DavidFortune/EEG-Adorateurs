@@ -1078,19 +1078,7 @@ const getItemIcon = (type: ProgramItemType) => {
     'Prière': handLeftOutline,
     'Lecture biblique': libraryOutline,
     'Prédication': micOutline,
-    'Titre': documentTextOutline,
-    'Annonce': megaphoneOutline,
-    'Offrande': giftOutline,
-    'Bénédiction': handLeftOutline,
-    'Mot de bienvenue': handLeftOutline,
-    'Salutations': handLeftOutline,
-    'Numéro spécial': musicalNoteOutline,
-    'Collecte': giftOutline,
-    'Adoration': musicalNoteOutline,
-    'Louange': musicalNoteOutline,
-    'Chant final': musicalNoteOutline,
-    'Chant de clôture': musicalNoteOutline,
-    'Autre': documentTextOutline
+    'Titre': documentTextOutline
   };
   return iconMap[type] || documentTextOutline;
 };
