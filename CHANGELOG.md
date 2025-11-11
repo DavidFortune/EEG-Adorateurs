@@ -2,6 +2,44 @@
 
 All notable changes to EEG Adorateurs will be documented in this file.
 
+## [1.10.0] - 2025-11-11
+
+### Added
+- **YouTube Integration**: Complete YouTube search and resource creation system
+  - New NaturalResourceSelector component for searching YouTube videos directly
+  - Cloud Functions for YouTube Data API v3 integration (searchYouTube, getVideoMetadata, createResourceFromYouTube)
+  - Video preview modal with embedded YouTube player
+  - Lyrics extraction and input functionality with video description fetching
+  - Integrated into ResourceSelector via tabbed interface (Existing Resources / YouTube Search)
+  - Auto-selection and auto-population of resource details after creation
+
+- **Visual Type Selection**: Icon-based program item type selector
+  - Replaced dropdown with visual button grid showing icons and labels
+  - Red text for unselected types, white text on hover/selection
+  - Improved UX with larger, more intuitive selection interface
+
+### Enhanced
+- **Program Item Types**: Simplified and streamlined type system
+  - Reduced from 18 types to 5 essential types: Chant, Prière, Lecture biblique, Prédication, Titre
+  - Removed redundant types: Annonce, Offrande, Bénédiction, Mot de bienvenue, Salutations, Numéro spécial, Collecte, Adoration, Louange, Chant final, Chant de clôture, Autre
+  - Cleaner, more focused program creation experience
+
+- **Data Structure Normalization**: Reference field moved to Resource type
+  - Moved reference field from ProgramItem to Resource for better data organization
+  - References (Bible verses, song numbers) now stored at resource level
+  - Eliminates duplication across multiple program items
+
+- **Program Item Form UI**: Improved modal interface design
+  - Back button positioned top-left, action button (Add/Modify) top-right
+  - Resource selector integrated inline with title field (right side)
+  - Removed duplicate "Add Element" buttons
+  - Auto-population of title when resource is selected
+  - Compact button styling (solid fill, small size)
+
+### Fixed
+- TypeScript compilation errors for removed program item types
+- Icon mapping updated to reflect new simplified type system
+
 ## [1.9.1] - 2025-11-09
 
 ### Fixed
