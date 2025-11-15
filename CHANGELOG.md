@@ -2,6 +2,32 @@
 
 All notable changes to EEG Adorateurs will be documented in this file.
 
+## [1.10.1] - 2025-11-15
+
+### Added
+- **YouTube Playlist Player**: New feature for service programs
+  - Click YouTube icon in program header to access playlist
+  - Full-screen video player with navigation controls (previous/next)
+  - Auto-play next video when current video ends
+  - Visual progress indicator with clickable dots
+  - Queue view showing all videos with program context
+  - Mobile-optimized controls (icon-only buttons)
+  - Feature announcement banner with consistent app styling
+
+### Enhanced
+- **Lyrics Display Modal**: Improved readability for worship
+  - Full-screen display mode
+  - Minimized padding and margins for maximum content space
+  - Added subtitle (reference) below song title
+  - Added program item notes below subtitle
+  - Optimized font sizes (1.1rem for lyrics, 1.2rem for title)
+  - Better contrast for active queue items (white text on red background)
+
+### Technical
+- Integrated YouTube IFrame API for video state detection
+- Added program item context to video metadata (item number and title)
+- Improved type checking for both 'video' and 'youtube' content types
+
 ## [1.10.0] - 2025-11-11
 
 ### Added

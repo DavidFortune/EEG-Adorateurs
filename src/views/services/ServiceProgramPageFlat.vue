@@ -5,8 +5,11 @@
         <ion-buttons slot="start">
           <ion-back-button :default-href="`/service-detail/${route.params.id}`"></ion-back-button>
         </ion-buttons>
-        <ion-title>{{ isEditMode ? 'Édition du programme' : 'Programme du service' }}</ion-title>
+        <ion-title>{{ isEditMode ? 'Édition du programme' : 'Programme' }}</ion-title>
         <ion-buttons slot="end">
+          <ion-button v-if="!isEditMode && hasYouTubeVideos" @click="showYouTubePlaylist" fill="clear" color="danger">
+            <ion-icon :icon="logoYoutube" />
+          </ion-button>
           <ion-button v-if="isAdmin && !isEditMode" @click="showSMSModal" fill="clear" color="primary">
             <ion-icon :icon="chatboxEllipsesOutline" />
           </ion-button>
@@ -28,6 +31,19 @@
             <ion-icon :icon="calendarOutline" />
             {{ formatDateTime(service.date, service.time) }}
           </p>
+        </div>
+      </div>
+
+      <!-- YouTube Playlist Feature Notice -->
+      <div v-if="!isEditMode && hasYouTubeVideos" class="youtube-feature-notice">
+        <div class="notice-content">
+          <ion-icon :icon="logoYoutube" class="notice-icon" />
+          <div class="notice-text">
+            <strong>Nouveau !</strong> Cliquez sur l'icône
+            <ion-icon :icon="logoYoutube" class="inline-icon" />
+            en haut à droite pour accéder à la playlist YouTube des chants du service.
+            Idéal pour apprendre les chants ou se mettre déjà dans un esprit d'adoration !
+          </div>
         </div>
       </div>
 
@@ -521,7 +537,7 @@
       </ion-modal>
 
       <!-- Item Lyrics View Modal -->
-      <ion-modal :is-open="showItemLyricsModalState" @ionModalDidDismiss="closeItemLyricsView" class="lyrics-view-modal">
+      <ion-modal :is-open="showItemLyricsModalState" @ionModalDidDismiss="closeItemLyricsView" class="lyrics-view-modal fullscreen-modal">
         <ion-header>
           <ion-toolbar>
             <ion-title>{{ selectedItemForLyrics?.title }}</ion-title>
@@ -532,7 +548,7 @@
             </ion-buttons>
           </ion-toolbar>
         </ion-header>
-        <ion-content class="lyrics-view-modal-content">
+        <ion-content class="lyrics-view-modal-content fullscreen-content">
           <div v-if="selectedItemForLyrics" class="lyrics-view-container">
             <!-- Sub-Items with Titles and Lyrics -->
             <div
@@ -543,9 +559,17 @@
               <!-- Item Header -->
               <div class="lyrics-item-header">
                 <div class="lyrics-item-number">{{ index + 1 }}</div>
-                <h3 class="lyrics-item-title">
-                  {{ subItem.resourceId && getLinkedResource(subItem.resourceId) ? getLinkedResource(subItem.resourceId)?.title : subItem.title }}
-                </h3>
+                <div class="lyrics-item-header-text">
+                  <h3 class="lyrics-item-title">
+                    {{ subItem.resourceId && getLinkedResource(subItem.resourceId) ? getLinkedResource(subItem.resourceId)?.title : subItem.title }}
+                  </h3>
+                  <p v-if="subItem.resourceId && getLinkedResource(subItem.resourceId)?.reference" class="lyrics-item-subtitle">
+                    {{ getLinkedResource(subItem.resourceId)?.reference }}
+                  </p>
+                  <p v-if="subItem.notes" class="lyrics-item-notes">
+                    {{ subItem.notes }}
+                  </p>
+                </div>
               </div>
 
               <!-- Lyrics -->
@@ -554,6 +578,115 @@
               </div>
               <div v-else class="no-lyrics">
                 Aucune parole disponible
+              </div>
+            </div>
+          </div>
+        </ion-content>
+      </ion-modal>
+
+      <!-- YouTube Playlist Modal -->
+      <ion-modal :is-open="showYouTubePlaylistModalState" @ionModalDidDismiss="closeYouTubePlaylist" class="youtube-playlist-modal fullscreen-modal">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>
+              <ion-icon :icon="logoYoutube" style="vertical-align: middle; margin-right: 0.5rem;" />
+              Playlist YouTube
+            </ion-title>
+            <ion-buttons slot="end">
+              <ion-button @click="closeYouTubePlaylist">
+                <ion-icon :icon="closeOutline" />
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="fullscreen-content">
+          <div class="youtube-player-container">
+            <!-- Main Video Player -->
+            <div v-if="youtubeVideos.length > 0" class="main-player-section">
+              <div class="current-video-info">
+                <div class="video-counter">
+                  Vidéo {{ currentVideoIndex + 1 }} / {{ youtubeVideos.length }}
+                </div>
+                <h2 class="current-video-title">{{ youtubeVideos[currentVideoIndex].title }}</h2>
+                <p v-if="youtubeVideos[currentVideoIndex].subtitle" class="current-video-subtitle">
+                  {{ youtubeVideos[currentVideoIndex].subtitle }}
+                </p>
+              </div>
+
+              <div class="main-video-wrapper">
+                <iframe
+                  :key="currentVideoIndex"
+                  :src="getAutoplayEmbedUrl(youtubeVideos[currentVideoIndex].embedUrl)"
+                  frameborder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowfullscreen
+                  class="main-video-iframe"
+                ></iframe>
+              </div>
+
+              <!-- Player Controls -->
+              <div class="player-controls">
+                <ion-button
+                  @click="previousVideo"
+                  :disabled="currentVideoIndex === 0"
+                  fill="solid"
+                  color="danger"
+                  class="nav-button"
+                >
+                  <ion-icon :icon="playBackOutline" slot="start" class="hide-mobile" />
+                  <ion-icon :icon="playBackOutline" slot="icon-only" class="show-mobile" />
+                  <span class="hide-mobile">Précédent</span>
+                </ion-button>
+
+                <div class="progress-indicator">
+                  <div
+                    v-for="(video, index) in youtubeVideos"
+                    :key="index"
+                    :class="['progress-dot', { 'active': index === currentVideoIndex, 'played': index < currentVideoIndex }]"
+                    @click="goToVideo(index)"
+                  ></div>
+                </div>
+
+                <ion-button
+                  @click="nextVideo"
+                  :disabled="currentVideoIndex === youtubeVideos.length - 1"
+                  fill="solid"
+                  color="danger"
+                  class="nav-button"
+                >
+                  <span class="hide-mobile">Suivant</span>
+                  <ion-icon :icon="playForwardOutline" slot="icon-only" class="show-mobile" />
+                  <ion-icon :icon="playForwardOutline" slot="end" class="hide-mobile" />
+                </ion-button>
+              </div>
+            </div>
+
+            <!-- Playlist Queue -->
+            <div class="playlist-queue">
+              <h3 class="queue-title">File d'attente ({{ youtubeVideos.length }})</h3>
+              <div class="queue-list">
+                <div
+                  v-for="(video, index) in youtubeVideos"
+                  :key="index"
+                  :class="['queue-item', { 'active': index === currentVideoIndex, 'played': index < currentVideoIndex }]"
+                  @click="goToVideo(index)"
+                >
+                  <div class="queue-item-number">{{ index + 1 }}</div>
+                  <div class="queue-item-info">
+                    <div class="queue-item-title">{{ video.title }}</div>
+                    <div class="queue-item-subtitle-group">
+                      <div v-if="video.subtitle" class="queue-item-subtitle">{{ video.subtitle }}</div>
+                      <div v-if="video.programItemNumber && video.programItemTitle" class="queue-item-context">
+                        #{{ video.programItemNumber }} - {{ video.programItemTitle }}
+                      </div>
+                    </div>
+                  </div>
+                  <ion-icon
+                    v-if="index === currentVideoIndex"
+                    :icon="playCircleOutline"
+                    class="queue-item-playing"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -589,7 +722,7 @@ import {
   checkmarkOutline, reorderThreeOutline, addOutline, trashOutline,
   playCircleOutline, volumeHighOutline, documentOutline,
   chatboxEllipsesOutline, chevronDownOutline, chevronForwardOutline,
-  arrowBackOutline
+  arrowBackOutline, logoYoutube, playBackOutline, playForwardOutline
 } from 'ionicons/icons';
 import ResourceSelector from '@/components/ResourceSelector.vue';
 import SendProgramSMSModal from '@/components/SendProgramSMSModal.vue';
@@ -676,6 +809,17 @@ const showSMSModalState = ref(false);
 const showItemLyricsModalState = ref(false);
 const selectedItemForLyrics = ref<ProgramItem | null>(null);
 
+// YouTube Playlist Modal
+const showYouTubePlaylistModalState = ref(false);
+const youtubeVideos = ref<Array<{
+  title: string;
+  subtitle?: string;
+  embedUrl: string;
+  programItemNumber?: number;
+  programItemTitle?: string;
+}>>([]);
+const currentVideoIndex = ref(0);
+
 // Computed Properties
 const serviceId = computed(() => route.params.id as string);
 
@@ -689,6 +833,35 @@ const sortedItems = computed(() => {
 const totalDuration = computed(() => {
   if (!program.value) return 0;
   return program.value.items.reduce((sum, item) => sum + (item.duration || 0), 0);
+});
+
+const hasYouTubeVideos = computed(() => {
+  if (!program.value) return false;
+
+  // Check all items and sub-items for YouTube videos
+  for (const item of program.value.items) {
+    // Check item resource
+    if (item.resourceId) {
+      const resource = getLinkedResource(item.resourceId);
+      if (resource?.contents?.some(c => (c.type === 'video' || c.type === 'youtube') && c.url && isYouTubeUrl(c.url))) {
+        return true;
+      }
+    }
+
+    // Check sub-items
+    if (item.subItems) {
+      for (const subItem of item.subItems) {
+        if (subItem.resourceId) {
+          const resource = getLinkedResource(subItem.resourceId);
+          if (resource?.contents?.some(c => (c.type === 'video' || c.type === 'youtube') && c.url && isYouTubeUrl(c.url))) {
+            return true;
+          }
+        }
+      }
+    }
+  }
+
+  return false;
 });
 
 // Helper Functions
@@ -1270,6 +1443,163 @@ const onSMSSent = () => {
   showToast('SMS envoyé avec succès', 'success');
 };
 
+// YouTube Playlist Functions
+const collectYouTubeVideos = () => {
+  const videos: Array<{
+    title: string;
+    subtitle?: string;
+    embedUrl: string;
+    programItemNumber?: number;
+    programItemTitle?: string;
+  }> = [];
+
+  if (!program.value) return videos;
+
+  // Collect from all items in order
+  for (let i = 0; i < sortedItems.value.length; i++) {
+    const item = sortedItems.value[i];
+    const itemNumber = i + 1;
+
+    // Check item resource
+    if (item.resourceId) {
+      const resource = getLinkedResource(item.resourceId);
+      if (resource?.contents) {
+        for (const content of resource.contents) {
+          // Check for both 'video' and 'youtube' types
+          if ((content.type === 'video' || content.type === 'youtube') && content.url && isYouTubeUrl(content.url)) {
+            const embedUrl = getYouTubeEmbedUrl(content.url);
+            if (embedUrl) {
+              videos.push({
+                title: resource.title,
+                subtitle: resource.reference,
+                embedUrl,
+                programItemNumber: itemNumber,
+                programItemTitle: item.title
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // Check sub-items
+    if (item.subItems && item.subItems.length > 0) {
+      const sortedSubItems = getSortedSubItems(item);
+      for (const subItem of sortedSubItems) {
+        if (subItem.resourceId) {
+          const resource = getLinkedResource(subItem.resourceId);
+          if (resource?.contents) {
+            for (const content of resource.contents) {
+              // Check for both 'video' and 'youtube' types
+              if ((content.type === 'video' || content.type === 'youtube') && content.url && isYouTubeUrl(content.url)) {
+                const embedUrl = getYouTubeEmbedUrl(content.url);
+                if (embedUrl) {
+                  videos.push({
+                    title: resource.title,
+                    subtitle: resource.reference,
+                    embedUrl,
+                    programItemNumber: itemNumber,
+                    programItemTitle: item.title
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return videos;
+};
+
+const showYouTubePlaylist = () => {
+  youtubeVideos.value = collectYouTubeVideos();
+  currentVideoIndex.value = 0;
+  showYouTubePlaylistModalState.value = true;
+};
+
+const closeYouTubePlaylist = () => {
+  showYouTubePlaylistModalState.value = false;
+  currentVideoIndex.value = 0;
+};
+
+const nextVideo = () => {
+  if (currentVideoIndex.value < youtubeVideos.value.length - 1) {
+    currentVideoIndex.value++;
+  }
+};
+
+const previousVideo = () => {
+  if (currentVideoIndex.value > 0) {
+    currentVideoIndex.value--;
+  }
+};
+
+const goToVideo = (index: number) => {
+  currentVideoIndex.value = index;
+};
+
+const getAutoplayEmbedUrl = (embedUrl: string): string => {
+  // Add autoplay parameter and enable JS API to YouTube embed URL
+  const separator = embedUrl.includes('?') ? '&' : '?';
+  return `${embedUrl}${separator}autoplay=1&rel=0&enablejsapi=1`;
+};
+
+// YouTube Player API integration for auto-advance
+const setupYouTubeAPIListener = () => {
+  // Load YouTube IFrame API if not already loaded
+  if (!(window as any).YT) {
+    const tag = document.createElement('script');
+    tag.src = 'https://www.youtube.com/iframe_api';
+    const firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+
+    // Setup callback for when API is ready
+    (window as any).onYouTubeIframeAPIReady = () => {
+      initYouTubePlayer();
+    };
+  } else {
+    initYouTubePlayer();
+  }
+};
+
+const initYouTubePlayer = () => {
+  // Wait for iframe to be available
+  setTimeout(() => {
+    const iframe = document.querySelector('.main-video-iframe') as HTMLIFrameElement;
+    if (!iframe || !iframe.contentWindow) return;
+
+    const player = new (window as any).YT.Player(iframe, {
+      events: {
+        onStateChange: (event: any) => {
+          // YT.PlayerState.ENDED = 0
+          if (event.data === 0) {
+            // Video ended, play next
+            if (currentVideoIndex.value < youtubeVideos.value.length - 1) {
+              nextVideo();
+            }
+          }
+        }
+      }
+    });
+  }, 1000);
+};
+
+// Watch for video changes to reinitialize player
+watch(currentVideoIndex, () => {
+  if (showYouTubePlaylistModalState.value) {
+    initYouTubePlayer();
+  }
+});
+
+// Setup API when modal opens
+watch(showYouTubePlaylistModalState, (isOpen) => {
+  if (isOpen && youtubeVideos.value.length > 0) {
+    setupYouTubeAPIListener();
+  }
+});
+
 // Watch for resource selection to auto-populate title
 watch(() => itemForm.value.resourceId, async (newResourceId) => {
   if (newResourceId && !itemForm.value.title) {
@@ -1326,6 +1656,75 @@ onMounted(async () => {
   font-size: 1rem;
   opacity: 0.9;
   margin: 0;
+}
+
+/* YouTube Feature Notice */
+.youtube-feature-notice {
+  background: linear-gradient(135deg, #F3F4F6 0%, #E5E7EB 100%);
+  padding: 1rem 1.5rem;
+  margin: 0;
+  border-bottom: 1px solid #D1D5DB;
+  border-left: 4px solid #EF4444;
+}
+
+.notice-content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.notice-icon {
+  font-size: 2.5rem;
+  color: #EF4444;
+  flex-shrink: 0;
+}
+
+.notice-text {
+  flex: 1;
+  color: #374151;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.notice-text strong {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: #EF4444;
+}
+
+.inline-icon {
+  font-size: 1.2rem;
+  vertical-align: middle;
+  margin: 0 0.25rem;
+  color: #EF4444;
+}
+
+@media (max-width: 768px) {
+  .youtube-feature-notice {
+    padding: 0.75rem 1rem;
+  }
+
+  .notice-content {
+    gap: 0.75rem;
+  }
+
+  .notice-icon {
+    font-size: 2rem;
+  }
+
+  .notice-text {
+    font-size: 0.85rem;
+  }
+
+  .notice-text strong {
+    font-size: 0.95rem;
+  }
+
+  .inline-icon {
+    font-size: 1rem;
+  }
 }
 
 /* Content Container */
@@ -1794,67 +2193,107 @@ onMounted(async () => {
   --border-radius: 12px;
 }
 
+/* Fullscreen Modal */
+.fullscreen-modal {
+  --width: 100%;
+  --height: 100%;
+  --border-radius: 0;
+}
+
+.fullscreen-content {
+  --padding-top: 0;
+  --padding-bottom: 0;
+  --padding-start: 0;
+  --padding-end: 0;
+}
+
 .lyrics-view-modal-content {
   --padding-top: 1rem;
 }
 
 .lyrics-view-container {
-  padding: 1rem;
+  padding: 0.5rem;
 }
 
 .lyrics-item-card {
   background: white;
-  border-radius: 12px;
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 0;
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+  box-shadow: none;
+  border-bottom: 1px solid var(--ion-color-light);
 }
 
 .lyrics-item-header {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  margin-bottom: 1rem;
-  padding-bottom: 0.75rem;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.5rem;
   border-bottom: 2px solid var(--ion-color-primary);
+}
+
+.lyrics-item-header-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
 .lyrics-item-number {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   background: var(--ion-color-primary);
   color: white;
   border-radius: 50%;
   font-weight: 700;
-  font-size: 1.1rem;
+  font-size: 1.25rem;
   flex-shrink: 0;
 }
 
 .lyrics-item-title {
   margin: 0;
   font-size: 1.2rem;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--ion-color-dark);
-  flex: 1;
+  line-height: 1.2;
+}
+
+.lyrics-item-subtitle {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--ion-color-medium-shade);
+  line-height: 1.2;
+}
+
+.lyrics-item-notes {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: var(--ion-color-medium);
+  font-style: italic;
+  line-height: 1.2;
 }
 
 .lyrics-content-display {
-  background: var(--ion-color-light);
-  padding: 1.5rem;
-  border-radius: 8px;
-  margin-top: 1rem;
+  background: transparent;
+  padding: 0.5rem 0;
+  border-radius: 0;
+  margin-top: 0.5rem;
 }
 
 .lyrics-content-display pre {
   white-space: pre-wrap;
   font-family: var(--ion-font-family);
-  font-size: 1rem;
-  line-height: 1.8;
+  font-size: 1.1rem;
+  line-height: 1.7;
   margin: 0;
   color: var(--ion-color-dark);
+  font-weight: 400;
 }
 
 .no-lyrics {
@@ -1862,6 +2301,305 @@ onMounted(async () => {
   padding: 2rem;
   color: var(--ion-color-medium);
   font-style: italic;
+}
+
+/* YouTube Playlist Modal */
+.youtube-playlist-modal {
+  --width: 100%;
+  --height: 100%;
+  --border-radius: 0;
+}
+
+.youtube-player-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #000;
+}
+
+/* Main Player Section */
+.main-player-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #000;
+}
+
+.current-video-info {
+  padding: 1rem;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.7));
+  color: white;
+}
+
+.video-counter {
+  font-size: 0.85rem;
+  color: var(--ion-color-danger);
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.current-video-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: white;
+  line-height: 1.3;
+}
+
+.current-video-subtitle {
+  margin: 0.25rem 0 0 0;
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.main-video-wrapper {
+  flex: 1;
+  position: relative;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.main-video-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* Player Controls */
+.player-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.7));
+  gap: 1rem;
+}
+
+.progress-indicator {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding: 0.5rem 0;
+}
+
+.progress-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.progress-dot:hover {
+  background: rgba(255, 255, 255, 0.5);
+  transform: scale(1.2);
+}
+
+.progress-dot.active {
+  background: var(--ion-color-danger);
+  width: 16px;
+  height: 16px;
+}
+
+.progress-dot.played {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+/* Playlist Queue */
+.playlist-queue {
+  background: var(--ion-color-light);
+  border-top: 2px solid var(--ion-color-medium);
+  max-height: 40%;
+  overflow-y: auto;
+}
+
+.queue-title {
+  margin: 0;
+  padding: 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ion-color-dark);
+  background: white;
+  border-bottom: 1px solid var(--ion-color-light-shade);
+  sticky: top;
+  top: 0;
+  z-index: 1;
+}
+
+.queue-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.queue-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: white;
+  border-bottom: 1px solid var(--ion-color-light);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.queue-item:hover {
+  background: var(--ion-color-light-tint);
+}
+
+.queue-item.active {
+  background: var(--ion-color-danger);
+  border-left: 4px solid var(--ion-color-danger-shade);
+}
+
+.queue-item.played {
+  opacity: 0.6;
+}
+
+.queue-item-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--ion-color-light);
+  color: var(--ion-color-dark);
+  font-weight: 600;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.queue-item.active .queue-item-number {
+  background: rgba(255, 255, 255, 0.3);
+  color: white;
+}
+
+.queue-item-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.queue-item-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ion-color-dark);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.queue-item.active .queue-item-title {
+  color: white;
+}
+
+.queue-item-subtitle-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.queue-item-subtitle {
+  font-size: 0.8rem;
+  color: var(--ion-color-medium-shade);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.queue-item.active .queue-item-subtitle {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.queue-item-context {
+  font-size: 0.75rem;
+  color: var(--ion-color-medium);
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.queue-item.active .queue-item-context {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.queue-item-playing {
+  font-size: 1.5rem;
+  color: white;
+  flex-shrink: 0;
+}
+
+/* Utility classes for responsive display */
+.hide-mobile {
+  display: inline;
+}
+
+.show-mobile {
+  display: none;
+}
+
+/* Navigation buttons */
+.nav-button {
+  --padding-start: 1rem;
+  --padding-end: 1rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .current-video-title {
+    font-size: 1.2rem;
+  }
+
+  .player-controls {
+    flex-direction: row;
+    gap: 0.5rem;
+    padding: 0.75rem;
+  }
+
+  .nav-button {
+    --padding-start: 0.5rem;
+    --padding-end: 0.5rem;
+    min-width: 44px;
+    flex-shrink: 0;
+  }
+
+  .hide-mobile {
+    display: none;
+  }
+
+  .show-mobile {
+    display: inline;
+  }
+
+  .progress-indicator {
+    flex: 1;
+    gap: 0.35rem;
+    padding: 0;
+  }
+
+  .progress-dot {
+    width: 10px;
+    height: 10px;
+  }
+
+  .progress-dot.active {
+    width: 14px;
+    height: 14px;
+  }
+
+  .playlist-queue {
+    max-height: 50%;
+  }
 }
 
 /* Responsive Design */
