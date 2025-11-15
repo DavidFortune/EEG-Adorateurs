@@ -42,7 +42,7 @@
             <strong>Nouveauté !</strong> Cliquez sur l'icône
             <ion-icon :icon="logoYoutube" class="inline-icon" />
             pour accéder à la playlist YouTube des chants du service.<br/>
-            <strong>Idéal pour apprendre les chants et se mettre déjà dans un esprit d'adoration !</strong>
+            <strong>Idéal pour apprendre les chants et se mettre dans un esprit d'adoration !</strong>
           </div>
         </div>
       </div>
