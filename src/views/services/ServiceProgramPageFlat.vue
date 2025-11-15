@@ -39,10 +39,10 @@
         <div class="notice-content">
           <ion-icon :icon="logoYoutube" class="notice-icon" />
           <div class="notice-text">
-            <strong>Nouveau !</strong> Cliquez sur l'icône
+            <strong>Nouveauté !</strong> Cliquez sur l'icône
             <ion-icon :icon="logoYoutube" class="inline-icon" />
-            en haut à droite pour accéder à la playlist YouTube des chants du service.
-            Idéal pour apprendre les chants ou se mettre déjà dans un esprit d'adoration !
+            pour accéder à la playlist YouTube des chants du service.<br/>
+            <strong>Idéal pour apprendre les chants et se mettre déjà dans un esprit d'adoration !</strong>
           </div>
         </div>
       </div>
@@ -236,7 +236,7 @@
                 <!-- Sub-Items (Expanded) -->
                 <div v-if="hasSubItems(item) && isItemExpanded(item.id)" class="sub-items-container">
                   <div
-                    v-for="(subItem, subIndex) in getSortedSubItems(item)"
+                    v-for="subItem in getSortedSubItems(item)"
                     :key="subItem.id"
                     class="sub-item"
                   >
@@ -613,15 +613,27 @@
                 </p>
               </div>
 
-              <div class="main-video-wrapper">
+              <div
+                class="main-video-wrapper"
+                @touchstart="handleTouchStart"
+                @touchmove="handleTouchMove"
+                @touchend="handleTouchEnd"
+              >
                 <iframe
+                  :id="`youtube-player-${currentVideoIndex}`"
                   :key="currentVideoIndex"
                   :src="getAutoplayEmbedUrl(youtubeVideos[currentVideoIndex].embedUrl)"
                   frameborder="0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
                   allowfullscreen
                   class="main-video-iframe"
                 ></iframe>
+                <div v-if="showPlayPrompt" class="play-prompt-overlay" @click="dismissPlayPrompt">
+                  <div class="play-prompt-content">
+                    <ion-icon :icon="playCircleOutline" class="play-prompt-icon" />
+                    <p class="play-prompt-text">Appuyez sur la vidéo pour démarrer la lecture</p>
+                  </div>
+                </div>
               </div>
 
               <!-- Player Controls -->
@@ -708,7 +720,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonBackButton,
   IonButton, IonIcon, IonCard, IonCardContent, IonLoading, IonModal,
@@ -819,6 +831,15 @@ const youtubeVideos = ref<Array<{
   programItemTitle?: string;
 }>>([]);
 const currentVideoIndex = ref(0);
+
+// Touch/Swipe handling
+const touchStartX = ref(0);
+const touchEndX = ref(0);
+const touchStartY = ref(0);
+const touchEndY = ref(0);
+
+// Play prompt for mobile
+const showPlayPrompt = ref(false);
 
 // Computed Properties
 const serviceId = computed(() => route.params.id as string);
@@ -988,24 +1009,28 @@ const showToast = async (message: string, color: 'success' | 'danger' | 'warning
 
 // Confirm Helper
 const confirmAction = async (message: string): Promise<boolean> => {
-  return new Promise(async (resolve) => {
-    const alert = await alertController.create({
-      header: 'Confirmation',
-      message,
-      buttons: [
-        {
-          text: 'Annuler',
-          role: 'cancel',
-          handler: () => resolve(false)
-        },
-        {
-          text: 'Confirmer',
-          handler: () => resolve(true)
+  const alert = await alertController.create({
+    header: 'Confirmation',
+    message,
+    buttons: [
+      {
+        text: 'Annuler',
+        role: 'cancel',
+        handler: () => {
+          alert.dismiss(false);
         }
-      ]
-    });
-    await alert.present();
+      },
+      {
+        text: 'Confirmer',
+        handler: () => {
+          alert.dismiss(true);
+        }
+      }
+    ]
   });
+  await alert.present();
+  const { data } = await alert.onDidDismiss();
+  return data === true;
 };
 
 // Load Data
@@ -1517,33 +1542,89 @@ const showYouTubePlaylist = () => {
   youtubeVideos.value = collectYouTubeVideos();
   currentVideoIndex.value = 0;
   showYouTubePlaylistModalState.value = true;
+
+  // Show play prompt on mobile after a short delay
+  setTimeout(() => {
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (isMobile) {
+      showPlayPrompt.value = true;
+    }
+  }, 500);
 };
 
 const closeYouTubePlaylist = () => {
   showYouTubePlaylistModalState.value = false;
   currentVideoIndex.value = 0;
+  showPlayPrompt.value = false;
 };
 
 const nextVideo = () => {
   if (currentVideoIndex.value < youtubeVideos.value.length - 1) {
     currentVideoIndex.value++;
+    showPlayPrompt.value = false;
   }
 };
 
 const previousVideo = () => {
   if (currentVideoIndex.value > 0) {
     currentVideoIndex.value--;
+    showPlayPrompt.value = false;
   }
 };
 
 const goToVideo = (index: number) => {
   currentVideoIndex.value = index;
+  showPlayPrompt.value = false;
+};
+
+const dismissPlayPrompt = () => {
+  showPlayPrompt.value = false;
 };
 
 const getAutoplayEmbedUrl = (embedUrl: string): string => {
   // Add autoplay parameter and enable JS API to YouTube embed URL
   const separator = embedUrl.includes('?') ? '&' : '?';
   return `${embedUrl}${separator}autoplay=1&rel=0&enablejsapi=1`;
+};
+
+// Touch/Swipe handlers
+const handleTouchStart = (e: TouchEvent) => {
+  touchStartX.value = e.touches[0].clientX;
+  touchStartY.value = e.touches[0].clientY;
+};
+
+const handleTouchMove = (e: TouchEvent) => {
+  touchEndX.value = e.touches[0].clientX;
+  touchEndY.value = e.touches[0].clientY;
+};
+
+const handleTouchEnd = () => {
+  const deltaX = touchStartX.value - touchEndX.value;
+  const deltaY = Math.abs(touchStartY.value - touchEndY.value);
+
+  // Minimum swipe distance (in pixels)
+  const minSwipeDistance = 50;
+
+  // Check if horizontal swipe is dominant (not vertical scroll)
+  if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaX) > deltaY * 2) {
+    if (deltaX > 0) {
+      // Swiped left - next video
+      if (currentVideoIndex.value < youtubeVideos.value.length - 1) {
+        nextVideo();
+      }
+    } else {
+      // Swiped right - previous video
+      if (currentVideoIndex.value > 0) {
+        previousVideo();
+      }
+    }
+  }
+
+  // Reset values
+  touchStartX.value = 0;
+  touchEndX.value = 0;
+  touchStartY.value = 0;
+  touchEndY.value = 0;
 };
 
 // YouTube Player API integration for auto-advance
@@ -1570,7 +1651,8 @@ const initYouTubePlayer = () => {
     const iframe = document.querySelector('.main-video-iframe') as HTMLIFrameElement;
     if (!iframe || !iframe.contentWindow) return;
 
-    const player = new (window as any).YT.Player(iframe, {
+    // Initialize YouTube player with event listeners
+    new (window as any).YT.Player(iframe, {
       events: {
         onStateChange: (event: any) => {
           // YT.PlayerState.ENDED = 0
@@ -2365,6 +2447,61 @@ onMounted(async () => {
   width: 100%;
   height: 100%;
   border: none;
+}
+
+.play-prompt-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  cursor: pointer;
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.play-prompt-content {
+  text-align: center;
+  color: white;
+  padding: 2rem;
+}
+
+.play-prompt-icon {
+  font-size: 4rem;
+  color: #EF4444;
+  margin-bottom: 1rem;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+.play-prompt-text {
+  font-size: 1.1rem;
+  font-weight: 500;
+  margin: 0;
+  line-height: 1.5;
 }
 
 /* Player Controls */

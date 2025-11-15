@@ -2,6 +2,27 @@
 
 All notable changes to EEG Adorateurs will be documented in this file.
 
+## [1.10.2] - 2025-11-15
+
+### Added
+- **Mobile Autoplay Prompt**: Enhanced YouTube playlist player for mobile devices
+  - Visual play prompt overlay for iOS and Android devices
+  - Animated pulsing play icon with clear instructions
+  - Automatic detection of mobile browsers (iPhone, iPad, iPod, Android)
+  - Auto-dismisses when user taps or changes videos
+  - Addresses mobile browser autoplay restrictions
+
+### Enhanced
+- **Touch Gestures**: Added swipe support for YouTube playlist
+  - Swipe left to go to next video
+  - Swipe right to go to previous video
+  - Intelligent swipe detection (minimum 50px, horizontal dominance check)
+  - Natural mobile navigation experience
+
+### Fixed
+- Code quality improvements (removed unused variables and fixed linting issues)
+- Improved Promise handling in confirmation dialogs
+
 ## [1.10.1] - 2025-11-15
 
 ### Added
