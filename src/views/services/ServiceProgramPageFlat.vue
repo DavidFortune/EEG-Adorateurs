@@ -456,7 +456,7 @@
       </ion-modal>
 
       <!-- Media Modal (for displaying lyrics, videos, etc.) -->
-      <ion-modal :is-open="showMediaModalState" @ionModalDidDismiss="closeMediaModal" class="media-modal">
+      <ion-modal :is-open="showMediaModalState" @ionModalDidDismiss="closeMediaModal" class="media-modal fullscreen-modal">
         <ion-header>
           <ion-toolbar>
             <ion-title>{{ selectedMediaTitle }}</ion-title>
