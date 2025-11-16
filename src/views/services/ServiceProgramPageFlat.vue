@@ -469,7 +469,7 @@
         </ion-header>
         <ion-content v-if="selectedMediaContent">
           <!-- YouTube Video -->
-          <div v-if="selectedMediaContent.type === 'video' && selectedMediaContent.url && isYouTubeUrl(selectedMediaContent.url)" class="video-container">
+          <div v-if="(selectedMediaContent.type === 'video' || selectedMediaContent.type === 'youtube') && selectedMediaContent.url && isYouTubeUrl(selectedMediaContent.url)" class="video-container">
             <iframe
               :src="getYouTubeEmbedUrl(selectedMediaContent.url) || ''"
               frameborder="0"
@@ -528,7 +528,7 @@
           </div>
 
           <!-- Debug/Fallback - Show if no content matched -->
-          <div v-if="!['video', 'spotify', 'audio', 'lyrics', 'music_sheet'].includes(selectedMediaContent.type)" class="debug-container" style="padding: 1rem;">
+          <div v-if="!['video', 'youtube', 'spotify', 'audio', 'lyrics', 'music_sheet'].includes(selectedMediaContent.type)" class="debug-container" style="padding: 1rem;">
             <p><strong>Type:</strong> {{ selectedMediaContent.type }}</p>
             <p><strong>URL:</strong> {{ selectedMediaContent.url }}</p>
             <p><strong>Content:</strong> {{ selectedMediaContent.content }}</p>
