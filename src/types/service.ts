@@ -18,6 +18,7 @@ export interface Service {
   isPublished: boolean;
   availabilityDeadline?: string; // ISO 8601 datetime format (YYYY-MM-DDTHH:MM:SS) for deadline to submit availability
   teamRequirements?: TeamRequirement[]; // Team staffing requirements
+  guestMemberIds?: string[]; // Member IDs who have direct access to this service without being in a required team
   createdAt: string; // ISO timestamp
   modifiedAt: string; // ISO timestamp
 }
@@ -30,6 +31,7 @@ export interface CreateServiceRequest {
   isPublished: boolean;
   availabilityDeadline?: string; // ISO 8601 datetime format (YYYY-MM-DDTHH:MM:SS) for deadline to submit availability
   teamRequirements?: TeamRequirement[]; // Team staffing requirements
+  guestMemberIds?: string[]; // Member IDs who have direct access to this service without being in a required team
 }
 
 export interface UpdateServiceRequest extends CreateServiceRequest {

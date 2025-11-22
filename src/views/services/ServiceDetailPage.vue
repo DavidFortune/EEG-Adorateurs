@@ -122,6 +122,50 @@
             </ion-list>
           </ion-card-content>
         </ion-card>
+
+        <!-- Guests Section (Admin only) -->
+        <ion-card v-if="isAdmin" class="guests-card">
+          <ion-card-header>
+            <ion-card-title class="guests-title">
+              <ion-icon :icon="personAddOutline" />
+              Invités spéciaux
+            </ion-card-title>
+            <ion-card-subtitle>
+              Personnes ayant accès au service sans être membres d'une équipe requise
+            </ion-card-subtitle>
+          </ion-card-header>
+          <ion-card-content>
+            <div v-if="loadingGuests" class="loading-guests">
+              <ion-spinner name="crescent" />
+              <span>Chargement...</span>
+            </div>
+
+            <div v-else-if="guestMembers.length > 0" class="guests-list">
+              <div v-for="guest in guestMembers" :key="guest.id" class="guest-item">
+                <ion-avatar>
+                  <img v-if="guest.avatar" :src="guest.avatar" :alt="guest.fullName" />
+                  <div v-else class="avatar-initials">{{ getInitials(guest.fullName) }}</div>
+                </ion-avatar>
+                <div class="guest-info">
+                  <span class="guest-name">{{ guest.fullName }}</span>
+                  <span class="guest-email">{{ guest.email }}</span>
+                </div>
+                <ion-button fill="clear" color="danger" size="small" @click="removeGuest(guest)">
+                  <ion-icon :icon="removeCircleOutline" slot="icon-only" />
+                </ion-button>
+              </div>
+            </div>
+
+            <div v-else class="no-guests">
+              <p>Aucun invité pour ce service</p>
+            </div>
+
+            <ion-button expand="block" fill="outline" @click="openGuestModal" class="add-guest-btn">
+              <ion-icon :icon="addOutline" slot="start" />
+              Gérer les invités
+            </ion-button>
+          </ion-card-content>
+        </ion-card>
         
         <ion-button v-if="isAdmin" expand="block" color="primary" @click="goToEdit" class="ion-margin-top">
           <ion-icon :icon="pencil" slot="start" />
@@ -142,6 +186,60 @@
           Retour aux services
         </ion-button>
       </div>
+
+      <!-- Guest Management Modal -->
+      <ion-modal :is-open="showGuestModal" @didDismiss="showGuestModal = false">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>Gérer les invités</ion-title>
+            <ion-buttons slot="end">
+              <ion-button @click="showGuestModal = false">
+                <ion-icon :icon="closeOutline" />
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+          <ion-toolbar>
+            <ion-searchbar
+              v-model="guestSearchQuery"
+              placeholder="Rechercher un membre..."
+              :debounce="300"
+            ></ion-searchbar>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content>
+          <div v-if="loadingAllMembers" class="modal-loading">
+            <ion-spinner name="crescent" />
+            <p>Chargement des membres...</p>
+          </div>
+
+          <ion-list v-else>
+            <ion-item
+              v-for="member in filteredMembers"
+              :key="member.id"
+              :button="true"
+              @click="toggleGuestMember(member)"
+              :disabled="savingGuests"
+            >
+              <ion-avatar slot="start">
+                <img v-if="member.avatar" :src="member.avatar" :alt="member.fullName" />
+                <div v-else class="avatar-initials">{{ getInitials(member.fullName) }}</div>
+              </ion-avatar>
+              <ion-label>
+                <h3>{{ member.fullName }}</h3>
+                <p>{{ member.email }}</p>
+              </ion-label>
+              <ion-chip v-if="isGuestMember(member.id)" color="success" slot="end">
+                <ion-icon :icon="checkmarkCircle" />
+                <ion-label>Invité</ion-label>
+              </ion-chip>
+            </ion-item>
+          </ion-list>
+
+          <div v-if="!loadingAllMembers && filteredMembers.length === 0" class="no-results">
+            <p>Aucun membre trouvé</p>
+          </div>
+        </ion-content>
+      </ion-modal>
     </ion-content>
   </ion-page>
 </template>
@@ -152,21 +250,25 @@ import { useRoute, useRouter } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonBackButton,
   IonButton, IonIcon, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle,
-  IonCardContent, IonList, IonItem, IonLabel, IonChip, IonLoading, alertController, toastController
+  IonCardContent, IonList, IonItem, IonLabel, IonChip, IonLoading, IonModal,
+  IonSearchbar, IonAvatar, IonSpinner, alertController, toastController
 } from '@ionic/vue';
 import {
   pencil, calendarOutline, timeOutline, informationCircleOutline, createOutline,
   syncOutline, checkmarkCircle, trashOutline, alertCircleOutline, timerOutline,
   peopleOutline, chevronForwardOutline, documentTextOutline, eyeOutline,
-  eyeOffOutline, lockClosedOutline
+  eyeOffOutline, lockClosedOutline, personAddOutline, closeOutline, addOutline,
+  removeCircleOutline
 } from 'ionicons/icons';
 import { Service, ServiceCategory } from '@/types/service';
 import { serviceService } from '@/services/serviceService';
 import { assignmentsService } from '@/firebase/assignments';
+import { membersService } from '@/firebase/members';
 import { timezoneUtils } from '@/utils/timezone';
 import { getProgramByServiceId } from '@/firebase/programs';
 import { useUser } from '@/composables/useUser';
 import type { ServiceProgram } from '@/types/program';
+import type { Member } from '@/types/member';
 
 const route = useRoute();
 const router = useRouter();
@@ -178,6 +280,15 @@ const memberCount = ref(0);
 const loadingMembers = ref(false);
 const program = ref<ServiceProgram | null>(null);
 const loadingProgram = ref(false);
+
+// Guest management
+const showGuestModal = ref(false);
+const guestMembers = ref<Member[]>([]);
+const loadingGuests = ref(false);
+const allMembers = ref<Member[]>([]);
+const loadingAllMembers = ref(false);
+const guestSearchQuery = ref('');
+const savingGuests = ref(false);
 
 const loadService = async () => {
   const id = route.params.id as string;
@@ -350,8 +461,138 @@ const togglePublishStatus = async () => {
   }
 };
 
-onMounted(() => {
-  loadService();
+// Guest management functions
+const loadGuestMembers = async () => {
+  if (!service.value?.guestMemberIds?.length) {
+    guestMembers.value = [];
+    return;
+  }
+
+  loadingGuests.value = true;
+  try {
+    const members = await Promise.all(
+      service.value.guestMemberIds.map(id => membersService.getMemberById(id))
+    );
+    guestMembers.value = members.filter((m): m is Member => m !== null);
+  } catch (error) {
+    console.error('Error loading guest members:', error);
+    guestMembers.value = [];
+  } finally {
+    loadingGuests.value = false;
+  }
+};
+
+const openGuestModal = async () => {
+  showGuestModal.value = true;
+  guestSearchQuery.value = '';
+
+  // Load all members for selection if not already loaded
+  if (allMembers.value.length === 0) {
+    loadingAllMembers.value = true;
+    try {
+      allMembers.value = await membersService.getAllMembers();
+    } catch (error) {
+      console.error('Error loading all members:', error);
+    } finally {
+      loadingAllMembers.value = false;
+    }
+  }
+};
+
+const filteredMembers = computed(() => {
+  if (!guestSearchQuery.value.trim()) {
+    return allMembers.value;
+  }
+
+  const query = guestSearchQuery.value.toLowerCase();
+  return allMembers.value.filter(member =>
+    member.fullName.toLowerCase().includes(query) ||
+    member.email.toLowerCase().includes(query)
+  );
+});
+
+const isGuestMember = (memberId: string) => {
+  return service.value?.guestMemberIds?.includes(memberId) || false;
+};
+
+const toggleGuestMember = async (member: Member) => {
+  if (!service.value) return;
+
+  const currentGuests = service.value.guestMemberIds || [];
+  let newGuests: string[];
+
+  if (currentGuests.includes(member.id)) {
+    newGuests = currentGuests.filter(id => id !== member.id);
+  } else {
+    newGuests = [...currentGuests, member.id];
+  }
+
+  savingGuests.value = true;
+  try {
+    const updatedService = await serviceService.updateService({
+      ...service.value,
+      guestMemberIds: newGuests
+    });
+
+    if (updatedService) {
+      service.value = updatedService;
+      await loadGuestMembers();
+    }
+
+    const toast = await toastController.create({
+      message: currentGuests.includes(member.id)
+        ? `${member.fullName} retiré des invités`
+        : `${member.fullName} ajouté comme invité`,
+      duration: 2000,
+      color: 'success'
+    });
+    await toast.present();
+  } catch (error) {
+    console.error('Error updating guests:', error);
+    const toast = await toastController.create({
+      message: 'Erreur lors de la mise à jour des invités',
+      duration: 3000,
+      color: 'danger'
+    });
+    await toast.present();
+  } finally {
+    savingGuests.value = false;
+  }
+};
+
+const removeGuest = async (member: Member) => {
+  const alert = await alertController.create({
+    header: 'Retirer l\'invité',
+    message: `Voulez-vous retirer ${member.fullName} des invités de ce service ?`,
+    buttons: [
+      {
+        text: 'Annuler',
+        role: 'cancel'
+      },
+      {
+        text: 'Retirer',
+        role: 'destructive',
+        handler: () => {
+          toggleGuestMember(member);
+        }
+      }
+    ]
+  });
+  await alert.present();
+};
+
+const getInitials = (name: string): string => {
+  const names = name.split(' ').filter(n => n.length > 0);
+  if (names.length === 0) return '?';
+  if (names.length === 1) return names[0].charAt(0).toUpperCase();
+  return names[0].charAt(0).toUpperCase() + names[names.length - 1].charAt(0).toUpperCase();
+};
+
+const guestCount = computed(() => service.value?.guestMemberIds?.length || 0);
+
+onMounted(async () => {
+  await loadService();
+  await loadGuestMembers();
 });
 </script>
 
@@ -370,5 +611,117 @@ onMounted(() => {
 .disabled-text {
   color: var(--ion-color-medium);
   font-style: italic;
+}
+
+/* Guests Section Styles */
+.guests-card {
+  margin-top: 16px;
+}
+
+.guests-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.guests-title ion-icon {
+  font-size: 1.25rem;
+  color: var(--ion-color-primary);
+}
+
+.loading-guests {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
+  color: var(--ion-color-medium);
+}
+
+.guests-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.guest-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  background: var(--ion-color-light);
+  border-radius: 8px;
+}
+
+.guest-item ion-avatar {
+  width: 40px;
+  height: 40px;
+}
+
+.avatar-initials {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ion-color-primary);
+  color: white;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border-radius: 50%;
+}
+
+.guest-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.guest-name {
+  font-weight: 600;
+  color: var(--ion-color-dark);
+}
+
+.guest-email {
+  font-size: 0.85rem;
+  color: var(--ion-color-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.no-guests {
+  text-align: center;
+  padding: 16px;
+  color: var(--ion-color-medium);
+}
+
+.no-guests p {
+  margin: 0;
+}
+
+.add-guest-btn {
+  margin-top: 8px;
+}
+
+/* Modal Styles */
+.modal-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 16px;
+  color: var(--ion-color-medium);
+}
+
+.modal-loading p {
+  margin-top: 16px;
+}
+
+.no-results {
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--ion-color-medium);
 }
 </style>

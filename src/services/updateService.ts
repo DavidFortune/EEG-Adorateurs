@@ -241,6 +241,23 @@ class UpdateService {
   async getReleaseNotes(): Promise<ReleaseNote[]> {
     return [
       {
+        version: '1.10.4',
+        date: '2025-01-22',
+        title: 'Invités spéciaux pour les services',
+        description: 'Possibilité d\'inviter des utilisateurs spécifiques à un service sans qu\'ils fassent partie d\'une équipe requise',
+        features: [
+          'Nouvelle section "Invités spéciaux" dans la page de détail d\'un service (admin seulement)',
+          'Modal de recherche et sélection de membres à inviter',
+          'Les utilisateurs invités voient le service dans leur liste et accueil',
+          'Accès complet au programme du service pour les invités'
+        ],
+        fixes: [],
+        improvements: [
+          'Filtrage des services mis à jour pour inclure les invités',
+          'Interface intuitive pour gérer les invités avec recherche'
+        ]
+      },
+      {
         version: '1.10.3',
         date: '2025-01-22',
         title: 'Recherche YouTube dans les ressources',

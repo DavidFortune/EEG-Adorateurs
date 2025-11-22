@@ -405,6 +405,10 @@ const loadUpcomingServices = async () => {
         // Filter by date
         if (service.parsedDateTime.getTime() <= nowTime) return false;
 
+        // Check if user is a guest for this service
+        const isGuest = service.guestMemberIds?.includes(member.value?.id || '');
+        if (isGuest) return true;
+
         // Filter by user membership in needed teams
         if (service.teamRequirements && service.teamRequirements.length > 0) {
           const activeTeamNames = service.teamRequirements

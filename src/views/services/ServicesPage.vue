@@ -197,8 +197,12 @@ const filteredServices = computed(() => {
       filtered = validServices;
   }
 
-  // Filter by user membership in needed teams
+  // Filter by user membership in needed teams or guest access
   filtered = filtered.filter(service => {
+    // Check if user is a guest for this service
+    const isGuest = service.guestMemberIds?.includes(member.value?.id || '');
+    if (isGuest) return true;
+
     // If service has team requirements, check user membership
     if (service.teamRequirements && service.teamRequirements.length > 0) {
       const activeTeamNames = service.teamRequirements
