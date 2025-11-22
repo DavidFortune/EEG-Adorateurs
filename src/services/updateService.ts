@@ -241,6 +241,23 @@ class UpdateService {
   async getReleaseNotes(): Promise<ReleaseNote[]> {
     return [
       {
+        version: '1.10.3',
+        date: '2025-01-22',
+        title: 'Recherche YouTube dans les ressources',
+        description: 'Ajout de la possibilité de rechercher des vidéos YouTube directement lors de l\'ajout de médias dans ResourceFormPage',
+        features: [
+          'Nouveau bouton "Rechercher sur YouTube" dans le formulaire de ressources',
+          'Interface de recherche YouTube intégrée avec résultats en miniatures',
+          'Prévisualisation des vidéos avant sélection',
+          'Modal de prévisualisation avec lecteur YouTube intégré'
+        ],
+        fixes: [],
+        improvements: [
+          'Intégration de la recherche YouTube similaire à ServiceProgramPageFlat',
+          'Sélection rapide de vidéos YouTube pour les ressources'
+        ]
+      },
+      {
         version: '1.8.4',
         date: '2025-01-08',
         title: 'Mise à jour des pages d\'équipes',
