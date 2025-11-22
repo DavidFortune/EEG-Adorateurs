@@ -31,7 +31,20 @@ service firebase.storage {
       allow read: if request.auth != null;
       allow update, delete: if request.auth != null;
     }
-    
+
+    // Avatars directory - allow authenticated users to upload and read profile pictures
+    match /avatars/{userId}/{allPaths=**} {
+      // Users can only upload to their own avatar folder
+      allow create: if request.auth != null &&
+        request.auth.uid == userId &&
+        request.resource.size <= 5 * 1024 * 1024 && // Max 5MB for avatars
+        request.resource.contentType.matches('image/.*');
+      // Anyone authenticated can read avatars
+      allow read: if request.auth != null;
+      // Users can only update/delete their own avatar
+      allow update, delete: if request.auth != null && request.auth.uid == userId;
+    }
+
     // Deny all other access by default
     match /{allPaths=**} {
       allow read, write: if false;

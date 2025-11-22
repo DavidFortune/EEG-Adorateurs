@@ -29,7 +29,7 @@
         </div>
         
         <!-- Teams List -->
-        <div v-else-if="teamAssignments.length > 0" class="teams-container">
+        <div v-else-if="teamAssignments.length > 0 || guestMembers.length > 0" class="teams-container">
           <div class="summary-card">
             <ion-card>
               <ion-card-content>
@@ -38,7 +38,7 @@
                     <ion-icon :icon="peopleOutline" class="stat-icon" />
                     <div class="stat-details">
                       <span class="stat-value">{{ totalMembers }}</span>
-                      <span class="stat-label">Membres assignés</span>
+                      <span class="stat-label">Total participants</span>
                     </div>
                   </div>
                   <div class="stat-item">
@@ -46,6 +46,13 @@
                     <div class="stat-details">
                       <span class="stat-value">{{ teamAssignments.length }}</span>
                       <span class="stat-label">Équipes</span>
+                    </div>
+                  </div>
+                  <div v-if="totalGuests > 0" class="stat-item">
+                    <ion-icon :icon="personAddOutline" class="stat-icon guest-stat-icon" />
+                    <div class="stat-details">
+                      <span class="stat-value">{{ totalGuests }}</span>
+                      <span class="stat-label">Invités</span>
                     </div>
                   </div>
                 </div>
@@ -101,8 +108,47 @@
               </ion-card-content>
             </ion-card>
           </div>
+
+          <!-- Guests Section -->
+          <div v-if="guestMembers.length > 0" class="guests-section">
+            <ion-card class="guests-card">
+              <ion-card-header>
+                <div class="team-header">
+                  <div class="team-info">
+                    <ion-card-title class="team-title">
+                      <ion-icon :icon="personAddOutline" class="guest-icon" />
+                      Invités
+                    </ion-card-title>
+                    <ion-card-subtitle>
+                      {{ guestMembers.length }} invité{{ guestMembers.length > 1 ? 's' : '' }}
+                    </ion-card-subtitle>
+                  </div>
+                  <ion-chip color="tertiary" size="small">
+                    Accès spécial
+                  </ion-chip>
+                </div>
+              </ion-card-header>
+
+              <ion-card-content>
+                <ion-list class="members-list">
+                  <ion-item v-for="guest in guestMembers" :key="guest.id" lines="none" class="member-item">
+                    <ion-avatar slot="start">
+                      <img v-if="guest.avatar" :src="guest.avatar" :alt="guest.fullName" />
+                      <div v-else class="avatar-initials">
+                        {{ getInitials(guest.fullName) }}
+                      </div>
+                    </ion-avatar>
+                    <ion-label>
+                      <h3 class="member-name">{{ guest.fullName }}</h3>
+                      <p class="guest-info">Invité avec accès spécial</p>
+                    </ion-label>
+                  </ion-item>
+                </ion-list>
+              </ion-card-content>
+            </ion-card>
+          </div>
         </div>
-        
+
         <!-- Empty State -->
         <div v-else class="empty-state">
           <ion-icon :icon="peopleOutline" size="large" color="medium"></ion-icon>
@@ -133,7 +179,7 @@ import {
   IonSpinner, IonButton
 } from '@ionic/vue';
 import {
-  peopleOutline, calendarOutline, alertCircleOutline, peopleCircleOutline
+  peopleOutline, calendarOutline, alertCircleOutline, peopleCircleOutline, personAddOutline
 } from 'ionicons/icons';
 import { assignmentsService } from '@/firebase/assignments';
 import { serviceService } from '@/services/serviceService';
@@ -161,12 +207,16 @@ const loading = ref(true);
 const loadingAssignments = ref(true);
 const service = ref<Service | null>(null);
 const teamAssignments = ref<TeamAssignmentGroup[]>([]);
+const guestMembers = ref<Member[]>([]);
 
 const serviceId = computed(() => route.params.id as string);
 
 const totalMembers = computed(() => {
-  return teamAssignments.value.reduce((total, team) => total + team.members.length, 0);
+  const teamMembersCount = teamAssignments.value.reduce((total, team) => total + team.members.length, 0);
+  return teamMembersCount + guestMembers.value.length;
 });
+
+const totalGuests = computed(() => guestMembers.value.length);
 
 const formatDateTime = (dateStr: string, timeStr: string) => {
   return timezoneUtils.formatDateTimeForDisplay(dateStr, timeStr);
@@ -297,13 +347,41 @@ const loadAssignments = async () => {
   }
 };
 
+const loadGuestMembers = async () => {
+  if (!service.value?.guestMemberIds || service.value.guestMemberIds.length === 0) {
+    guestMembers.value = [];
+    return;
+  }
+
+  try {
+    const guests: Member[] = [];
+    for (const memberId of service.value.guestMemberIds) {
+      try {
+        const member = await membersService.getMemberById(memberId);
+        if (member) {
+          guests.push(member);
+        }
+      } catch (error) {
+        console.error(`Error loading guest member ${memberId}:`, error);
+      }
+    }
+    guestMembers.value = guests.sort((a, b) => a.fullName.localeCompare(b.fullName));
+  } catch (error) {
+    console.error('Error loading guest members:', error);
+    guestMembers.value = [];
+  }
+};
+
 const goToScheduling = () => {
   router.push(`/scheduling?serviceId=${serviceId.value}`);
 };
 
 onMounted(async () => {
   await loadService();
-  await loadAssignments();
+  await Promise.all([
+    loadAssignments(),
+    loadGuestMembers()
+  ]);
 });
 </script>
 
@@ -507,6 +585,33 @@ onMounted(async () => {
 .warning-icon {
   font-size: 1.25rem;
   color: #daa520;
+}
+
+/* Guests Section */
+.guests-section {
+  margin-top: 16px;
+}
+
+.guests-card {
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-left: 4px solid var(--ion-color-tertiary);
+}
+
+.guest-icon {
+  font-size: 1.25rem;
+  color: var(--ion-color-tertiary);
+}
+
+.guest-stat-icon {
+  color: var(--ion-color-tertiary);
+}
+
+.guest-info {
+  font-size: 0.85rem;
+  color: var(--ion-color-tertiary);
+  margin: 0;
+  font-style: italic;
 }
 
 /* Empty State */

@@ -241,6 +241,25 @@ class UpdateService {
   async getReleaseNotes(): Promise<ReleaseNote[]> {
     return [
       {
+        version: '1.10.5',
+        date: '2025-01-22',
+        title: 'Avatar personnalisé et affichage des invités',
+        description: 'Les utilisateurs peuvent maintenant ajouter leur propre avatar et les invités sont visibles dans les participants des services',
+        features: [
+          'Téléversement d\'avatar personnalisé depuis la page Mon compte',
+          'Prévisualisation et modification de l\'avatar avec interface intuitive',
+          'Annonce de la fonctionnalité avatar sur la page d\'accueil (masquable)',
+          'Nouvelle section "Invités" dans la page des membres assignés d\'un service',
+          'Statistiques mises à jour incluant le nombre d\'invités'
+        ],
+        fixes: [],
+        improvements: [
+          'Les avatars personnalisés sont prioritaires sur les photos Google',
+          'Règles Firebase Storage pour les avatars (5MB max, images uniquement)',
+          'Design distinctif pour la carte des invités dans les participants'
+        ]
+      },
+      {
         version: '1.10.4',
         date: '2025-01-22',
         title: 'Invités spéciaux pour les services',

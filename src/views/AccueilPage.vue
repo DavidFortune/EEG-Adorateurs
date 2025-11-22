@@ -71,7 +71,7 @@
               <div class="prompt-text">
                 <h3 class="prompt-title">Restez connecté!</h3>
                 <p class="prompt-description">
-                  Recevez les mises à jour et activités de l’église directement sur votre cellulaire.
+                  Recevez les mises à jour et activités de l'église directement sur votre cellulaire.
                 </p>
               </div>
               <ion-button
@@ -82,6 +82,39 @@
               >
                 <ion-icon :icon="addOutline" slot="start"></ion-icon>
                 Ajouter mon mobile
+              </ion-button>
+            </div>
+          </ion-card-content>
+        </ion-card>
+
+        <!-- New Feature Announcement: Avatar Upload -->
+        <ion-card v-if="showAvatarAnnouncement" class="feature-announcement-card">
+          <ion-card-content>
+            <button class="dismiss-button" @click="dismissAvatarAnnouncement">
+              <ion-icon :icon="closeOutline"></ion-icon>
+            </button>
+            <div class="announcement-content">
+              <div class="announcement-badge">
+                <ion-icon :icon="sparklesOutline"></ion-icon>
+                <span>Nouveau</span>
+              </div>
+              <div class="announcement-icon">
+                <ion-icon :icon="cameraOutline" color="primary"></ion-icon>
+              </div>
+              <div class="announcement-text">
+                <h3 class="announcement-title">Personnalisez votre profil!</h3>
+                <p class="announcement-description">
+                  Vous pouvez maintenant ajouter votre propre photo de profil. Cliquez sur votre avatar dans "Mon compte" pour télécharger une image.
+                </p>
+              </div>
+              <ion-button
+                @click="goToMyAccount"
+                fill="solid"
+                color="primary"
+                class="announcement-button"
+              >
+                <ion-icon :icon="cameraOutline" slot="start"></ion-icon>
+                Ajouter ma photo
               </ion-button>
             </div>
           </ion-card-content>
@@ -261,7 +294,7 @@ import {
 import {
   bookOutline, peopleOutline, checkmarkCircle, calendarOutline,
   helpOutline, arrowForwardOutline, homeOutline, phonePortraitOutline,
-  addOutline, handRightOutline
+  addOutline, handRightOutline, cameraOutline, sparklesOutline, closeOutline
 } from 'ionicons/icons';
 import { useUser } from '@/composables/useUser';
 import { serviceService } from '@/services/serviceService';
@@ -281,6 +314,27 @@ const isUserMenuOpen = ref(false);
 const upcomingServices = ref<Service[]>([]);
 const userAssignments = ref<ServiceAssignment[]>([]);
 const showPhoneModal = ref(false);
+
+// Avatar announcement - show only if user hasn't dismissed it and doesn't have a custom avatar
+const AVATAR_ANNOUNCEMENT_KEY = 'avatar_announcement_dismissed';
+const showAvatarAnnouncement = computed(() => {
+  // Don't show if user already has a custom avatar (not from Google)
+  if (member.value?.avatar && !member.value.avatar.includes('googleusercontent.com')) {
+    return false;
+  }
+  // Check if user has dismissed the announcement
+  const dismissed = localStorage.getItem(AVATAR_ANNOUNCEMENT_KEY);
+  return !dismissed;
+});
+
+const dismissAvatarAnnouncement = () => {
+  localStorage.setItem(AVATAR_ANNOUNCEMENT_KEY, 'true');
+};
+
+const goToMyAccount = () => {
+  dismissAvatarAnnouncement();
+  router.push('/my-account');
+};
 
 const memberFirstName = computed(() => {
   return member.value?.firstName || 'Ami(e)';
@@ -644,6 +698,104 @@ onMounted(() => {
 }
 
 .encouragement-button {
+  --border-radius: 8px;
+  --padding-start: 20px;
+  --padding-end: 20px;
+  --height: 44px;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+/* Feature Announcement Card */
+.feature-announcement-card {
+  margin-bottom: 1.5rem;
+  background: linear-gradient(135deg, #FDF4FF 0%, #FAE8FF 100%);
+  border: 1px solid #A855F7;
+  position: relative;
+  overflow: visible;
+}
+
+.dismiss-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9333EA;
+  transition: background-color 0.2s;
+}
+
+.dismiss-button:hover {
+  background: rgba(147, 51, 234, 0.1);
+}
+
+.dismiss-button ion-icon {
+  font-size: 1.25rem;
+}
+
+.announcement-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.75rem;
+  padding-top: 0.5rem;
+}
+
+.announcement-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, #9333EA 0%, #A855F7 100%);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.announcement-badge ion-icon {
+  font-size: 0.875rem;
+}
+
+.announcement-icon {
+  flex-shrink: 0;
+}
+
+.announcement-icon ion-icon {
+  font-size: 2.5rem;
+  color: #9333EA;
+}
+
+.announcement-text {
+  flex: 1;
+}
+
+.announcement-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #7E22CE;
+  margin: 0 0 0.5rem 0;
+}
+
+.announcement-description {
+  font-size: 0.9rem;
+  color: #6B21A8;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.announcement-button {
+  --background: #9333EA;
+  --background-hover: #7E22CE;
   --border-radius: 8px;
   --padding-start: 20px;
   --padding-end: 20px;

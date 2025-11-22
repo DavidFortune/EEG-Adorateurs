@@ -12,6 +12,10 @@ export function useUser() {
   const memberTeams = ref<Team[]>([])
 
   const userAvatar = computed(() => {
+    // Prioritize member avatar (custom uploaded) over Firebase Auth photoURL
+    if (member.value?.avatar) {
+      return member.value.avatar
+    }
     if (user.value?.photoURL) {
       return user.value.photoURL
     }

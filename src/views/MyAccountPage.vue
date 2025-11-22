@@ -22,13 +22,27 @@
           <!-- Profile Section -->
           <div class="profile-section">
             <div class="avatar-container">
-              <div class="avatar">
-                <img v-if="member?.avatar" :src="member.avatar" :alt="member.fullName" />
-                <div v-else class="initials-avatar">
-                  <span class="initials">{{ initials }}</span>
+              <div class="avatar-wrapper" @click="triggerAvatarUpload">
+                <div class="avatar">
+                  <img v-if="member?.avatar" :src="member.avatar" :alt="member.fullName" />
+                  <div v-else class="initials-avatar">
+                    <span class="initials">{{ initials }}</span>
+                  </div>
+                </div>
+                <div class="avatar-overlay" :class="{ uploading: uploadingAvatar }">
+                  <ion-spinner v-if="uploadingAvatar" name="crescent" color="light"></ion-spinner>
+                  <ion-icon v-else :icon="cameraOutline" color="light"></ion-icon>
                 </div>
               </div>
+              <input
+                ref="avatarInput"
+                type="file"
+                accept="image/*"
+                @change="handleAvatarSelect"
+                style="display: none;"
+              />
             </div>
+            <p class="avatar-hint">Cliquez pour modifier la photo</p>
             <h2>{{ member?.fullName || 'Utilisateur' }}</h2>
             <p class="email">{{ member?.email }}</p>
           </div>
@@ -126,12 +140,14 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonBackButton,
-  IonItem, IonLabel, IonInput, IonNote, IonCheckbox, IonButton, IonSpinner,
+  IonItem, IonLabel, IonInput, IonNote, IonCheckbox, IonButton, IonSpinner, IonIcon,
   toastController, alertController
 } from '@ionic/vue';
+import { cameraOutline } from 'ionicons/icons';
 import { authService } from '@/firebase/auth';
 import { membersService } from '@/firebase/members';
 import { ministriesService } from '@/firebase/ministries';
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import type { Member, Ministry } from '@/types/member';
 
 const router = useRouter();
@@ -141,6 +157,8 @@ const loading = ref(true);
 const saving = ref(false);
 const member = ref<Member | null>(null);
 const availableMinistries = ref<Ministry[]>([]);
+const uploadingAvatar = ref(false);
+const avatarInput = ref<HTMLInputElement | null>(null);
 
 // Form Data
 const formData = ref({
@@ -267,6 +285,106 @@ const toggleMinistry = (ministryName: string) => {
     selectedMinistries.value.splice(index, 1);
   } else {
     selectedMinistries.value.push(ministryName);
+  }
+};
+
+// Avatar upload functions
+const triggerAvatarUpload = () => {
+  if (uploadingAvatar.value) return;
+  avatarInput.value?.click();
+};
+
+const handleAvatarSelect = async (event: Event) => {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+
+  if (!file) return;
+
+  // Validate file type
+  if (!file.type.startsWith('image/')) {
+    await showToast('Veuillez sélectionner une image', 'danger');
+    return;
+  }
+
+  // Validate file size (max 5MB)
+  if (file.size > 5 * 1024 * 1024) {
+    await showToast('L\'image ne doit pas dépasser 5 Mo', 'danger');
+    return;
+  }
+
+  await uploadAvatar(file);
+
+  // Reset input
+  input.value = '';
+};
+
+const uploadAvatar = async (file: File) => {
+  const user = authService.getCurrentUser();
+  if (!user || !member.value) {
+    await showToast('Vous devez être connecté pour modifier votre avatar', 'danger');
+    return;
+  }
+
+  uploadingAvatar.value = true;
+
+  try {
+    const storage = getStorage();
+
+    // Delete old avatar if exists and is from our storage
+    if (member.value.avatar && member.value.avatar.includes('firebasestorage.googleapis.com')) {
+      try {
+        // Extract path from URL and delete
+        const oldAvatarUrl = new URL(member.value.avatar);
+        const pathMatch = oldAvatarUrl.pathname.match(/\/o\/(.+)\?/);
+        if (pathMatch) {
+          const oldPath = decodeURIComponent(pathMatch[1]);
+          const oldRef = storageRef(storage, oldPath);
+          await deleteObject(oldRef).catch(() => {
+            // Ignore errors when deleting old avatar
+          });
+        }
+      } catch {
+        // Ignore errors when parsing/deleting old avatar
+      }
+    }
+
+    // Create unique filename with timestamp
+    const timestamp = Date.now();
+    const extension = file.name.split('.').pop() || 'jpg';
+    const filename = `avatars/${user.uid}/${timestamp}.${extension}`;
+    const fileRef = storageRef(storage, filename);
+
+    // Add metadata
+    const metadata = {
+      contentType: file.type,
+      customMetadata: {
+        uploadedBy: user.uid,
+        originalName: file.name,
+        uploadDate: new Date().toISOString()
+      }
+    };
+
+    // Upload file
+    const snapshot = await uploadBytes(fileRef, file, metadata);
+    const downloadURL = await getDownloadURL(snapshot.ref);
+
+    // Update member with new avatar URL
+    await membersService.updateMember(member.value.id, {
+      avatar: downloadURL
+    });
+
+    // Update local member data
+    member.value = {
+      ...member.value,
+      avatar: downloadURL
+    };
+
+    await showToast('Photo de profil mise à jour !');
+  } catch (error) {
+    console.error('Error uploading avatar:', error);
+    await showToast('Erreur lors du téléchargement de l\'image', 'danger');
+  } finally {
+    uploadingAvatar.value = false;
   }
 };
 
@@ -441,14 +559,23 @@ onMounted(() => {
 }
 
 .avatar-container {
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.avatar-wrapper {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  margin: 0 auto;
+  cursor: pointer;
+  border-radius: 50%;
+  overflow: hidden;
 }
 
 .avatar {
-  width: 80px;
-  height: 80px;
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
-  margin: 0 auto;
   overflow: hidden;
   background: #f3f4f6;
   display: flex;
@@ -462,6 +589,41 @@ onMounted(() => {
   object-fit: cover;
 }
 
+.avatar-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  border-radius: 50%;
+}
+
+.avatar-wrapper:hover .avatar-overlay,
+.avatar-overlay.uploading {
+  opacity: 1;
+}
+
+.avatar-overlay ion-icon {
+  font-size: 2rem;
+}
+
+.avatar-overlay ion-spinner {
+  width: 2rem;
+  height: 2rem;
+}
+
+.avatar-hint {
+  font-size: 0.75rem;
+  color: #9CA3AF;
+  margin: 0.5rem 0 1rem 0;
+}
+
 .initials-avatar {
   background: #b5121b;
   color: white;
@@ -473,7 +635,7 @@ onMounted(() => {
 }
 
 .initials {
-  font-size: 2rem;
+  font-size: 2.5rem;
   font-weight: 600;
 }
 
