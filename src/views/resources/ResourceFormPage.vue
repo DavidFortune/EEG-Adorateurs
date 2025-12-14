@@ -22,57 +22,123 @@
         <ion-list>
           <ion-item>
             <ion-label position="stacked">Titre *</ion-label>
-            <ion-input 
-              v-model="form.title" 
+            <ion-input
+              v-model="form.title"
               placeholder="Titre de la ressource"
               required
             ></ion-input>
           </ion-item>
-          
+
           <ion-item>
-            <ion-label position="stacked">Description</ion-label>
-            <ion-textarea 
-              v-model="form.description" 
-              placeholder="Description de la ressource"
-              :rows="3"
-            ></ion-textarea>
+            <ion-label position="stacked">Référence</ion-label>
+            <ion-input
+              v-model="form.reference"
+              placeholder="Ex: Psaume 23, #145, etc."
+            ></ion-input>
           </ion-item>
-          
+
           <ion-item>
-            <ion-label position="stacked">
-              Collections de ressources
-              <ion-button 
-                v-if="isAdmin" 
-                @click="showCreateCollectionModal = true" 
-                size="small" 
-                fill="clear" 
-                color="primary"
-                class="create-collection-btn"
-              >
-                <ion-icon :icon="addOutline" slot="start" />
-                Créer une collection
-              </ion-button>
-            </ion-label>
-            <ion-button 
-              @click="showCollectionSelector = true" 
-              fill="outline" 
+            <ion-label position="stacked">Collection</ion-label>
+            <ion-button
+              @click="showCollectionSelector = true"
+              fill="outline"
               expand="block"
               class="collection-selector-btn"
             >
               <ion-icon :icon="folderOutline" slot="start" />
-              <span v-if="form.collectionIds.length === 0">Sélectionner les collections</span>
-              <span v-else-if="form.collectionIds.length === 1">{{ getCollectionName(form.collectionIds[0]) }}</span>
-              <span v-else>{{ form.collectionIds.length }} collections sélectionnées</span>
+              <span v-if="!form.collectionId">Sélectionner une collection</span>
+              <span v-else>{{ getCollectionName(form.collectionId) }}</span>
             </ion-button>
           </ion-item>
-          
+
+          <!-- Music Properties -->
+          <div class="music-properties-form">
+            <ion-item>
+              <ion-select
+                v-model="form.musicKey"
+                label="Tonalité"
+                label-placement="stacked"
+                interface="action-sheet"
+                placeholder="Sélectionner..."
+              >
+                <ion-select-option value="">Aucune</ion-select-option>
+                <ion-select-option v-for="option in musicKeys" :key="option.id" :value="option.id">
+                  {{ option.name }}
+                </ion-select-option>
+              </ion-select>
+            </ion-item>
+
+            <ion-item>
+              <ion-select
+                v-model="form.musicBeat"
+                label="Signature"
+                label-placement="stacked"
+                interface="action-sheet"
+                placeholder="Sélectionner..."
+              >
+                <ion-select-option value="">Aucune</ion-select-option>
+                <ion-select-option v-for="option in musicBeats" :key="option.id" :value="option.id">
+                  {{ option.name }}
+                </ion-select-option>
+              </ion-select>
+            </ion-item>
+
+            <ion-item>
+              <ion-select
+                v-model="form.musicTempo"
+                label="Tempo"
+                label-placement="stacked"
+                interface="action-sheet"
+                placeholder="Sélectionner..."
+              >
+                <ion-select-option value="">Aucun</ion-select-option>
+                <ion-select-option v-for="option in musicTempos" :key="option.id" :value="option.id">
+                  {{ option.name }} <span v-if="option.label">({{ option.label }})</span>
+                </ion-select-option>
+              </ion-select>
+            </ion-item>
+
+            <ion-item>
+              <ion-select
+                v-model="form.musicStyle"
+                label="Style"
+                label-placement="stacked"
+                interface="action-sheet"
+                placeholder="Sélectionner..."
+              >
+                <ion-select-option value="">Aucun</ion-select-option>
+                <ion-select-option v-for="option in musicStyles" :key="option.id" :value="option.id">
+                  {{ option.name }}
+                </ion-select-option>
+              </ion-select>
+            </ion-item>
+          </div>
+
+          <!-- Tags - Hidden for now, will be re-enabled later
           <ion-item>
-            <ion-label position="stacked">Tags (séparés par des virgules)</ion-label>
-            <ion-input 
-              v-model="tagsInput" 
-              placeholder="ex: louange, adoration, communion"
-            ></ion-input>
+            <ion-label position="stacked">Tags</ion-label>
+            <div class="tags-input-container">
+              <div class="tags-chips">
+                <ion-chip
+                  v-for="(tag, index) in form.tags"
+                  :key="index"
+                  color="primary"
+                  outline
+                >
+                  <ion-label>{{ tag }}</ion-label>
+                  <ion-icon :icon="closeCircleOutline" @click="removeTag(index)" />
+                </ion-chip>
+              </div>
+              <ion-input
+                v-model="newTagInput"
+                placeholder="Ajouter un tag..."
+                @keydown.enter.prevent="addTag"
+                @keydown.tab.prevent="addTag"
+                @keydown.,="addTag"
+              ></ion-input>
+            </div>
           </ion-item>
+          -->
         </ion-list>
         
         <!-- Content Items -->
@@ -591,20 +657,45 @@
       <ion-modal :is-open="showCollectionSelector" @didDismiss="showCollectionSelector = false">
         <ion-header>
           <ion-toolbar>
-            <ion-title>Sélectionner les collections</ion-title>
+            <ion-title>Sélectionner une collection</ion-title>
             <ion-buttons slot="end">
               <ion-button @click="showCollectionSelector = false">Fermer</ion-button>
             </ion-buttons>
           </ion-toolbar>
         </ion-header>
         <ion-content class="ion-padding">
+          <ion-button
+            v-if="isAdmin"
+            @click="openCreateCollectionModal"
+            expand="block"
+            fill="outline"
+            class="create-collection-btn"
+          >
+            <ion-icon :icon="addOutline" slot="start" />
+            Créer une collection
+          </ion-button>
+
           <ion-list>
-            <ion-item v-for="collection in collections" :key="collection.id">
-              <ion-checkbox
-                :checked="form.collectionIds.includes(collection.id)"
-                @ionChange="toggleCollection(collection.id)"
-              ></ion-checkbox>
-              <ion-label class="ion-margin-start">
+            <ion-item
+              v-for="collection in collections"
+              :key="collection.id"
+              button
+              @click="selectCollection(collection.id)"
+              :class="{ 'selected-collection': form.collectionId === collection.id }"
+            >
+              <ion-icon
+                v-if="form.collectionId === collection.id"
+                :icon="checkmarkCircle"
+                slot="start"
+                color="primary"
+              />
+              <ion-icon
+                v-else
+                :icon="ellipseOutline"
+                slot="start"
+                color="medium"
+              />
+              <ion-label>
                 <h3>{{ collection.name }}</h3>
                 <p v-if="collection.description">{{ collection.description }}</p>
               </ion-label>
@@ -613,12 +704,18 @@
               </div>
             </ion-item>
           </ion-list>
-          
-          <div v-if="collections.length === 0" class="empty-state ion-text-center">
+
+          <div v-if="collections.length === 0 && !isAdmin" class="empty-state ion-text-center">
+            <ion-icon :icon="folderOutline" size="large" color="medium" />
+            <h2>Aucune collection</h2>
+            <p>Aucune collection disponible.</p>
+          </div>
+
+          <div v-if="collections.length === 0 && isAdmin" class="empty-state ion-text-center">
             <ion-icon :icon="folderOutline" size="large" color="medium" />
             <h2>Aucune collection</h2>
             <p>Créez votre première collection pour organiser vos ressources.</p>
-            <ion-button v-if="isAdmin" @click="showCreateCollectionModal = true; showCollectionSelector = false" fill="outline">
+            <ion-button @click="openCreateCollectionModal" fill="outline">
               <ion-icon :icon="addOutline" slot="start" />
               Créer une collection
             </ion-button>
@@ -677,26 +774,29 @@ import { useRoute, useRouter } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonBackButton,
   IonButton, IonIcon, IonList, IonItem, IonLabel, IonInput, IonTextarea,
-  IonItemSliding, IonItemOptions, IonItemOption, IonCheckbox,
-  IonModal, IonLoading, IonNote, IonSpinner, IonFooter, toastController
+  IonItemSliding, IonItemOptions, IonItemOption, IonCheckbox, IonChip,
+  IonModal, IonLoading, IonNote, IonSpinner, IonFooter, IonSelect, IonSelectOption,
+  toastController
 } from '@ionic/vue';
 import {
   checkmarkOutline, addOutline, pencilOutline, trashOutline,
   folderOutline, documentTextOutline, videocamOutline, volumeHighOutline,
   musicalNotesOutline, musicalNoteOutline, informationCircleOutline,
-  searchOutline, logoYoutube, playCircleOutline, closeOutline, checkmarkCircle, ellipseOutline
+  searchOutline, logoYoutube, playCircleOutline, closeOutline, checkmarkCircle, ellipseOutline,
+  closeCircleOutline
 } from 'ionicons/icons';
 import { getContentIcon, getContentLabel, formatFileSize, isYouTubeUrl, getYouTubeEmbedUrl, getFileName, getPreviewText, getSpotifyEmbedUrl } from '@/utils/resource-utils';
-import { Resource, ResourceMedia, ResourceType, ResourceCollection } from '@/types/resource';
-import { 
-  createResource, 
-  updateResource, 
-  getResourceById, 
+import { Resource, ResourceMedia, ResourceType, ResourceCollection, CollectionType, ResourceOption } from '@/types/resource';
+import {
+  createResource,
+  updateResource,
+  getResourceById,
   getResourceCollections,
   createResourceCollection as createCollectionService,
   generateUniqueSymbol,
   COLLECTION_COLORS,
-  getRandomColor
+  getRandomColor,
+  getAllResourceOptions
 } from '@/firebase/resources';
 import { useUser } from '@/composables/useUser';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -715,7 +815,7 @@ const showCollectionSelector = ref(false);
 const editingContentIndex = ref(-1);
 const uploading = ref(false);
 const selectedFile = ref<File | null>(null);
-const tagsInput = ref('');
+const newTagInput = ref('');
 
 // YouTube search state
 interface YouTubeSearchResult {
@@ -734,15 +834,25 @@ const selectedYouTubeResult = ref<YouTubeSearchResult | null>(null);
 const showYouTubePreviewModal = ref(false);
 const previewingYouTubeVideo = ref<YouTubeSearchResult | null>(null);
 
+// Music options state
+const musicKeys = ref<ResourceOption[]>([]);
+const musicBeats = ref<ResourceOption[]>([]);
+const musicTempos = ref<ResourceOption[]>([]);
+const musicStyles = ref<ResourceOption[]>([]);
+
 // Make enum available in template
 const ResourceTypeEnum = ResourceType;
 
 const form = ref({
   title: '',
-  description: '',
-  collectionIds: [] as string[],
+  reference: '',
+  collectionId: '',
   contents: [] as ResourceMedia[],
-  tags: [] as string[]
+  tags: [] as string[],
+  musicKey: '' as string,
+  musicBeat: '' as string,
+  musicTempo: '' as string,
+  musicStyle: '' as string
 });
 
 const contentForm = ref<Partial<ResourceMedia>>({
@@ -765,6 +875,18 @@ const isEditMode = computed(() => !!route.params.id);
 const isFormValid = computed(() => {
   return form.value.title && form.value.title.trim().length > 0;
 });
+
+const addTag = () => {
+  const tag = newTagInput.value.trim().replace(/,/g, '');
+  if (tag && !form.value.tags.includes(tag)) {
+    form.value.tags.push(tag);
+  }
+  newTagInput.value = '';
+};
+
+const removeTag = (index: number) => {
+  form.value.tags.splice(index, 1);
+};
 
 const isContentValid = computed(() => {
   const type = contentForm.value.type;
@@ -795,23 +917,38 @@ const loadResourceCollections = async () => {
   }
 };
 
+const loadMusicOptions = async () => {
+  try {
+    const options = await getAllResourceOptions();
+    musicKeys.value = options.musicKeys;
+    musicBeats.value = options.musicBeats;
+    musicTempos.value = options.musicTempos;
+    musicStyles.value = options.musicStyles;
+  } catch (error) {
+    console.error('Error loading music options:', error);
+  }
+};
+
 const loadResource = async () => {
   if (!isEditMode.value) return;
-  
+
   const id = route.params.id as string;
   loading.value = true;
-  
+
   try {
     const resource = await getResourceById(id);
     if (resource) {
       form.value = {
         title: resource.title,
-        description: resource.description || '',
-        collectionIds: resource.collectionIds,
+        reference: resource.reference || '',
+        collectionId: resource.collectionId || '',
         contents: [...resource.contents],
-        tags: resource.tags || []
+        tags: resource.tags || [],
+        musicKey: resource.musicKey || '',
+        musicBeat: resource.musicBeat || '',
+        musicTempo: resource.musicTempo || '',
+        musicStyle: resource.musicStyle || ''
       };
-      tagsInput.value = resource.tags?.join(', ') || '';
     }
   } catch (error) {
     console.error('Error loading resource:', error);
@@ -941,26 +1078,34 @@ const saveResource = async () => {
     console.log('Starting saveResource...');
     console.log('User:', user.value?.uid, user.value?.email);
     console.log('Form data:', JSON.parse(JSON.stringify(form.value)));
-    
-    // Process tags
-    const tags = tagsInput.value
-      .split(',')
-      .map(tag => tag.trim())
-      .filter(tag => tag.length > 0);
-    
+
     // Build resource data, filtering out undefined values
     const resourceData: any = {
       title: form.value.title,
-      collectionIds: form.value.collectionIds,
+      collectionId: form.value.collectionId,
       contents: form.value.contents,
-      tags,
+      tags: form.value.tags,
       createdBy: user.value?.uid || '',
       updatedBy: user.value?.uid || ''
     };
-    
-    // Only add description if it has a value
-    if (form.value.description && form.value.description.trim()) {
-      resourceData.description = form.value.description.trim();
+
+    // Add reference if provided
+    if (form.value.reference?.trim()) {
+      resourceData.reference = form.value.reference.trim();
+    }
+
+    // Add music properties if provided
+    if (form.value.musicKey) {
+      resourceData.musicKey = form.value.musicKey;
+    }
+    if (form.value.musicBeat) {
+      resourceData.musicBeat = form.value.musicBeat;
+    }
+    if (form.value.musicTempo) {
+      resourceData.musicTempo = form.value.musicTempo;
+    }
+    if (form.value.musicStyle) {
+      resourceData.musicStyle = form.value.musicStyle;
     }
     
     console.log('Resource data to save:', JSON.parse(JSON.stringify(resourceData)));
@@ -986,12 +1131,16 @@ const saveResource = async () => {
     if (!isEditMode.value) {
       form.value = {
         title: '',
-        description: '',
-        collectionIds: [],
+        reference: '',
+        collectionId: '',
         contents: [],
-        tags: []
+        tags: [],
+        musicKey: '',
+        musicBeat: '',
+        musicTempo: '',
+        musicStyle: ''
       };
-      tagsInput.value = '';
+      newTagInput.value = '';
       selectedFile.value = null;
     }
 
@@ -1158,6 +1307,7 @@ const createNewCollection = async () => {
       name: collectionForm.value.name.trim(),
       symbol: collectionForm.value.symbol.trim(),
       color: collectionForm.value.color,
+      type: CollectionType.CORE,
       description: collectionForm.value.description?.trim() || undefined
     });
     
@@ -1165,9 +1315,7 @@ const createNewCollection = async () => {
     await loadResourceCollections();
     
     // Auto-select the newly created collection
-    if (!form.value.collectionIds.includes(newCollectionId)) {
-      form.value.collectionIds.push(newCollectionId);
-    }
+    form.value.collectionId = newCollectionId;
     
     const toast = await toastController.create({
       message: 'Collection créée avec succès',
@@ -1223,17 +1371,19 @@ const getCollectionName = (collectionId: string): string => {
   return collection ? collection.name : 'Collection inconnue';
 };
 
-const toggleCollection = (collectionId: string) => {
-  const index = form.value.collectionIds.indexOf(collectionId);
-  if (index > -1) {
-    form.value.collectionIds.splice(index, 1);
-  } else {
-    form.value.collectionIds.push(collectionId);
-  }
+const selectCollection = (collectionId: string) => {
+  form.value.collectionId = collectionId;
+  showCollectionSelector.value = false;
+};
+
+const openCreateCollectionModal = () => {
+  showCollectionSelector.value = false;
+  showCreateCollectionModal.value = true;
 };
 
 onMounted(() => {
   loadResourceCollections();
+  loadMusicOptions();
   loadResource();
 });
 </script>
@@ -1241,6 +1391,55 @@ onMounted(() => {
 <style scoped>
 .form-container {
   padding: 1rem;
+}
+
+.tags-input-container {
+  width: 100%;
+  padding: 8px 0;
+}
+
+.tags-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.tags-chips ion-chip {
+  margin: 0;
+  height: 28px;
+}
+
+.tags-chips ion-chip ion-icon {
+  cursor: pointer;
+  margin-left: 4px;
+}
+
+.tags-input-container ion-input {
+  --padding-start: 0;
+  --padding-end: 0;
+}
+
+.create-collection-btn {
+  margin-bottom: 16px;
+}
+
+/* Music properties form */
+.music-properties-form {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0;
+  margin-top: 0.5rem;
+}
+
+.music-properties-form ion-item {
+  --padding-start: 16px;
+}
+
+@media (max-width: 480px) {
+  .music-properties-form {
+    grid-template-columns: 1fr;
+  }
 }
 
 .content-section {

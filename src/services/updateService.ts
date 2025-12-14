@@ -241,6 +241,24 @@ class UpdateService {
   async getReleaseNotes(): Promise<ReleaseNote[]> {
     return [
       {
+        version: '1.11.0',
+        date: '2025-12-14',
+        title: 'Programme de service en temps réel',
+        description: 'Le programme de service est maintenant synchronisé en temps réel entre tous les utilisateurs',
+        features: [
+          'Synchronisation en temps réel du programme de service avec Firestore',
+          'Les modifications (ajout, suppression, édition d\'éléments) sont visibles instantanément par tous',
+          'Les propriétés musicales des ressources se mettent à jour en temps réel',
+          'Subscription aux ressources liées pour afficher les changements sans rafraîchir'
+        ],
+        fixes: [],
+        improvements: [
+          'Suppression des appels manuels de rechargement après chaque modification',
+          'Nettoyage automatique des subscriptions lors de la fermeture de la page',
+          'Performance améliorée grâce à la mise à jour incrémentale des données'
+        ]
+      },
+      {
         version: '1.10.5',
         date: '2025-01-22',
         title: 'Avatar personnalisé et affichage des invités',

@@ -381,10 +381,6 @@
         <ion-content class="resource-detail-content">
           <div class="resource-details" v-if="selectedResource">
             <div class="resource-info">
-              <p v-if="selectedResource.description" class="resource-description">
-                {{ selectedResource.description }}
-              </p>
-              
               <div class="resource-media-list">
                 <h4>Contenus disponibles</h4>
                 <div 
@@ -3387,13 +3383,6 @@ onMounted(async () => {
 
 .resource-details {
   padding: 16px;
-}
-
-.resource-description {
-  font-size: 14px;
-  color: var(--ion-color-dark);
-  margin-bottom: 20px;
-  line-height: 1.5;
 }
 
 .resource-media-list h4 {

@@ -15,11 +15,21 @@ export enum SortOption {
   ALPHABETICAL_DESC = 'alphabetical_desc'
 }
 
+export enum CollectionType {
+  CORE = 'core',
+  TEAM = 'team',
+  SERVICE = 'service',
+  USER = 'user'
+}
+
 export interface ResourceCollection {
   id: string;
   name: string;
   symbol: string; // 2-3 character abbreviation, must be unique
   color: string; // Hex color code for avatar generation
+  type: CollectionType; // Determines if collection is core, for a team, a service, or a user
+  ownerId?: string; // ID of the associated team, service, or user (only when type is not 'core')
+  ownerName?: string; // Name of the associated entity for display purposes
   description?: string;
   createdAt: string;
   updatedAt: string;
@@ -34,14 +44,14 @@ export interface ResourceMedia {
   fileSize?: number; // File size in bytes
   mimeType?: string; // MIME type for files
   notes?: string; // Additional notes or instructions for this media
+  createdAt?: string; // ISO timestamp when media was added
 }
 
 export interface Resource {
   id: string;
   title: string;
-  description?: string;
   reference?: string; // Bible reference, song number, etc.
-  collectionIds: string[]; // Can belong to multiple collections
+  collectionId: string; // Belongs to one collection
   contents: ResourceMedia[]; // Can have multiple media types
   tags?: string[]; // For better search
   createdAt: string;
@@ -50,11 +60,30 @@ export interface Resource {
   updatedBy: string; // User ID who last updated it
   viewCount?: number; // Track popularity
   searchText?: string; // Preprocessed text for full-text search
+  // Music metadata
+  musicKey?: string; // e.g., 'C', 'D', 'Em', 'F#m'
+  musicBeat?: string; // e.g., '4/4', '3/4', '6/8'
+  musicTempo?: string; // e.g., 'bpm_120'
+  musicStyle?: string; // e.g., 'gospel', 'hymn', 'contemporary'
+}
+
+export interface ResourceOption {
+  id: string;
+  name: string;
+  label?: string;
+  description?: string;
+  order: number;
+}
+
+export interface ResourceOptionsDoc {
+  items: ResourceOption[];
+  updatedAt?: string;
+  updatedBy?: string;
 }
 
 export interface ResourceFilter {
   searchQuery?: string;
-  collectionIds?: string[];
+  collectionId?: string;
   resourceTypes?: ResourceType[];
   sortBy?: SortOption;
 }

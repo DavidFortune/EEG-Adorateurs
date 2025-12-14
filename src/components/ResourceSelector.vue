@@ -103,7 +103,6 @@
                 </div>
                 <div class="resource-info">
                   <h4 class="resource-title">{{ resource.title }}</h4>
-                  <p class="resource-description" v-if="resource.description">{{ resource.description }}</p>
                   <div class="resource-meta">
                     <span class="resource-types">{{ getResourceTypeList(resource) }}</span>
                     <span class="resource-collections" v-if="getResourceCollectionNames(resource).length > 0">
@@ -209,7 +208,6 @@ const filteredResources = computed(() => {
     const query = searchQuery.value.toLowerCase();
     filtered = filtered.filter(resource =>
       resource.title.toLowerCase().includes(query) ||
-      resource.description?.toLowerCase().includes(query) ||
       resource.tags?.some(tag => tag.toLowerCase().includes(query))
     );
   }
@@ -217,7 +215,7 @@ const filteredResources = computed(() => {
   // Filter by collection
   if (selectedCollectionId.value) {
     filtered = filtered.filter(resource =>
-      resource.collectionIds.includes(selectedCollectionId.value)
+      resource.collectionId === selectedCollectionId.value
     );
   }
 
@@ -317,9 +315,9 @@ const getResourceTypeList = (resource: Resource) => {
 };
 
 const getResourceCollectionNames = (resource: Resource) => {
-  return resource.collectionIds
-    .map(id => collections.value.find(c => c.id === id)?.name)
-    .filter(Boolean) as string[];
+  if (!resource.collectionId) return [];
+  const collection = collections.value.find(c => c.id === resource.collectionId);
+  return collection ? [collection.name] : [];
 };
 
 const onResourceCreated = async (resource: Resource) => {
@@ -442,16 +440,6 @@ onMounted(() => {
   font-size: 16px;
   font-weight: 600;
   color: var(--ion-color-dark);
-}
-
-.resource-description {
-  margin: 0 0 8px 0;
-  font-size: 14px;
-  color: var(--ion-color-medium-shade);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 .resource-meta {

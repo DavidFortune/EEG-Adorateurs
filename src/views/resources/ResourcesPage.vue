@@ -4,6 +4,9 @@
       <ion-toolbar>
         <ion-title>Ressources</ion-title>
         <ion-buttons slot="end">
+          <ion-button v-if="isAdmin" @click="importMusicStyles" fill="clear" title="Importer styles musicaux">
+            <ion-icon :icon="cloudDownloadOutline" />
+          </ion-button>
           <ion-button v-if="isAdmin" @click="goToCollections" fill="clear">
             <ion-icon :icon="folderOutline" />
           </ion-button>
@@ -42,12 +45,11 @@
           <ion-chip
             @click="showCollectionFilter = true"
             outline
-            :color="selectedCollections.length > 0 ? 'primary' : undefined"
+            :color="selectedCollection ? 'primary' : undefined"
           >
             <ion-icon :icon="folderOutline" />
             <ion-label>
-              Collections de ressources
-              <span v-if="selectedCollections.length > 0">({{ selectedCollections.length }})</span>
+              {{ selectedCollection ? getCollectionName(selectedCollection) : 'Collection' }}
             </ion-label>
           </ion-chip>
           
@@ -64,16 +66,14 @@
         <!-- Active Filters Display -->
         <div v-if="hasActiveFilters" class="active-filters">
           <ion-chip
-            v-for="collection in getSelectedCollectionNames()"
-            :key="collection.id"
-            @click="removeCollectionFilter(collection.id)"
+            v-if="selectedCollection"
+            @click="clearCollectionFilter"
             color="primary"
           >
-            <ion-label>{{ collection.name }}</ion-label>
+            <ion-label>{{ getCollectionName(selectedCollection) }}</ion-label>
             <ion-icon :icon="closeCircle" />
           </ion-chip>
-          
-          
+
           <ion-chip @click="clearAllFilters" color="medium">
             <ion-label>Effacer tout</ion-label>
             <ion-icon :icon="closeCircle" />
@@ -96,32 +96,37 @@
             v-for="resource in filteredResources"
             :key="resource.id"
             button
+            :detail="false"
             @click="goToResourceDetail(resource.id)"
           >
-            <ion-icon :icon="getResourceIcon(resource)" slot="start" />
+            <div slot="start" class="collection-badge" :style="{ backgroundColor: getCollectionColor(resource.collectionId) }">
+              {{ getCollectionSymbol(resource.collectionId) }}
+            </div>
             <ion-label>
-              <h2>{{ resource.title }}</h2>
-              <p v-if="resource.description">{{ resource.description }}</p>
+              <div class="resource-title-row">
+                <h2>{{ resource.title }}</h2>
+                <span class="media-icons">
+                  <ion-icon
+                    v-for="type in getResourceTypes(resource)"
+                    :key="type"
+                    :icon="getTypeIcon(type)"
+                    color="medium"
+                  />
+                </span>
+              </div>
               <div class="resource-meta">
-                <ion-chip
-                  v-for="type in getResourceTypes(resource)"
-                  :key="type"
-                  size="small"
-                  :color="getTypeColor(type)"
-                >
-                  <ion-icon :icon="getTypeIcon(type)" />
-                </ion-chip>
+                <span class="music-props">
+                  <span v-if="resource.musicKey" class="music-prop">{{ getMusicOptionName(resource.musicKey, musicKeys) }}</span>
+                  <span v-if="resource.musicBeat" class="music-prop">{{ getMusicOptionName(resource.musicBeat, musicBeats) }}</span>
+                  <span v-if="resource.musicTempo" class="music-prop">{{ getMusicOptionName(resource.musicTempo, musicTempos) }}</span>
+                  <span v-if="resource.musicStyle" class="music-prop">{{ getMusicOptionName(resource.musicStyle, musicStyles) }}</span>
+                </span>
                 <span v-if="resource.viewCount" class="view-count">
                   <ion-icon :icon="eyeOutline" />
                   {{ resource.viewCount }}
                 </span>
               </div>
             </ion-label>
-            <ion-buttons slot="end" v-if="isAdmin">
-              <ion-button @click.stop="editResource(resource.id)" fill="clear">
-                <ion-icon :icon="pencilOutline" slot="icon-only" />
-              </ion-button>
-            </ion-buttons>
           </ion-item>
         </ion-list>
       </div>
@@ -138,13 +143,23 @@
         </ion-header>
         <ion-content class="ion-padding">
           <ion-list>
-            <ion-item v-for="collection in collections" :key="collection.id">
-              <ion-checkbox
-                :checked="selectedCollections.includes(collection.id)"
-                @ionChange="toggleCollectionFilter(collection.id)"
-              >
-                {{ collection.name }}
-              </ion-checkbox>
+            <ion-item
+              button
+              @click="selectCollectionFilter('')"
+              :class="{ 'selected-item': !selectedCollection }"
+            >
+              <ion-label>Toutes les collections</ion-label>
+              <ion-icon v-if="!selectedCollection" :icon="checkmarkOutline" slot="end" color="primary" />
+            </ion-item>
+            <ion-item
+              v-for="collection in collections"
+              :key="collection.id"
+              button
+              @click="selectCollectionFilter(collection.id)"
+              :class="{ 'selected-item': selectedCollection === collection.id }"
+            >
+              <ion-label>{{ collection.name }}</ion-label>
+              <ion-icon v-if="selectedCollection === collection.id" :icon="checkmarkOutline" slot="end" color="primary" />
             </ion-item>
           </ion-list>
         </ion-content>
@@ -163,22 +178,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
-  IonIcon, IonSearchbar, IonList, IonItem, IonLabel, IonChip, IonRefresher,
+  IonIcon, IonSearchbar, IonList, IonItem, IonLabel, IonRefresher,
   IonRefresherContent, IonLoading, IonModal, IonCheckbox, IonActionSheet,
   onIonViewWillEnter
 } from '@ionic/vue';
 import {
   addOutline, folderOutline, swapVerticalOutline, closeCircle,
   documentTextOutline, eyeOutline, pencilOutline, musicalNotesOutline,
-  videocamOutline, volumeHighOutline, logoYoutube, documentOutline
+  videocamOutline, volumeHighOutline, logoYoutube, documentOutline,
+  checkmarkOutline, cloudDownloadOutline
 } from 'ionicons/icons';
-import { Resource, ResourceCollection, ResourceType, SortOption } from '@/types/resource';
-import { getResources, getResourceCollections } from '@/firebase/resources';
+import { Resource, ResourceCollection, ResourceType, SortOption, ResourceOption } from '@/types/resource';
+import { getResourceCollections, subscribeToResources, getAllResourceOptions } from '@/firebase/resources';
 import { useUser } from '@/composables/useUser';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { app } from '@/firebase/config';
+import { toastController } from '@ionic/vue';
 
 const router = useRouter();
 const { isAdmin } = useUser();
@@ -187,10 +206,19 @@ const loading = ref(false);
 const resources = ref<Resource[]>([]);
 const collections = ref<ResourceCollection[]>([]);
 const searchQuery = ref('');
-const selectedCollections = ref<string[]>([]);
+const selectedCollection = ref<string>('');
 const sortOption = ref<SortOption>(SortOption.NEWEST);
 const showCollectionFilter = ref(false);
 const showSortOptions = ref(false);
+
+// Music options
+const musicKeys = ref<ResourceOption[]>([]);
+const musicBeats = ref<ResourceOption[]>([]);
+const musicTempos = ref<ResourceOption[]>([]);
+const musicStyles = ref<ResourceOption[]>([]);
+
+// Real-time subscription unsubscribe function
+let unsubscribeResources: (() => void) | null = null;
 
 
 const sortButtons = [
@@ -225,18 +253,16 @@ const sortButtons = [
 ];
 
 const hasActiveFilters = computed(() => {
-  return selectedCollections.value.length > 0;
+  return !!selectedCollection.value;
 });
 
 const filteredResources = computed(() => {
   let filtered = [...resources.value];
 
   // Apply collection filter
-  if (selectedCollections.value.length > 0) {
+  if (selectedCollection.value) {
     filtered = filtered.filter(resource =>
-      resource.collectionIds.some(collectionId =>
-        selectedCollections.value.includes(collectionId)
-      )
+      resource.collectionId === selectedCollection.value
     );
   }
 
@@ -244,7 +270,7 @@ const filteredResources = computed(() => {
   if (searchQuery.value.trim()) {
     const searchLower = searchQuery.value.toLowerCase().trim();
     filtered = filtered.filter(resource => {
-      const searchableText = `${resource.title} ${resource.description || ''} ${resource.tags?.join(' ') || ''}`.toLowerCase();
+      const searchableText = `${resource.title} ${resource.tags?.join(' ') || ''}`.toLowerCase();
       return searchableText.includes(searchLower);
     });
   }
@@ -306,16 +332,26 @@ const getTimestamp = (date: any): number => {
   return 0;
 };
 
-const loadResources = async () => {
-  loading.value = true;
-  try {
-    // Load all resources, filtering will be done client-side
-    resources.value = await getResources();
-  } catch (error) {
-    console.error('Error loading resources:', error);
-  } finally {
-    loading.value = false;
+const setupResourcesSubscription = () => {
+  // Clean up previous subscription if exists
+  if (unsubscribeResources) {
+    unsubscribeResources();
+    unsubscribeResources = null;
   }
+
+  loading.value = true;
+
+  // Set up real-time subscription
+  unsubscribeResources = subscribeToResources(
+    (updatedResources) => {
+      resources.value = updatedResources;
+      loading.value = false;
+    },
+    (error) => {
+      console.error('Error in resources subscription:', error);
+      loading.value = false;
+    }
+  );
 };
 
 const loadResourceCollections = async () => {
@@ -326,43 +362,61 @@ const loadResourceCollections = async () => {
   }
 };
 
+const loadMusicOptions = async () => {
+  try {
+    const options = await getAllResourceOptions();
+    musicKeys.value = options.musicKeys;
+    musicBeats.value = options.musicBeats;
+    musicTempos.value = options.musicTempos;
+    musicStyles.value = options.musicStyles;
+  } catch (error) {
+    console.error('Error loading music options:', error);
+  }
+};
+
+const getMusicOptionName = (optionId: string | undefined, options: ResourceOption[]): string => {
+  if (!optionId) return '';
+  const option = options.find(o => o.id === optionId);
+  return option?.name || '';
+};
+
 const handleSearch = () => {
   // Search filtering is now reactive through computed property, no need to reload
 };
 
 const handleRefresh = async (event: any) => {
-  await Promise.all([loadResources(), loadResourceCollections()]);
+  // Collections still need manual refresh, but resources are real-time
+  await loadResourceCollections();
   event.target.complete();
 };
 
-const toggleCollectionFilter = (collectionId: string) => {
-  const index = selectedCollections.value.indexOf(collectionId);
-  if (index > -1) {
-    selectedCollections.value.splice(index, 1);
-  } else {
-    selectedCollections.value.push(collectionId);
-  }
-  // Filtering is now reactive through computed property, no need to reload
+const selectCollectionFilter = (collectionId: string) => {
+  selectedCollection.value = collectionId;
+  showCollectionFilter.value = false;
 };
 
-
-const removeCollectionFilter = (collectionId: string) => {
-  const index = selectedCollections.value.indexOf(collectionId);
-  if (index > -1) {
-    selectedCollections.value.splice(index, 1);
-    // Filtering is now reactive through computed property, no need to reload
-  }
+const clearCollectionFilter = () => {
+  selectedCollection.value = '';
 };
-
 
 const clearAllFilters = () => {
-  selectedCollections.value = [];
+  selectedCollection.value = '';
   searchQuery.value = '';
-  // Filtering is now reactive through computed property, no need to reload
 };
 
-const getSelectedCollectionNames = () => {
-  return collections.value.filter(c => selectedCollections.value.includes(c.id));
+const getCollectionName = (collectionId: string): string => {
+  const collection = collections.value.find(c => c.id === collectionId);
+  return collection ? collection.name : 'Collection inconnue';
+};
+
+const getCollectionSymbol = (collectionId: string): string => {
+  const collection = collections.value.find(c => c.id === collectionId);
+  return collection ? collection.symbol : '?';
+};
+
+const getCollectionColor = (collectionId: string): string => {
+  const collection = collections.value.find(c => c.id === collectionId);
+  return collection ? collection.color : '#888888';
 };
 
 const getSortLabel = () => {
@@ -427,22 +481,8 @@ const getTypeIcon = (type: ResourceType) => {
   }
 };
 
-const getTypeColor = (type: ResourceType) => {
-  switch (type) {
-    case ResourceType.LYRICS:
-      return 'primary';
-    case ResourceType.VIDEO:
-    case ResourceType.YOUTUBE:
-      return 'danger';
-    case ResourceType.AUDIO:
-      return 'success';
-    case ResourceType.MUSIC_SHEET:
-      return 'warning';
-    case ResourceType.FILE:
-      return 'secondary';
-    default:
-      return 'medium';
-  }
+const getTypeColor = () => {
+  return 'medium';
 };
 
 const getEmptyMessage = () => {
@@ -471,14 +511,93 @@ const editResource = (resourceId: string) => {
   router.push(`/resource-form/${resourceId}`);
 };
 
+// Import resource options (music styles, keys, beats, and tempos)
+const importMusicStyles = async () => {
+  try {
+    const functions = getFunctions(app);
+    const importStylesFn = httpsCallable(functions, 'importMusicStyles');
+    const importKeysFn = httpsCallable(functions, 'importMusicKeys');
+    const importBeatsFn = httpsCallable(functions, 'importMusicBeats');
+    const importTemposFn = httpsCallable(functions, 'importMusicTempos');
+
+    const toast = await toastController.create({
+      message: 'Importation en cours...',
+      duration: 0,
+      position: 'bottom'
+    });
+    await toast.present();
+
+    // Import music styles, keys, beats, and tempos
+    const [stylesResult, keysResult, beatsResult, temposResult] = await Promise.all([
+      importStylesFn({}),
+      importKeysFn({}),
+      importBeatsFn({}),
+      importTemposFn({})
+    ]);
+
+    const stylesData = stylesResult.data as { success: boolean; count: number; alreadyExists?: boolean };
+    const keysData = keysResult.data as { success: boolean; count: number; alreadyExists?: boolean };
+    const beatsData = beatsResult.data as { success: boolean; count: number; alreadyExists?: boolean };
+    const temposData = temposResult.data as { success: boolean; count: number; alreadyExists?: boolean };
+
+    await toast.dismiss();
+
+    const messages: string[] = [];
+    if (stylesData.alreadyExists) {
+      messages.push('Styles: ✓');
+    } else {
+      messages.push(`${stylesData.count} styles`);
+    }
+    if (keysData.alreadyExists) {
+      messages.push('Tonalités: ✓');
+    } else {
+      messages.push(`${keysData.count} tonalités`);
+    }
+    if (beatsData.alreadyExists) {
+      messages.push('Mesures: ✓');
+    } else {
+      messages.push(`${beatsData.count} mesures`);
+    }
+    if (temposData.alreadyExists) {
+      messages.push('Tempos: ✓');
+    } else {
+      messages.push(`${temposData.count} tempos`);
+    }
+
+    const allExist = stylesData.alreadyExists && keysData.alreadyExists && beatsData.alreadyExists && temposData.alreadyExists;
+
+    const successToast = await toastController.create({
+      message: messages.join(' | '),
+      duration: 3000,
+      position: 'bottom',
+      color: allExist ? 'warning' : 'success'
+    });
+    await successToast.present();
+
+  } catch (error: any) {
+    console.error('Import error:', error);
+    const errorToast = await toastController.create({
+      message: `Erreur: ${error.message || 'Échec de l\'importation'}`,
+      duration: 3000,
+      position: 'bottom',
+      color: 'danger'
+    });
+    await errorToast.present();
+  }
+};
+
 onMounted(() => {
-  loadResources();
+  setupResourcesSubscription();
   loadResourceCollections();
+  loadMusicOptions();
 });
 
-// Refresh resources every time the page is displayed
-onIonViewWillEnter(() => {
-  loadResources();
+// Clean up subscription on unmount
+onUnmounted(() => {
+  if (unsubscribeResources) {
+    unsubscribeResources();
+    unsubscribeResources = null;
+  }
 });
 </script>
 
@@ -497,24 +616,60 @@ onIonViewWillEnter(() => {
   margin-bottom: 1rem;
 }
 
-.resource-meta {
+.collection-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: white;
+  font-weight: bold;
+  font-size: 0.75rem;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+}
+
+.resource-title-row {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-top: 0.5rem;
 }
 
-.resource-meta ion-chip {
-  --border-radius: 50%;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  justify-content: center;
+.resource-title-row h2 {
+  margin: 0;
+}
+
+.media-icons {
+  display: flex;
   align-items: center;
+  gap: 0.25rem;
 }
 
-.resource-meta ion-chip ion-icon {
-  font-size: 16px;
+.media-icons ion-icon {
+  font-size: 14px;
+}
+
+.resource-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+.music-props {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.music-prop {
+  font-size: 0.75rem;
+  color: var(--ion-color-medium);
+  background: var(--ion-color-light);
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
 .view-count {
@@ -558,6 +713,16 @@ ion-searchbar {
     overflow-x: auto;
     flex-wrap: nowrap;
     -webkit-overflow-scrolling: touch;
+  }
+
+  .resource-title-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+
+  .media-icons {
+    margin-top: 0.25rem;
   }
 }
 </style>

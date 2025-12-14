@@ -1,15 +1,17 @@
-import { 
-  collection, 
-  doc, 
-  getDoc, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where, 
+import {
+  collection,
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
   getDocs,
+  onSnapshot,
   serverTimestamp,
-  Timestamp 
+  Timestamp,
+  type Unsubscribe
 } from 'firebase/firestore';
 import { db } from './config';
 import type { ServiceProgram, ProgramSection, ProgramItem } from '@/types/program';
@@ -29,18 +31,18 @@ const PROGRAMS_COLLECTION = 'programs';
 export const getProgramByServiceId = async (serviceId: string): Promise<ServiceProgram | null> => {
   try {
     const q = query(
-      collection(db, PROGRAMS_COLLECTION), 
+      collection(db, PROGRAMS_COLLECTION),
       where('serviceId', '==', serviceId)
     );
     const querySnapshot = await getDocs(q);
-    
+
     if (querySnapshot.empty) {
       return null;
     }
-    
+
     const doc = querySnapshot.docs[0];
     const data = doc.data() as FirestoreProgram;
-    
+
     return {
       ...data,
       id: doc.id,
@@ -51,6 +53,48 @@ export const getProgramByServiceId = async (serviceId: string): Promise<ServiceP
     console.error('Error fetching program:', error);
     throw error;
   }
+};
+
+/**
+ * Subscribe to program by service ID for real-time updates
+ */
+export const subscribeToProgramByServiceId = (
+  serviceId: string,
+  onUpdate: (program: ServiceProgram | null) => void,
+  onError?: (error: Error) => void
+): Unsubscribe => {
+  const q = query(
+    collection(db, PROGRAMS_COLLECTION),
+    where('serviceId', '==', serviceId)
+  );
+
+  return onSnapshot(
+    q,
+    (querySnapshot) => {
+      if (querySnapshot.empty) {
+        onUpdate(null);
+        return;
+      }
+
+      const docSnapshot = querySnapshot.docs[0];
+      const data = docSnapshot.data() as FirestoreProgram;
+
+      const program: ServiceProgram = {
+        ...data,
+        id: docSnapshot.id,
+        createdAt: data.createdAt?.toDate() || new Date(),
+        updatedAt: data.updatedAt?.toDate() || new Date()
+      };
+
+      onUpdate(program);
+    },
+    (error) => {
+      console.error('Error in program subscription:', error);
+      if (onError) {
+        onError(error);
+      }
+    }
+  );
 };
 
 /**

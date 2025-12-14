@@ -187,6 +187,19 @@
                           <span>{{ formatMediaType(content.type) }}</span>
                         </button>
                       </div>
+                      <!-- Music Properties -->
+                      <div class="music-props-row">
+                        <div v-if="getResourceMusicProps(item.resourceId)" class="music-props">
+                          <span v-for="prop in getResourceMusicProps(item.resourceId)" :key="prop" class="music-prop">{{ prop }}</span>
+                        </div>
+                        <button
+                          v-if="isAdmin && item.resourceId"
+                          @click.stop="openMusicPropsModal(item.resourceId!)"
+                          class="music-props-edit-btn"
+                        >
+                          <ion-icon :icon="createOutline" />
+                        </button>
+                      </div>
                     </div>
 
                     <!-- View All Lyrics Button (for items with sub-items) -->
@@ -257,6 +270,15 @@
                             class="media-chip-button small"
                           >
                             <ion-icon :icon="getMediaTypeIcon(content.type)" />
+                          </button>
+                          <!-- Music Properties for Sub-Item -->
+                          <span v-for="prop in getResourceMusicProps(subItem.resourceId)" :key="prop" class="music-prop small">{{ prop }}</span>
+                          <button
+                            v-if="isAdmin"
+                            @click.stop="openMusicPropsModal(subItem.resourceId!)"
+                            class="music-props-edit-btn small"
+                          >
+                            <ion-icon :icon="createOutline" />
                           </button>
                         </div>
                       </div>
@@ -714,17 +736,99 @@
         @close="closeSMSModal"
         @sent="onSMSSent"
       />
+
+      <!-- Music Properties Edit Modal -->
+      <ion-modal :is-open="showMusicPropsModalState" @ionModalDidDismiss="closeMusicPropsModal" :initial-breakpoint="0.6" :breakpoints="[0, 0.6, 0.9]">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>Propriétés musicales</ion-title>
+            <ion-buttons slot="end">
+              <ion-button @click="closeMusicPropsModal">
+                <ion-icon :icon="closeOutline" />
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="ion-padding">
+          <div class="music-props-form">
+            <ion-item>
+              <ion-select
+                v-model="musicPropsForm.musicKey"
+                label="Tonalité"
+                label-placement="stacked"
+                interface="action-sheet"
+                placeholder="Sélectionner..."
+              >
+                <ion-select-option value="">Aucune</ion-select-option>
+                <ion-select-option v-for="option in musicKeys" :key="option.id" :value="option.id">
+                  {{ option.name }}
+                </ion-select-option>
+              </ion-select>
+            </ion-item>
+
+            <ion-item>
+              <ion-select
+                v-model="musicPropsForm.musicBeat"
+                label="Signature"
+                label-placement="stacked"
+                interface="action-sheet"
+                placeholder="Sélectionner..."
+              >
+                <ion-select-option value="">Aucune</ion-select-option>
+                <ion-select-option v-for="option in musicBeats" :key="option.id" :value="option.id">
+                  {{ option.name }}
+                </ion-select-option>
+              </ion-select>
+            </ion-item>
+
+            <ion-item>
+              <ion-select
+                v-model="musicPropsForm.musicTempo"
+                label="Tempo"
+                label-placement="stacked"
+                interface="action-sheet"
+                placeholder="Sélectionner..."
+              >
+                <ion-select-option value="">Aucun</ion-select-option>
+                <ion-select-option v-for="option in musicTempos" :key="option.id" :value="option.id">
+                  {{ option.name }} <span v-if="option.label">({{ option.label }})</span>
+                </ion-select-option>
+              </ion-select>
+            </ion-item>
+
+            <ion-item>
+              <ion-select
+                v-model="musicPropsForm.musicStyle"
+                label="Style"
+                label-placement="stacked"
+                interface="action-sheet"
+                placeholder="Sélectionner..."
+              >
+                <ion-select-option value="">Aucun</ion-select-option>
+                <ion-select-option v-for="option in musicStyles" :key="option.id" :value="option.id">
+                  {{ option.name }}
+                </ion-select-option>
+              </ion-select>
+            </ion-item>
+
+            <ion-button @click="saveMusicProps" expand="block" class="ion-margin-top">
+              Enregistrer
+            </ion-button>
+          </div>
+        </ion-content>
+      </ion-modal>
     </ion-content>
   </ion-page>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonBackButton,
   IonButton, IonIcon, IonCard, IonCardContent, IonLoading, IonModal,
-  IonItem, IonLabel, IonInput, IonTextarea, toastController, alertController
+  IonItem, IonLabel, IonInput, IonTextarea, IonSelect, IonSelectOption,
+  toastController, alertController
 } from '@ionic/vue';
 import {
   calendarOutline, createOutline, listOutline, timeOutline,
@@ -743,6 +847,7 @@ import { timezoneUtils } from '@/utils/timezone';
 import { useUser } from '@/composables/useUser';
 import {
   getProgramByServiceId,
+  subscribeToProgramByServiceId,
   createProgram,
   updateProgram,
   addItemToProgram,
@@ -755,8 +860,9 @@ import {
 import type { Service } from '@/types/service';
 import type { ServiceProgram, ProgramItem, ProgramParticipant, ProgramSubItem } from '@/types/program';
 import { ProgramItemType } from '@/types/program';
-import type { Resource } from '@/types/resource';
-import { getResourceById } from '@/firebase/resources';
+import type { Resource, ResourceOption } from '@/types/resource';
+import { getResourceById, getAllResourceOptions, updateResource, subscribeToResource } from '@/firebase/resources';
+import type { Unsubscribe } from 'firebase/firestore';
 import { isYouTubeUrl, getYouTubeEmbedUrl, getSpotifyEmbedUrl } from '@/utils/resource-utils';
 
 const route = useRoute();
@@ -768,6 +874,12 @@ const service = ref<Service | null>(null);
 const program = ref<ServiceProgram | null>(null);
 const linkedResources = ref<Map<string, Resource>>(new Map());
 const isEditMode = ref(false);
+
+// Music options
+const musicKeys = ref<ResourceOption[]>([]);
+const musicBeats = ref<ResourceOption[]>([]);
+const musicTempos = ref<ResourceOption[]>([]);
+const musicStyles = ref<ResourceOption[]>([]);
 
 // Edit Program Modal
 const showEditProgramModalState = ref(false);
@@ -840,6 +952,22 @@ const touchEndY = ref(0);
 
 // Play prompt for mobile
 const showPlayPrompt = ref(false);
+
+// Music Properties Edit Modal
+const showMusicPropsModalState = ref(false);
+const editingResourceId = ref<string | null>(null);
+const musicPropsForm = ref({
+  musicKey: '' as string,
+  musicBeat: '' as string,
+  musicTempo: '' as string,
+  musicStyle: '' as string
+});
+
+// Real-time subscriptions for resources
+const resourceSubscriptions = ref<Map<string, Unsubscribe>>(new Map());
+
+// Real-time subscription for program
+const programSubscription = ref<Unsubscribe | null>(null);
 
 // Computed Properties
 const serviceId = computed(() => route.params.id as string);
@@ -1043,32 +1171,49 @@ const loadService = async () => {
   }
 };
 
+const subscribeToResourcesInProgram = (programData: ServiceProgram) => {
+  // Subscribe to linked resources for real-time updates
+  const resourceIds = new Set<string>();
+  programData.items.forEach(item => {
+    if (item.resourceId) resourceIds.add(item.resourceId);
+    item.subItems?.forEach(subItem => {
+      if (subItem.resourceId) resourceIds.add(subItem.resourceId);
+    });
+  });
+
+  for (const resourceId of resourceIds) {
+    // Subscribe to real-time updates for each resource
+    subscribeToLinkedResource(resourceId);
+  }
+};
+
+const setupProgramSubscription = () => {
+  // Unsubscribe from previous subscription if exists
+  if (programSubscription.value) {
+    programSubscription.value();
+    programSubscription.value = null;
+  }
+
+  // Subscribe to program for real-time updates
+  programSubscription.value = subscribeToProgramByServiceId(
+    serviceId.value,
+    (programData) => {
+      program.value = programData;
+      if (programData) {
+        subscribeToResourcesInProgram(programData);
+      }
+      loading.value = false;
+    },
+    (error) => {
+      console.error('Error in program subscription:', error);
+      loading.value = false;
+    }
+  );
+};
+
 const loadProgram = async () => {
   try {
-    const programData = await getProgramByServiceId(serviceId.value);
-    program.value = programData;
-
-    if (programData) {
-      // Load linked resources
-      const resourceIds = new Set<string>();
-      programData.items.forEach(item => {
-        if (item.resourceId) resourceIds.add(item.resourceId);
-        item.subItems?.forEach(subItem => {
-          if (subItem.resourceId) resourceIds.add(subItem.resourceId);
-        });
-      });
-
-      for (const resourceId of resourceIds) {
-        try {
-          const resource = await getResourceById(resourceId);
-          if (resource) {
-            linkedResources.value.set(resourceId, resource);
-          }
-        } catch (error) {
-          console.error(`Error loading resource ${resourceId}:`, error);
-        }
-      }
-    }
+    setupProgramSubscription();
   } catch (error) {
     console.error('Error loading program:', error);
   }
@@ -1148,7 +1293,6 @@ const updateProgramInfo = async () => {
       user.value.uid
     );
 
-    await loadProgram();
     closeEditProgramModal();
     await showToast('Programme mis à jour', 'success');
   } catch (error) {
@@ -1227,7 +1371,6 @@ const addItem = async () => {
       user.value.uid
     );
 
-    await loadProgram();
     closeItemFormModal();
     await showToast('Élément ajouté avec succès', 'success');
   } catch (error) {
@@ -1272,7 +1415,6 @@ const updateItem = async () => {
       user.value.uid
     );
 
-    await loadProgram();
     closeItemFormModal();
     await showToast('Élément mis à jour', 'success');
   } catch (error) {
@@ -1294,7 +1436,6 @@ const deleteItem = async (itemId: string) => {
 
     await deleteItemFromProgram(program.value.id, itemId, user.value.uid);
 
-    await loadProgram();
     await showToast('Élément supprimé', 'success');
   } catch (error) {
     console.error('Error deleting item:', error);
@@ -1345,8 +1486,6 @@ const addSubItem = async () => {
       newSubItem,
       user.value.uid
     );
-
-    await loadProgram();
 
     // Auto-expand the parent item
     expandedItems.value.add(parentItemIdForSubItem.value);
@@ -1401,7 +1540,6 @@ const updateSubItem = async () => {
       user.value.uid
     );
 
-    await loadProgram();
     closeEditSubItemModal();
     await showToast('Sous-élément mis à jour', 'success');
   } catch (error) {
@@ -1428,7 +1566,6 @@ const deleteSubItem = async (itemId: string, subItemId: string) => {
       user.value.uid
     );
 
-    await loadProgram();
     await showToast('Sous-élément supprimé', 'success');
   } catch (error) {
     console.error('Error deleting sub-item:', error);
@@ -1703,12 +1840,139 @@ watch(() => itemForm.value.resourceId, async (newResourceId) => {
   }
 });
 
+// Load music options
+const loadMusicOptions = async () => {
+  try {
+    const options = await getAllResourceOptions();
+    musicKeys.value = options.musicKeys;
+    musicBeats.value = options.musicBeats;
+    musicTempos.value = options.musicTempos;
+    musicStyles.value = options.musicStyles;
+  } catch (error) {
+    console.error('Error loading music options:', error);
+  }
+};
+
+// Get music option name
+const getMusicOptionName = (optionId: string | undefined, options: ResourceOption[]): string => {
+  if (!optionId) return '';
+  const option = options.find(o => o.id === optionId);
+  return option?.name || '';
+};
+
+// Get music properties for a resource
+const getResourceMusicProps = (resourceId: string | undefined) => {
+  if (!resourceId) return null;
+  const resource = linkedResources.value.get(resourceId);
+  if (!resource) return null;
+
+  const props = [];
+  if (resource.musicKey) props.push(getMusicOptionName(resource.musicKey, musicKeys.value));
+  if (resource.musicBeat) props.push(getMusicOptionName(resource.musicBeat, musicBeats.value));
+  if (resource.musicTempo) props.push(getMusicOptionName(resource.musicTempo, musicTempos.value));
+  if (resource.musicStyle) props.push(getMusicOptionName(resource.musicStyle, musicStyles.value));
+
+  return props.length > 0 ? props : null;
+};
+
+// Subscribe to a resource for real-time updates
+const subscribeToLinkedResource = (resourceId: string) => {
+  // Don't subscribe twice
+  if (resourceSubscriptions.value.has(resourceId)) return;
+
+  const unsubscribe = subscribeToResource(
+    resourceId,
+    (resource) => {
+      if (resource) {
+        linkedResources.value.set(resourceId, resource);
+      }
+    },
+    (error) => {
+      console.error('Error in resource subscription:', error);
+    }
+  );
+
+  resourceSubscriptions.value.set(resourceId, unsubscribe);
+};
+
+// Unsubscribe from all resources
+const unsubscribeFromAllResources = () => {
+  resourceSubscriptions.value.forEach((unsubscribe) => {
+    unsubscribe();
+  });
+  resourceSubscriptions.value.clear();
+};
+
+// Open music properties edit modal
+const openMusicPropsModal = (resourceId: string) => {
+  const resource = linkedResources.value.get(resourceId);
+  if (!resource) return;
+
+  editingResourceId.value = resourceId;
+  musicPropsForm.value = {
+    musicKey: resource.musicKey || '',
+    musicBeat: resource.musicBeat || '',
+    musicTempo: resource.musicTempo || '',
+    musicStyle: resource.musicStyle || ''
+  };
+  showMusicPropsModalState.value = true;
+};
+
+// Close music properties modal
+const closeMusicPropsModal = () => {
+  showMusicPropsModalState.value = false;
+  editingResourceId.value = null;
+};
+
+// Save music properties
+const saveMusicProps = async () => {
+  if (!editingResourceId.value) return;
+
+  try {
+    await updateResource(editingResourceId.value, {
+      musicKey: musicPropsForm.value.musicKey || undefined,
+      musicBeat: musicPropsForm.value.musicBeat || undefined,
+      musicTempo: musicPropsForm.value.musicTempo || undefined,
+      musicStyle: musicPropsForm.value.musicStyle || undefined
+    });
+
+    const toast = await toastController.create({
+      message: 'Propriétés musicales mises à jour',
+      duration: 1500,
+      position: 'bottom',
+      color: 'success'
+    });
+    await toast.present();
+
+    closeMusicPropsModal();
+  } catch (error) {
+    console.error('Error saving music properties:', error);
+    const toast = await toastController.create({
+      message: 'Erreur lors de la mise à jour',
+      duration: 2000,
+      position: 'bottom',
+      color: 'danger'
+    });
+    await toast.present();
+  }
+};
+
 // Lifecycle
 onMounted(async () => {
   loading.value = true;
-  await loadService();
+  await Promise.all([loadService(), loadMusicOptions()]);
   await loadProgram();
   loading.value = false;
+});
+
+onUnmounted(() => {
+  // Clean up program subscription
+  if (programSubscription.value) {
+    programSubscription.value();
+    programSubscription.value = null;
+  }
+  // Clean up all resource subscriptions
+  unsubscribeFromAllResources();
 });
 </script>
 
@@ -2111,6 +2375,78 @@ onMounted(async () => {
 .media-chip-button.small {
   padding: 0.3rem 0.6rem;
   font-size: 0.8rem;
+}
+
+/* Music Properties */
+.music-props-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.music-props {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.music-prop {
+  font-size: 0.75rem;
+  color: var(--ion-color-medium);
+  background: var(--ion-color-light);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.music-prop.small {
+  font-size: 0.7rem;
+  padding: 1px 6px;
+  margin-left: 0.25rem;
+}
+
+.music-props-edit-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: var(--ion-color-light);
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--ion-color-medium);
+  transition: all 0.2s ease;
+}
+
+.music-props-edit-btn:hover {
+  background: var(--ion-color-primary);
+  color: white;
+}
+
+.music-props-edit-btn.small {
+  width: 20px;
+  height: 20px;
+}
+
+.music-props-edit-btn ion-icon {
+  font-size: 14px;
+}
+
+.music-props-edit-btn.small ion-icon {
+  font-size: 12px;
+}
+
+.music-props-form ion-item {
+  margin-bottom: 0.5rem;
+}
+
+.sub-item-resources {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
 }
 
 .item-meta-column {

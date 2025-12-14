@@ -519,3 +519,383 @@ const youtubeSearch = require('./youtube-search');
 exports.searchYouTube = youtubeSearch.searchYouTube;
 exports.getVideoMetadata = youtubeSearch.getVideoMetadata;
 exports.createResourceFromYouTube = youtubeSearch.createResourceFromYouTube;
+
+/**
+ * Import music styles into resource_options collection
+ * This is a one-time admin function to seed the database
+ */
+exports.importMusicStyles = https.onCall(async (request) => {
+  // Verify authentication
+  if (!request.auth) {
+    throw new https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  // Verify admin status
+  const memberSnapshot = await db.collection('members')
+    .where('firebaseUserId', '==', request.auth.uid)
+    .limit(1)
+    .get();
+
+  if (memberSnapshot.empty) {
+    throw new https.HttpsError('permission-denied', 'User profile not found.');
+  }
+
+  const userData = memberSnapshot.docs[0].data();
+  if (!userData.isAdmin) {
+    throw new https.HttpsError('permission-denied', 'Only admins can import data');
+  }
+
+  // Music styles data
+  const musicStyles = [
+    {id: 'worship_contemporain', name: 'Worship contemporain', order: 1},
+    {id: 'worship_acoustique', name: 'Worship acoustique', order: 2},
+    {id: 'hymnes_traditionnels', name: 'Hymnes traditionnels', order: 3},
+    {id: 'hymnes_modernises', name: 'Hymnes modernisés', order: 4},
+    {id: 'gospel_traditionnel', name: 'Gospel traditionnel', order: 5},
+    {id: 'gospel_contemporain', name: 'Gospel contemporain', order: 6},
+    {id: 'gospel_choeur', name: 'Gospel chœur', order: 7},
+    {id: 'southern_gospel', name: 'Southern gospel', order: 8},
+    {id: 'ccm', name: 'CCM (Contemporary Christian Music)', order: 9},
+    {id: 'pop_chretien', name: 'Pop chrétien', order: 10},
+    {id: 'rock_chretien', name: 'Rock chrétien', order: 11},
+    {id: 'soft_rock', name: 'Soft rock / Ballade', order: 12},
+    {id: 'kompa', name: 'Kompa', order: 13},
+    {id: 'reggae', name: 'Reggae', order: 14},
+    {id: 'zouk', name: 'Zouk', order: 15},
+    {id: 'calypso_soca', name: 'Calypso / Soca', order: 16},
+    {id: 'afro_gospel', name: 'Afro-gospel', order: 17},
+    {id: 'afrobeat', name: 'Afrobeat', order: 18},
+    {id: 'makossa', name: 'Makossa', order: 19},
+    {id: 'rumba_congolaise', name: 'Rumba congolaise', order: 20},
+    {id: 'coupe_decale', name: 'Coupé-décalé', order: 21},
+    {id: 'latin_salsa', name: 'Latin / Salsa', order: 22},
+    {id: 'bachata', name: 'Bachata', order: 23},
+    {id: 'cumbia', name: 'Cumbia', order: 24},
+    {id: 'bresilien', name: 'Musique brésilienne', order: 25},
+    {id: 'rnb_soul', name: 'R&B / Soul', order: 26},
+    {id: 'jazz', name: 'Jazz', order: 27},
+    {id: 'folk_acoustique', name: 'Folk / Acoustique', order: 28},
+    {id: 'electro_edm', name: 'Électro / EDM', order: 29},
+    {id: 'hiphop_rap', name: 'Hip-hop / Rap chrétien', order: 30},
+    {id: 'country_gospel', name: 'Country gospel', order: 31},
+    {id: 'classique_orchestral', name: 'Classique / Orchestral', order: 32},
+    {id: 'a_cappella', name: 'A cappella', order: 33},
+    {id: 'gregorien_liturgique', name: 'Chant grégorien / Liturgique', order: 34},
+    {id: 'enfants', name: 'Chants pour enfants', order: 35},
+    {id: 'meditation_instrumental', name: 'Méditation / Instrumental', order: 36},
+    {id: 'noel', name: 'Chants de Noël', order: 37},
+    {id: 'paques', name: 'Chants de Pâques', order: 38}
+  ];
+
+  try {
+    // Check if document already exists
+    const docRef = db.collection('resource_options').doc('music_styles');
+    const docSnapshot = await docRef.get();
+
+    if (docSnapshot.exists) {
+      logger.info('Music styles document already exists, skipping import');
+      return {
+        success: true,
+        alreadyExists: true,
+        count: 0,
+        message: 'Music styles already exist in the database'
+      };
+    }
+
+    // Create the music_styles document in resource_options collection
+    // Store the array directly at the document level
+    await docRef.set({
+      items: musicStyles,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedBy: request.auth.uid
+    });
+
+    logger.info(`Successfully imported ${musicStyles.length} music styles`);
+
+    return {
+      success: true,
+      alreadyExists: false,
+      count: musicStyles.length,
+      message: `Successfully imported ${musicStyles.length} music styles`
+    };
+  } catch (error) {
+    logger.error('Error importing music styles', {error: error.message});
+    throw new https.HttpsError('internal', `Failed to import music styles: ${error.message}`);
+  }
+});
+
+/**
+ * Import music keys into resource_options collection
+ * This is a one-time admin function to seed the database
+ */
+exports.importMusicKeys = https.onCall(async (request) => {
+  // Verify authentication
+  if (!request.auth) {
+    throw new https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  // Verify admin status
+  const memberSnapshot = await db.collection('members')
+    .where('firebaseUserId', '==', request.auth.uid)
+    .limit(1)
+    .get();
+
+  if (memberSnapshot.empty) {
+    throw new https.HttpsError('permission-denied', 'User profile not found.');
+  }
+
+  const userData = memberSnapshot.docs[0].data();
+  if (!userData.isAdmin) {
+    throw new https.HttpsError('permission-denied', 'Only admins can import data');
+  }
+
+  // Music keys data
+  const musicKeys = [
+    {id: 'c', name: 'C', order: 1},
+    {id: 'cm', name: 'Cm', order: 2},
+    {id: 'db', name: 'Db', order: 3},
+    {id: 'dbm', name: 'Dbm', order: 4},
+    {id: 'd', name: 'D', order: 5},
+    {id: 'dm', name: 'Dm', order: 6},
+    {id: 'eb', name: 'Eb', order: 7},
+    {id: 'ebm', name: 'Ebm', order: 8},
+    {id: 'e', name: 'E', order: 9},
+    {id: 'em', name: 'Em', order: 10},
+    {id: 'f', name: 'F', order: 11},
+    {id: 'fm', name: 'Fm', order: 12},
+    {id: 'gb', name: 'Gb', order: 13},
+    {id: 'gbm', name: 'Gbm', order: 14},
+    {id: 'g', name: 'G', order: 15},
+    {id: 'gm', name: 'Gm', order: 16},
+    {id: 'ab', name: 'Ab', order: 17},
+    {id: 'abm', name: 'Abm', order: 18},
+    {id: 'a', name: 'A', order: 19},
+    {id: 'am', name: 'Am', order: 20},
+    {id: 'bb', name: 'Bb', order: 21},
+    {id: 'bbm', name: 'Bbm', order: 22},
+    {id: 'b', name: 'B', order: 23},
+    {id: 'bm', name: 'Bm', order: 24}
+  ];
+
+  try {
+    // Check if document already exists
+    const docRef = db.collection('resource_options').doc('music_keys');
+    const docSnapshot = await docRef.get();
+
+    if (docSnapshot.exists) {
+      logger.info('Music keys document already exists, skipping import');
+      return {
+        success: true,
+        alreadyExists: true,
+        count: 0,
+        message: 'Music keys already exist in the database'
+      };
+    }
+
+    // Create the music_keys document in resource_options collection
+    await docRef.set({
+      items: musicKeys,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedBy: request.auth.uid
+    });
+
+    logger.info(`Successfully imported ${musicKeys.length} music keys`);
+
+    return {
+      success: true,
+      alreadyExists: false,
+      count: musicKeys.length,
+      message: `Successfully imported ${musicKeys.length} music keys`
+    };
+  } catch (error) {
+    logger.error('Error importing music keys', {error: error.message});
+    throw new https.HttpsError('internal', `Failed to import music keys: ${error.message}`);
+  }
+});
+
+/**
+ * Import music beats into resource_options collection
+ * This is a one-time admin function to seed the database
+ */
+exports.importMusicBeats = https.onCall(async (request) => {
+  // Verify authentication
+  if (!request.auth) {
+    throw new https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  // Verify admin status
+  const memberSnapshot = await db.collection('members')
+    .where('firebaseUserId', '==', request.auth.uid)
+    .limit(1)
+    .get();
+
+  if (memberSnapshot.empty) {
+    throw new https.HttpsError('permission-denied', 'User profile not found.');
+  }
+
+  const userData = memberSnapshot.docs[0].data();
+  if (!userData.isAdmin) {
+    throw new https.HttpsError('permission-denied', 'Only admins can import data');
+  }
+
+  // Music beats data
+  const musicBeats = [
+    {id: '4_4', name: '4/4', order: 1},
+    {id: '6_8', name: '6/8', order: 2},
+    {id: '3_4', name: '3/4', order: 3},
+    {id: '12_8', name: '12/8', order: 4},
+    {id: '2_4', name: '2/4', order: 5},
+    {id: '2_2', name: '2/2', order: 6},
+    {id: '6_4', name: '6/4', order: 7},
+    {id: '9_8', name: '9/8', order: 8},
+    {id: '5_4', name: '5/4', order: 9},
+    {id: '3_8', name: '3/8', order: 10},
+    {id: '7_8', name: '7/8', order: 11},
+    {id: '7_4', name: '7/4', order: 12}
+  ];
+
+  try {
+    // Check if document already exists
+    const docRef = db.collection('resource_options').doc('music_beats');
+    const docSnapshot = await docRef.get();
+
+    if (docSnapshot.exists) {
+      logger.info('Music beats document already exists, skipping import');
+      return {
+        success: true,
+        alreadyExists: true,
+        count: 0,
+        message: 'Music beats already exist in the database'
+      };
+    }
+
+    // Create the music_beats document in resource_options collection
+    await docRef.set({
+      items: musicBeats,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedBy: request.auth.uid
+    });
+
+    logger.info(`Successfully imported ${musicBeats.length} music beats`);
+
+    return {
+      success: true,
+      alreadyExists: false,
+      count: musicBeats.length,
+      message: `Successfully imported ${musicBeats.length} music beats`
+    };
+  } catch (error) {
+    logger.error('Error importing music beats', {error: error.message});
+    throw new https.HttpsError('internal', `Failed to import music beats: ${error.message}`);
+  }
+});
+
+/**
+ * Import music tempos into resource_options collection
+ * This is a one-time admin function to seed the database
+ */
+exports.importMusicTempos = https.onCall(async (request) => {
+  // Verify authentication
+  if (!request.auth) {
+    throw new https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  // Verify admin status
+  const memberSnapshot = await db.collection('members')
+    .where('firebaseUserId', '==', request.auth.uid)
+    .limit(1)
+    .get();
+
+  if (memberSnapshot.empty) {
+    throw new https.HttpsError('permission-denied', 'User profile not found.');
+  }
+
+  const userData = memberSnapshot.docs[0].data();
+  if (!userData.isAdmin) {
+    throw new https.HttpsError('permission-denied', 'Only admins can import data');
+  }
+
+  // Music tempos data
+  const musicTempos = [
+    {id: 'bpm_20', name: '20 BPM', label: 'Grave', description: 'Très lent, solennel', order: 1},
+    {id: 'bpm_25', name: '25 BPM', label: 'Grave', description: 'Très lent, solennel', order: 2},
+    {id: 'bpm_30', name: '30 BPM', label: 'Grave', description: 'Très lent, solennel', order: 3},
+    {id: 'bpm_35', name: '35 BPM', label: 'Grave', description: 'Très lent, solennel', order: 4},
+    {id: 'bpm_40', name: '40 BPM', label: 'Largo', description: 'Lent, large', order: 5},
+    {id: 'bpm_45', name: '45 BPM', label: 'Largo', description: 'Lent, large', order: 6},
+    {id: 'bpm_50', name: '50 BPM', label: 'Largo', description: 'Lent, large', order: 7},
+    {id: 'bpm_55', name: '55 BPM', label: 'Largo', description: 'Lent, large', order: 8},
+    {id: 'bpm_60', name: '60 BPM', label: 'Largo', description: 'Lent, large', order: 9},
+    {id: 'bpm_65', name: '65 BPM', label: 'Larghetto', description: 'Un peu moins lent', order: 10},
+    {id: 'bpm_70', name: '70 BPM', label: 'Adagio', description: 'Lent, expressif', order: 11},
+    {id: 'bpm_75', name: '75 BPM', label: 'Adagio', description: 'Lent, expressif', order: 12},
+    {id: 'bpm_80', name: '80 BPM', label: 'Andante', description: 'Allure de marche', order: 13},
+    {id: 'bpm_85', name: '85 BPM', label: 'Andante', description: 'Allure de marche', order: 14},
+    {id: 'bpm_90', name: '90 BPM', label: 'Andante', description: 'Allure de marche', order: 15},
+    {id: 'bpm_95', name: '95 BPM', label: 'Andante', description: 'Allure de marche', order: 16},
+    {id: 'bpm_100', name: '100 BPM', label: 'Andante', description: 'Allure de marche', order: 17},
+    {id: 'bpm_105', name: '105 BPM', label: 'Andante', description: 'Allure de marche', order: 18},
+    {id: 'bpm_110', name: '110 BPM', label: 'Moderato', description: 'Modéré', order: 19},
+    {id: 'bpm_115', name: '115 BPM', label: 'Moderato', description: 'Modéré', order: 20},
+    {id: 'bpm_120', name: '120 BPM', label: 'Allegro', description: 'Rapide, joyeux', order: 21},
+    {id: 'bpm_125', name: '125 BPM', label: 'Allegro', description: 'Rapide, joyeux', order: 22},
+    {id: 'bpm_130', name: '130 BPM', label: 'Allegro', description: 'Rapide, joyeux', order: 23},
+    {id: 'bpm_135', name: '135 BPM', label: 'Allegro', description: 'Rapide, joyeux', order: 24},
+    {id: 'bpm_140', name: '140 BPM', label: 'Allegro', description: 'Rapide, joyeux', order: 25},
+    {id: 'bpm_145', name: '145 BPM', label: 'Allegro', description: 'Rapide, joyeux', order: 26},
+    {id: 'bpm_150', name: '150 BPM', label: 'Allegro', description: 'Rapide, joyeux', order: 27},
+    {id: 'bpm_155', name: '155 BPM', label: 'Allegro', description: 'Rapide, joyeux', order: 28},
+    {id: 'bpm_160', name: '160 BPM', label: 'Vivace', description: 'Vif, animé', order: 29},
+    {id: 'bpm_165', name: '165 BPM', label: 'Vivace', description: 'Vif, animé', order: 30},
+    {id: 'bpm_170', name: '170 BPM', label: 'Vivace', description: 'Vif, animé', order: 31},
+    {id: 'bpm_175', name: '175 BPM', label: 'Vivace', description: 'Vif, animé', order: 32},
+    {id: 'bpm_180', name: '180 BPM', label: 'Presto', description: 'Très rapide', order: 33},
+    {id: 'bpm_185', name: '185 BPM', label: 'Presto', description: 'Très rapide', order: 34},
+    {id: 'bpm_190', name: '190 BPM', label: 'Presto', description: 'Très rapide', order: 35},
+    {id: 'bpm_195', name: '195 BPM', label: 'Presto', description: 'Très rapide', order: 36},
+    {id: 'bpm_200', name: '200 BPM', label: 'Presto', description: 'Très rapide', order: 37},
+    {id: 'bpm_205', name: '205 BPM', label: 'Prestissimo', description: 'Extrêmement rapide', order: 38},
+    {id: 'bpm_210', name: '210 BPM', label: 'Prestissimo', description: 'Extrêmement rapide', order: 39},
+    {id: 'bpm_215', name: '215 BPM', label: 'Prestissimo', description: 'Extrêmement rapide', order: 40},
+    {id: 'bpm_220', name: '220 BPM', label: 'Prestissimo', description: 'Extrêmement rapide', order: 41},
+    {id: 'bpm_225', name: '225 BPM', label: 'Prestissimo', description: 'Extrêmement rapide', order: 42},
+    {id: 'bpm_230', name: '230 BPM', label: 'Prestissimo', description: 'Extrêmement rapide', order: 43},
+    {id: 'bpm_235', name: '235 BPM', label: 'Prestissimo', description: 'Extrêmement rapide', order: 44},
+    {id: 'bpm_240', name: '240 BPM', label: 'Prestissimo', description: 'Extrêmement rapide', order: 45}
+  ];
+
+  try {
+    // Check if document already exists
+    const docRef = db.collection('resource_options').doc('music_tempos');
+    const docSnapshot = await docRef.get();
+
+    if (docSnapshot.exists) {
+      logger.info('Music tempos document already exists, skipping import');
+      return {
+        success: true,
+        alreadyExists: true,
+        count: 0,
+        message: 'Music tempos already exist in the database'
+      };
+    }
+
+    // Create the music_tempos document in resource_options collection
+    await docRef.set({
+      items: musicTempos,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedBy: request.auth.uid
+    });
+
+    logger.info(`Successfully imported ${musicTempos.length} music tempos`);
+
+    return {
+      success: true,
+      alreadyExists: false,
+      count: musicTempos.length,
+      message: `Successfully imported ${musicTempos.length} music tempos`
+    };
+  } catch (error) {
+    logger.error('Error importing music tempos', {error: error.message});
+    throw new https.HttpsError('internal', `Failed to import music tempos: ${error.message}`);
+  }
+});

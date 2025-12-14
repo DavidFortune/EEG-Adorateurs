@@ -98,7 +98,13 @@ service cloud.firestore {
         request.resource.data.color.matches('^#[0-9a-fA-F]{6}$');
       allow delete: if request.auth != null;
     }
-    
+
+    // Resource Options collection - read-only for authenticated users (music_keys, music_beats, etc.)
+    match /resource_options/{optionId} {
+      allow read: if request.auth != null;
+      allow write: if false; // Only cloud functions can write
+    }
+
     // Default deny all other access
     match /{document=**} {
       allow read, write: if false;

@@ -1,24 +1,44 @@
-import { 
-  collection, 
-  doc, 
-  getDocs, 
-  getDoc, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where, 
-  orderBy, 
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  orderBy,
   limit,
   QueryConstraint,
   serverTimestamp,
-  increment
+  increment,
+  Timestamp,
+  onSnapshot,
+  Unsubscribe
 } from 'firebase/firestore';
-import { db } from './config';
-import { Resource, ResourceCollection, ResourceFilter, ResourceType, SortOption } from '@/types/resource';
+import { ref as storageRef, deleteObject, listAll } from 'firebase/storage';
+import { db, storage } from './config';
+import { Resource, ResourceCollection, ResourceFilter, ResourceType, SortOption, ResourceOption, ResourceOptionsDoc } from '@/types/resource';
 
 const RESOURCES_COLLECTION = 'resources';
 const COLLECTIONS_COLLECTION = 'resource_collections';
+const RESOURCE_OPTIONS_COLLECTION = 'resource_options';
+
+// Helper function to convert Firestore Timestamp to ISO string
+const convertTimestamp = (timestamp: any): string => {
+  if (!timestamp) return new Date().toISOString();
+  if (timestamp instanceof Timestamp) {
+    return timestamp.toDate().toISOString();
+  }
+  if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+    return timestamp.toDate().toISOString();
+  }
+  if (typeof timestamp === 'string') {
+    return timestamp;
+  }
+  return new Date().toISOString();
+};
 
 // Predefined color palette for collections
 export const COLLECTION_COLORS = [
@@ -116,10 +136,15 @@ export const getResourceCollections = async (): Promise<ResourceCollection[]> =>
   try {
     const q = query(collection(db, COLLECTIONS_COLLECTION), orderBy('name'));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as ResourceCollection));
+    return snapshot.docs.map(docSnap => {
+      const data = docSnap.data();
+      return {
+        id: docSnap.id,
+        ...data,
+        createdAt: convertTimestamp(data.createdAt),
+        updatedAt: convertTimestamp(data.updatedAt)
+      } as ResourceCollection;
+    });
   } catch (error) {
     console.error('Error getting resource collections:', error);
     throw error;
@@ -130,11 +155,14 @@ export const getResourceCollectionById = async (collectionId: string): Promise<R
   try {
     const docRef = doc(db, COLLECTIONS_COLLECTION, collectionId);
     const docSnap = await getDoc(docRef);
-    
+
     if (docSnap.exists()) {
+      const data = docSnap.data();
       return {
         id: docSnap.id,
-        ...docSnap.data()
+        ...data,
+        createdAt: convertTimestamp(data.createdAt),
+        updatedAt: convertTimestamp(data.updatedAt)
       } as ResourceCollection;
     }
     return null;
@@ -182,14 +210,14 @@ export const deleteResourceCollection = async (collectionId: string): Promise<vo
     // First check if any resources are using this collection
     const q = query(
       collection(db, RESOURCES_COLLECTION),
-      where('collectionIds', 'array-contains', collectionId)
+      where('collectionId', '==', collectionId)
     );
     const snapshot = await getDocs(q);
-    
+
     if (!snapshot.empty) {
       throw new Error('Cannot delete resource collection that contains resources');
     }
-    
+
     await deleteDoc(doc(db, COLLECTIONS_COLLECTION, collectionId));
   } catch (error) {
     console.error('Error deleting resource collection:', error);
@@ -201,12 +229,12 @@ export const deleteResourceCollection = async (collectionId: string): Promise<vo
 export const getResources = async (filter?: ResourceFilter): Promise<Resource[]> => {
   try {
     const constraints: QueryConstraint[] = [];
-    
+
     // Apply collection filter
-    if (filter?.collectionIds && filter.collectionIds.length > 0) {
-      constraints.push(where('collectionIds', 'array-contains-any', filter.collectionIds));
+    if (filter?.collectionId) {
+      constraints.push(where('collectionId', '==', filter.collectionId));
     }
-    
+
     // Apply sorting (though most sorting is now handled client-side)
     if (filter?.sortBy) {
       switch (filter.sortBy) {
@@ -226,33 +254,42 @@ export const getResources = async (filter?: ResourceFilter): Promise<Resource[]>
     } else {
       constraints.push(orderBy('createdAt', 'desc'));
     }
-    
+
     const q = query(collection(db, RESOURCES_COLLECTION), ...constraints);
     const snapshot = await getDocs(q);
-    
-    let resources = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as Resource));
-    
+
+    let resources = snapshot.docs.map(docSnap => {
+      const data = docSnap.data();
+      // Handle migration: if collectionIds exists but collectionId doesn't, use first collectionId
+      if (!data.collectionId && data.collectionIds && data.collectionIds.length > 0) {
+        data.collectionId = data.collectionIds[0];
+      }
+      return {
+        id: docSnap.id,
+        ...data,
+        createdAt: convertTimestamp(data.createdAt),
+        updatedAt: convertTimestamp(data.updatedAt)
+      } as Resource;
+    });
+
     // Apply client-side filters
     if (filter?.resourceTypes && filter.resourceTypes.length > 0) {
-      resources = resources.filter(resource => 
-        resource.contents.some(content => 
+      resources = resources.filter(resource =>
+        resource.contents.some(content =>
           filter.resourceTypes!.includes(content.type)
         )
       );
     }
-    
+
     // Apply search filter (client-side for now, could be improved with Algolia or similar)
     if (filter?.searchQuery) {
       const searchLower = filter.searchQuery.toLowerCase();
       resources = resources.filter(resource => {
-        const searchableText = `${resource.title} ${resource.description || ''} ${resource.tags?.join(' ') || ''}`.toLowerCase();
+        const searchableText = `${resource.title} ${resource.tags?.join(' ') || ''}`.toLowerCase();
         return searchableText.includes(searchLower);
       });
     }
-    
+
     return resources;
   } catch (error) {
     console.error('Error getting resources:', error);
@@ -264,16 +301,24 @@ export const getResourceById = async (resourceId: string): Promise<Resource | nu
   try {
     const docRef = doc(db, RESOURCES_COLLECTION, resourceId);
     const docSnap = await getDoc(docRef);
-    
+
     if (docSnap.exists()) {
       // Increment view count
       await updateDoc(docRef, {
         viewCount: increment(1)
       });
-      
+
+      const data = docSnap.data();
+      // Handle migration: if collectionIds exists but collectionId doesn't, use first collectionId
+      if (!data.collectionId && data.collectionIds && data.collectionIds.length > 0) {
+        data.collectionId = data.collectionIds[0];
+      }
+
       return {
         id: docSnap.id,
-        ...docSnap.data()
+        ...data,
+        createdAt: convertTimestamp(data.createdAt),
+        updatedAt: convertTimestamp(data.updatedAt)
       } as Resource;
     }
     return null;
@@ -281,6 +326,81 @@ export const getResourceById = async (resourceId: string): Promise<Resource | nu
     console.error('Error getting resource:', error);
     throw error;
   }
+};
+
+// Real-time subscription to a resource - updates automatically when data changes
+export const subscribeToResource = (
+  resourceId: string,
+  onUpdate: (resource: Resource | null) => void,
+  onError?: (error: Error) => void
+): Unsubscribe => {
+  const docRef = doc(db, RESOURCES_COLLECTION, resourceId);
+
+  return onSnapshot(
+    docRef,
+    (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        // Handle migration: if collectionIds exists but collectionId doesn't, use first collectionId
+        if (!data.collectionId && data.collectionIds && data.collectionIds.length > 0) {
+          data.collectionId = data.collectionIds[0];
+        }
+
+        const resource: Resource = {
+          id: docSnap.id,
+          ...data,
+          createdAt: convertTimestamp(data.createdAt),
+          updatedAt: convertTimestamp(data.updatedAt)
+        } as Resource;
+
+        onUpdate(resource);
+      } else {
+        onUpdate(null);
+      }
+    },
+    (error) => {
+      console.error('Error in resource subscription:', error);
+      if (onError) {
+        onError(error);
+      }
+    }
+  );
+};
+
+// Real-time subscription to all resources - updates automatically when any resource changes
+export const subscribeToResources = (
+  onUpdate: (resources: Resource[]) => void,
+  onError?: (error: Error) => void
+): Unsubscribe => {
+  const q = query(collection(db, RESOURCES_COLLECTION), orderBy('createdAt', 'desc'));
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const resources = snapshot.docs.map(docSnap => {
+        const data = docSnap.data();
+        // Handle migration: if collectionIds exists but collectionId doesn't, use first collectionId
+        if (!data.collectionId && data.collectionIds && data.collectionIds.length > 0) {
+          data.collectionId = data.collectionIds[0];
+        }
+
+        return {
+          id: docSnap.id,
+          ...data,
+          createdAt: convertTimestamp(data.createdAt),
+          updatedAt: convertTimestamp(data.updatedAt)
+        } as Resource;
+      });
+
+      onUpdate(resources);
+    },
+    (error) => {
+      console.error('Error in resources subscription:', error);
+      if (onError) {
+        onError(error);
+      }
+    }
+  );
 };
 
 // Helper function to recursively remove undefined values from objects
@@ -304,7 +424,7 @@ export const createResource = async (resourceData: Omit<Resource, 'id' | 'create
     console.log('[Firebase] Creating resource with data:', resourceData);
     
     // Generate search text for better full-text search
-    const searchText = `${resourceData.title} ${resourceData.description || ''} ${resourceData.tags?.join(' ') || ''}`.toLowerCase();
+    const searchText = `${resourceData.title} ${resourceData.tags?.join(' ') || ''}`.toLowerCase();
     
     // Recursively filter out undefined fields to prevent Firebase errors
     const cleanData = removeUndefinedFields(resourceData);
@@ -334,15 +454,14 @@ export const createResource = async (resourceData: Omit<Resource, 'id' | 'create
 
 export const updateResource = async (resourceId: string, updates: Partial<Resource>): Promise<void> => {
   try {
-    // Update search text if title, description or tags changed
+    // Update search text if title or tags changed
     let searchText = undefined;
-    if (updates.title || updates.description || updates.tags) {
+    if (updates.title || updates.tags) {
       const existingResource = await getResourceById(resourceId);
       if (existingResource) {
         const title = updates.title || existingResource.title;
-        const description = updates.description || existingResource.description || '';
         const tags = updates.tags || existingResource.tags || [];
-        searchText = `${title} ${description} ${tags.join(' ')}`.toLowerCase();
+        searchText = `${title} ${tags.join(' ')}`.toLowerCase();
       }
     }
     
@@ -363,6 +482,36 @@ export const updateResource = async (resourceId: string, updates: Partial<Resour
 
 export const deleteResource = async (resourceId: string): Promise<void> => {
   try {
+    // First, delete all files from Cloud Storage for this resource
+    const resourceStoragePath = `resources/${resourceId}`;
+    const storageReference = storageRef(storage, resourceStoragePath);
+
+    try {
+      // List all files in the resource folder
+      const listResult = await listAll(storageReference);
+
+      // Delete all files in the root of the resource folder
+      const deletePromises = listResult.items.map(item => deleteObject(item));
+
+      // Also delete files in subdirectories (like /audio, /video, etc.)
+      for (const prefix of listResult.prefixes) {
+        const subFolderResult = await listAll(prefix);
+        subFolderResult.items.forEach(item => {
+          deletePromises.push(deleteObject(item));
+        });
+      }
+
+      // Wait for all deletions to complete
+      await Promise.all(deletePromises);
+      console.log(`Deleted ${deletePromises.length} files from storage for resource ${resourceId}`);
+    } catch (storageError: any) {
+      // If folder doesn't exist or is empty, that's okay - continue with document deletion
+      if (storageError.code !== 'storage/object-not-found') {
+        console.warn('Error deleting storage files:', storageError);
+      }
+    }
+
+    // Then delete the Firestore document
     await deleteDoc(doc(db, RESOURCES_COLLECTION, resourceId));
   } catch (error) {
     console.error('Error deleting resource:', error);
@@ -380,8 +529,8 @@ export const searchResources = async (searchQuery: string, limit = 20): Promise<
     
     return allResources
       .filter(resource => {
-        const searchableText = resource.searchText || 
-          `${resource.title} ${resource.description || ''} ${resource.tags?.join(' ') || ''}`.toLowerCase();
+        const searchableText = resource.searchText ||
+          `${resource.title} ${resource.tags?.join(' ') || ''}`.toLowerCase();
         return searchableText.includes(searchLower);
       })
       .slice(0, limit);
@@ -396,17 +545,66 @@ export const getResourcesByCollection = async (collectionId: string): Promise<Re
   try {
     const q = query(
       collection(db, RESOURCES_COLLECTION),
-      where('collectionIds', 'array-contains', collectionId),
+      where('collectionId', '==', collectionId),
       orderBy('title')
     );
     const snapshot = await getDocs(q);
-    
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as Resource));
+
+    return snapshot.docs.map(docSnap => {
+      const data = docSnap.data();
+      // Handle migration: if collectionIds exists but collectionId doesn't, use first collectionId
+      if (!data.collectionId && data.collectionIds && data.collectionIds.length > 0) {
+        data.collectionId = data.collectionIds[0];
+      }
+      return {
+        id: docSnap.id,
+        ...data,
+        createdAt: convertTimestamp(data.createdAt),
+        updatedAt: convertTimestamp(data.updatedAt)
+      } as Resource;
+    });
   } catch (error) {
     console.error('Error getting resources by collection:', error);
+    throw error;
+  }
+};
+
+// Get resource options (music_keys, music_beats, music_tempos, music_styles)
+export const getResourceOptions = async (optionType: 'music_keys' | 'music_beats' | 'music_tempos' | 'music_styles'): Promise<ResourceOption[]> => {
+  try {
+    const docRef = doc(db, RESOURCE_OPTIONS_COLLECTION, optionType);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      const data = docSnap.data() as ResourceOptionsDoc;
+      // Sort items by order field
+      return (data.items || []).sort((a, b) => a.order - b.order);
+    }
+    return [];
+  } catch (error) {
+    console.error(`Error getting resource options (${optionType}):`, error);
+    throw error;
+  }
+};
+
+// Get all resource options at once
+export const getAllResourceOptions = async (): Promise<{
+  musicKeys: ResourceOption[];
+  musicBeats: ResourceOption[];
+  musicTempos: ResourceOption[];
+  musicStyles: ResourceOption[];
+}> => {
+  try {
+    const [musicKeys, musicBeats, musicTempos, musicStyles] = await Promise.all([
+      getResourceOptions('music_keys'),
+      getResourceOptions('music_beats'),
+      getResourceOptions('music_tempos'),
+      getResourceOptions('music_styles')
+    ]);
+
+    return { musicKeys, musicBeats, musicTempos, musicStyles };
+  } catch (error) {
+    console.error('Error getting all resource options:', error);
     throw error;
   }
 };
