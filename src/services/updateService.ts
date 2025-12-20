@@ -241,6 +241,24 @@ class UpdateService {
   async getReleaseNotes(): Promise<ReleaseNote[]> {
     return [
       {
+        version: '1.11.1',
+        date: '2025-12-20',
+        title: 'Gestion des médias et paroles',
+        description: 'Amélioration de la gestion des médias et des paroles dans les ressources',
+        features: [
+          'Boutons d\'édition pour tous les types de médias (YouTube, vidéo, audio, Spotify, partition, fichier, lien)',
+          'Modal d\'édition des métadonnées (notes/nom) pour les médias',
+          'Modal d\'édition du contenu des paroles',
+          'Bouton "Ajouter des paroles" lorsqu\'aucune parole n\'existe (admin uniquement)',
+          'Section "Paroles" toujours visible même sans contenu'
+        ],
+        fixes: [],
+        improvements: [
+          'Boutons d\'édition et suppression alignés dans l\'en-tête de la section Paroles',
+          'Interface cohérente pour l\'ajout et la modification des paroles'
+        ]
+      },
+      {
         version: '1.11.0',
         date: '2025-12-14',
         title: 'Programme de service en temps réel',

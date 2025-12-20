@@ -1,7 +1,7 @@
 {
   "name": "ionic-app-base",
   "private": true,
-  "version": "1.11.0",
+  "version": "1.11.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,6 +12,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@capacitor-community/keep-awake": "^7.1.0",
     "@capacitor/android": "7.4.3",
     "@capacitor/app": "7.0.2",
     "@capacitor/core": "7.4.3",

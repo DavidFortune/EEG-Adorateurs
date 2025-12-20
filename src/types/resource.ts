@@ -54,6 +54,7 @@ export interface Resource {
   collectionId: string; // Belongs to one collection
   contents: ResourceMedia[]; // Can have multiple media types
   tags?: string[]; // For better search
+  notes?: string; // Additional notes or instructions for this resource
   createdAt: string;
   updatedAt: string;
   createdBy: string; // User ID who created it

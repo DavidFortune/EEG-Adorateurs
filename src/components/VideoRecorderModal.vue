@@ -149,6 +149,7 @@ import {
 } from 'ionicons/icons';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { storage } from '@/firebase/config';
+import { KeepAwake } from '@capacitor-community/keep-awake';
 
 interface Props {
   isOpen: boolean;
@@ -209,6 +210,9 @@ const stopTimer = () => {
 const startRecording = async () => {
   try {
     errorMessage.value = '';
+
+    // Prevent device from going idle during recording
+    await KeepAwake.keepAwake();
 
     // Request camera and microphone access
     mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -285,11 +289,14 @@ const startRecording = async () => {
   }
 };
 
-const stopRecording = () => {
+const stopRecording = async () => {
   if (mediaRecorder && mediaRecorder.state !== 'inactive') {
     mediaRecorder.stop();
     isRecording.value = false;
     stopTimer();
+
+    // Allow device to go idle again
+    await KeepAwake.allowSleep();
   }
 };
 
@@ -427,20 +434,23 @@ const saveRecording = async () => {
   }
 };
 
-const cleanup = () => {
+const cleanup = async () => {
   stopTimer();
   resetRecording();
   recordingName.value = '';
   errorMessage.value = '';
   uploading.value = false;
   uploadProgress.value = 0;
+
+  // Ensure device can sleep when cleaning up
+  await KeepAwake.allowSleep();
 };
 
-const handleClose = () => {
+const handleClose = async () => {
   if (isRecording.value) {
-    stopRecording();
+    await stopRecording();
   }
-  cleanup();
+  await cleanup();
   emit('close');
 };
 

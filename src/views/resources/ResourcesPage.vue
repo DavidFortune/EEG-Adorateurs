@@ -4,6 +4,9 @@
       <ion-toolbar>
         <ion-title>Ressources</ion-title>
         <ion-buttons slot="end">
+          <ion-button v-if="isAdmin" @click="migrateMediaMetadata" fill="clear" title="Migrer métadonnées médias">
+            <ion-icon :icon="syncOutline" />
+          </ion-button>
           <ion-button v-if="isAdmin" @click="importMusicStyles" fill="clear" title="Importer styles musicaux">
             <ion-icon :icon="cloudDownloadOutline" />
           </ion-button>
@@ -190,7 +193,7 @@ import {
   addOutline, folderOutline, swapVerticalOutline, closeCircle,
   documentTextOutline, eyeOutline, pencilOutline, musicalNotesOutline,
   videocamOutline, volumeHighOutline, logoYoutube, documentOutline,
-  checkmarkOutline, cloudDownloadOutline
+  checkmarkOutline, cloudDownloadOutline, syncOutline
 } from 'ionicons/icons';
 import { Resource, ResourceCollection, ResourceType, SortOption, ResourceOption } from '@/types/resource';
 import { getResourceCollections, subscribeToResources, getAllResourceOptions } from '@/firebase/resources';
@@ -578,6 +581,53 @@ const importMusicStyles = async () => {
     console.error('Import error:', error);
     const errorToast = await toastController.create({
       message: `Erreur: ${error.message || 'Échec de l\'importation'}`,
+      duration: 3000,
+      position: 'bottom',
+      color: 'danger'
+    });
+    await errorToast.present();
+  }
+};
+
+// Migrate media metadata (add names, timestamps, types)
+const migrateMediaMetadata = async () => {
+  try {
+    const functions = getFunctions(app);
+    const migrateFn = httpsCallable(functions, 'migrateMediaMetadata');
+
+    const toast = await toastController.create({
+      message: 'Migration en cours...',
+      duration: 0,
+      position: 'bottom'
+    });
+    await toast.present();
+
+    const result = await migrateFn({});
+    const data = result.data as {
+      success: boolean;
+      totalResources: number;
+      updatedResources: number;
+      totalMediaItems: number;
+      updatedMediaItems: number;
+      message: string;
+    };
+
+    await toast.dismiss();
+
+    const successToast = await toastController.create({
+      message: data.updatedMediaItems > 0
+        ? `${data.updatedMediaItems} médias mis à jour dans ${data.updatedResources} ressources`
+        : 'Tous les médias sont déjà à jour',
+      duration: 4000,
+      position: 'bottom',
+      color: data.updatedMediaItems > 0 ? 'success' : 'warning'
+    });
+    await successToast.present();
+
+  } catch (error: any) {
+    console.error('Migration error:', error);
+    const errorToast = await toastController.create({
+      message: `Erreur: ${error.message || 'Échec de la migration'}`,
       duration: 3000,
       position: 'bottom',
       color: 'danger'

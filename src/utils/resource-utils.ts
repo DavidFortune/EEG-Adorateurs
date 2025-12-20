@@ -163,6 +163,103 @@ export function isSpotifyUrl(url?: string): boolean {
 }
 
 /**
+ * Check if URL points to an audio file
+ */
+export function isAudioUrl(url?: string): boolean {
+  if (!url) return false;
+  const audioExtensions = ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac', '.wma', '.webm'];
+  const lowerUrl = url.toLowerCase();
+  return audioExtensions.some(ext => lowerUrl.includes(ext));
+}
+
+/**
+ * Check if URL points to a video file
+ */
+export function isVideoUrl(url?: string): boolean {
+  if (!url) return false;
+  const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.wmv', '.flv', '.m4v'];
+  const lowerUrl = url.toLowerCase();
+  return videoExtensions.some(ext => lowerUrl.includes(ext));
+}
+
+/**
+ * Check if URL points to a music sheet (PDF or image)
+ */
+export function isMusicSheetUrl(url?: string): boolean {
+  if (!url) return false;
+  return isPdfFile(url);
+}
+
+/**
+ * Detect ResourceType from URL
+ */
+export function detectMediaTypeFromUrl(url: string): ResourceType {
+  if (isYouTubeUrl(url)) {
+    return ResourceType.YOUTUBE;
+  }
+  if (isSpotifyUrl(url)) {
+    return ResourceType.SPOTIFY;
+  }
+  if (isAudioUrl(url)) {
+    return ResourceType.AUDIO;
+  }
+  if (isVideoUrl(url)) {
+    return ResourceType.VIDEO;
+  }
+  if (isPdfFile(url)) {
+    return ResourceType.MUSIC_SHEET;
+  }
+  // Default to FILE for any other URL
+  return ResourceType.FILE;
+}
+
+/**
+ * Get a suggested name for a URL based on its type and content
+ */
+export function getSuggestedNameFromUrl(url: string, type: ResourceType): string {
+  try {
+    const urlObj = new URL(url);
+
+    // For YouTube, try to extract video info from URL
+    if (type === ResourceType.YOUTUBE) {
+      return 'Vidéo YouTube';
+    }
+
+    // For Spotify, determine the type
+    if (type === ResourceType.SPOTIFY) {
+      if (url.includes('/track/')) return 'Piste Spotify';
+      if (url.includes('/album/')) return 'Album Spotify';
+      if (url.includes('/playlist/')) return 'Playlist Spotify';
+      return 'Spotify';
+    }
+
+    // For files, try to extract filename
+    const filename = getFileName(url);
+    if (filename && filename !== 'Fichier') {
+      // Remove extension for cleaner name
+      const nameWithoutExt = filename.replace(/\.[^/.]+$/, '');
+      return nameWithoutExt;
+    }
+
+    // Fallback based on type
+    switch (type) {
+      case ResourceType.AUDIO:
+        return 'Audio';
+      case ResourceType.VIDEO:
+        return 'Vidéo';
+      case ResourceType.MUSIC_SHEET:
+        return 'Partition';
+      case ResourceType.FILE:
+        return urlObj.hostname || 'Lien';
+      default:
+        return 'Média';
+    }
+  } catch {
+    return 'Lien';
+  }
+}
+
+/**
  * Get Spotify embed URL from various Spotify URL formats
  */
 export function getSpotifyEmbedUrl(url?: string): string | null {

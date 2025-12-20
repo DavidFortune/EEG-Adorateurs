@@ -520,6 +520,10 @@ exports.searchYouTube = youtubeSearch.searchYouTube;
 exports.getVideoMetadata = youtubeSearch.getVideoMetadata;
 exports.createResourceFromYouTube = youtubeSearch.createResourceFromYouTube;
 
+// Export media migration functions
+const mediaMigration = require('./media-migration');
+exports.migrateMediaMetadata = mediaMigration.migrateMediaMetadata;
+
 /**
  * Import music styles into resource_options collection
  * This is a one-time admin function to seed the database
