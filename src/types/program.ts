@@ -3,7 +3,8 @@ export enum ProgramItemType {
   PRAYER = 'Prière',
   SCRIPTURE = 'Lecture biblique',
   SERMON = 'Prédication',
-  TITLE = 'Titre'
+  TITLE = 'Titre',
+  SECTION = 'Section'
 }
 
 export interface ProgramParticipant {

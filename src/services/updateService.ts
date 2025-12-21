@@ -241,6 +241,25 @@ class UpdateService {
   async getReleaseNotes(): Promise<ReleaseNote[]> {
     return [
       {
+        version: '1.11.2',
+        date: '2025-12-21',
+        title: 'Affichage PDF et sections de programme',
+        description: 'Correction de l\'affichage des PDF sur mobile et ajout des sections de programme',
+        features: [
+          'Nouveau type "Section" pour les programmes de service',
+          'Les sections agissent comme des diviseurs visuels entre les parties du programme',
+          'Les sections ne sont pas numérotées et s\'affichent en pleine largeur avec un style distinctif'
+        ],
+        fixes: [
+          'Correction de l\'affichage des PDF dans les ressources (partitions)',
+          'Remplacement de l\'iframe par vue-pdf-embed pour une compatibilité mobile'
+        ],
+        improvements: [
+          'Navigation par pages dans le visualiseur PDF',
+          'Meilleur rendu des PDF sur iOS et Android'
+        ]
+      },
+      {
         version: '1.11.1',
         date: '2025-12-20',
         title: 'Gestion des médias et paroles',

@@ -120,7 +120,7 @@
               v-for="(item, index) in sortedItems"
               :key="item.id"
               class="program-item-wrapper"
-              :class="{ 'has-subitems': hasSubItems(item), 'expanded': isItemExpanded(item.id) }"
+              :class="{ 'has-subitems': hasSubItems(item), 'expanded': isItemExpanded(item.id), 'is-section': isSectionItem(item) }"
             >
               <div
                 class="program-item"
@@ -134,8 +134,8 @@
                     </div>
                   </div>
 
-                  <!-- Order Number -->
-                  <div class="item-column item-order-column">
+                  <!-- Order Number (hidden for Section items) -->
+                  <div v-if="!isSectionItem(item)" class="item-column item-order-column">
                     <div class="item-order">{{ index + 1 }}</div>
                   </div>
 
@@ -838,7 +838,8 @@ import {
   checkmarkOutline, reorderThreeOutline, addOutline, trashOutline,
   playCircleOutline, volumeHighOutline, documentOutline,
   chatboxEllipsesOutline, chevronDownOutline, chevronForwardOutline,
-  arrowBackOutline, logoYoutube, playBackOutline, playForwardOutline
+  arrowBackOutline, logoYoutube, playBackOutline, playForwardOutline,
+  removeOutline
 } from 'ionicons/icons';
 import ResourceSelector from '@/components/ResourceSelector.vue';
 import SendProgramSMSModal from '@/components/SendProgramSMSModal.vue';
@@ -1026,6 +1027,7 @@ const getItemIcon = (type: ProgramItemType) => {
     'Lecture biblique': libraryOutline,
     'Prédication': micOutline,
     'Titre': documentTextOutline,
+    'Section': removeOutline,
     'Annonce': megaphoneOutline,
     'Offrande': giftOutline,
     'Bénédiction': handLeftOutline,
@@ -1070,6 +1072,10 @@ const getLinkedResource = (resourceId: string): Resource | undefined => {
 
 const hasSubItems = (item: ProgramItem): boolean => {
   return !!(item.subItems && item.subItems.length > 0);
+};
+
+const isSectionItem = (item: ProgramItem): boolean => {
+  return item.type === ProgramItemType.SECTION;
 };
 
 const isItemExpanded = (itemId: string): boolean => {
@@ -3196,5 +3202,69 @@ onUnmounted(() => {
   font-weight: 500;
   text-align: center;
   line-height: 1.2;
+}
+
+/* Section Divider Styles */
+.program-item-wrapper.is-section {
+  margin: 1.5rem 0;
+}
+
+.program-item-wrapper.is-section .program-item {
+  background: linear-gradient(135deg, var(--ion-color-primary) 0%, var(--ion-color-primary-shade) 100%);
+  border-radius: 0;
+  padding: 0.75rem 1rem;
+}
+
+.program-item-wrapper.is-section .item-layout {
+  justify-content: center;
+}
+
+.program-item-wrapper.is-section .item-details-column {
+  text-align: center;
+}
+
+.program-item-wrapper.is-section .item-header-row {
+  justify-content: center;
+  margin-bottom: 0;
+}
+
+.program-item-wrapper.is-section .item-type {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.program-item-wrapper.is-section .item-type ion-icon {
+  display: none;
+}
+
+.program-item-wrapper.is-section .item-title {
+  color: white;
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 0;
+}
+
+.program-item-wrapper.is-section .item-subtitle,
+.program-item-wrapper.is-section .item-notes,
+.program-item-wrapper.is-section .item-resources {
+  display: none;
+}
+
+.program-item-wrapper.is-section .item-meta-column,
+.program-item-wrapper.is-section .item-actions-column {
+  display: none;
+}
+
+/* Edit mode: show actions for section */
+.edit-mode .program-item-wrapper.is-section .item-actions-column {
+  display: flex;
+}
+
+.edit-mode .program-item-wrapper.is-section .item-actions ion-button {
+  --color: white;
 }
 </style>

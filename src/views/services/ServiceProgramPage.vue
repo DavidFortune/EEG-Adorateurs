@@ -954,7 +954,7 @@ import {
   megaphoneOutline, giftOutline, handLeftOutline, personCircleOutline,
   checkmarkOutline, reorderThreeOutline, addOutline, trashOutline,
   playCircleOutline, volumeHighOutline, documentOutline, linkOutline,
-  downloadOutline, chatboxEllipsesOutline
+  downloadOutline, chatboxEllipsesOutline, removeOutline
 } from 'ionicons/icons';
 import ResourceSelector from '@/components/ResourceSelector.vue';
 import SendProgramSMSModal from '@/components/SendProgramSMSModal.vue';
@@ -1074,7 +1074,8 @@ const getItemIcon = (type: ProgramItemType) => {
     'Prière': handLeftOutline,
     'Lecture biblique': libraryOutline,
     'Prédication': micOutline,
-    'Titre': documentTextOutline
+    'Titre': documentTextOutline,
+    'Section': removeOutline
   };
   return iconMap[type] || documentTextOutline;
 };
