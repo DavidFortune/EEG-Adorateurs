@@ -241,6 +241,29 @@ class UpdateService {
   async getReleaseNotes(): Promise<ReleaseNote[]> {
     return [
       {
+        version: '1.11.5',
+        date: '2025-12-26',
+        title: 'Gestion des conflits de disponibilités',
+        description: 'Détection automatique des conflits d\'horaire lors de la gestion des disponibilités et des assignations',
+        features: [
+          'Détection des conflits lors de la déclaration de disponibilité (services qui se chevauchent)',
+          'Détection des conflits lors de l\'assignation d\'un membre à un service',
+          'Blocage de la double réservation (impossible de s\'assigner à deux services qui se chevauchent)',
+          'Mise à jour automatique des disponibilités en conflit (marquées indisponibles)',
+          'Filtres par équipe et par statut dans la page Disponibilités'
+        ],
+        fixes: [
+          'Correction du chargement des équipes utilisateur (utilisation de Team.members au lieu de Member.teams)',
+          'Bouton retour de la page de détail de service retourne toujours vers la liste des services'
+        ],
+        improvements: [
+          'Interface de filtrage améliorée avec chips pour les statuts',
+          'Messages d\'alerte clairs pour les conflits de disponibilité',
+          'Suppression du badge "Vous êtes assigné" redondant dans les cartes de disponibilité',
+          'Chips d\'équipe en gris pour cohérence visuelle'
+        ]
+      },
+      {
         version: '1.11.4',
         date: '2025-12-26',
         title: 'Synchronisation temps réel de l\'accueil',

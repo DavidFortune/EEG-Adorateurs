@@ -3,7 +3,9 @@
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-back-button default-href="/services"></ion-back-button>
+          <ion-button @click="goBack">
+            <ion-icon slot="icon-only" :icon="arrowBackOutline"></ion-icon>
+          </ion-button>
         </ion-buttons>
         <ion-title>Détail du Service</ion-title>
         <ion-buttons slot="end">
@@ -256,7 +258,7 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
-  IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonBackButton,
+  IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons,
   IonButton, IonIcon, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle,
   IonCardContent, IonList, IonItem, IonLabel, IonChip, IonLoading, IonModal,
   IonSearchbar, IonAvatar, IonSpinner, alertController, toastController
@@ -266,7 +268,7 @@ import {
   syncOutline, checkmarkCircle, trashOutline, alertCircleOutline, timerOutline,
   peopleOutline, chevronForwardOutline, documentTextOutline, eyeOutline,
   eyeOffOutline, lockClosedOutline, personAddOutline, closeOutline, addOutline,
-  removeCircleOutline
+  removeCircleOutline, arrowBackOutline
 } from 'ionicons/icons';
 import { Service, ServiceCategory } from '@/types/service';
 import { serviceService } from '@/services/serviceService';

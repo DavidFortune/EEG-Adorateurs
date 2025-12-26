@@ -42,7 +42,7 @@
           <ion-item button @click="openEndDatePicker">
             <ion-label>
               <p>Date et heure de fin</p>
-              <h3>{{ formData.endDate && formData.endTime ? formatEndDateTime() : 'Optionnel' }}</h3>
+              <h3>{{ formData.endDate && formData.endTime ? formatEndDateTime() : 'Sélectionner' }}</h3>
             </ion-label>
             <ion-icon :icon="calendarOutline" slot="end" color="secondary"></ion-icon>
           </ion-item>
@@ -341,6 +341,8 @@ const isFormValid = computed(() => {
   return formData.title.trim().length > 0 &&
          formData.date &&
          formData.time &&
+         formData.endDate &&
+         formData.endTime &&
          formData.category;
 });
 
@@ -415,8 +417,8 @@ const saveService = async () => {
         title: formData.title.trim(),
         date: formData.date,
         time: formData.time,
-        endDate: formData.endDate || undefined,
-        endTime: formData.endTime || undefined,
+        endDate: formData.endDate,
+        endTime: formData.endTime,
         category: formData.category,
         isPublished: formData.isPublished,
         availabilityDeadline: formData.availabilityDeadline || undefined,
@@ -433,8 +435,8 @@ const saveService = async () => {
         title: formData.title.trim(),
         date: formData.date,
         time: formData.time,
-        endDate: formData.endDate || undefined,
-        endTime: formData.endTime || undefined,
+        endDate: formData.endDate,
+        endTime: formData.endTime,
         category: formData.category,
         isPublished: formData.isPublished,
         availabilityDeadline: formData.availabilityDeadline || undefined,
@@ -488,11 +490,27 @@ const confirmServiceDateTime = () => {
     formData.date = datePart;
 
     // Ensure time is in HH:MM format only (remove seconds if present)
+    let time = '10:00';
     if (timePart) {
       const timeComponents = timePart.split(':');
-      formData.time = `${timeComponents[0]}:${timeComponents[1]}`;
-    } else {
-      formData.time = '10:00';
+      time = `${timeComponents[0]}:${timeComponents[1]}`;
+    }
+    formData.time = time;
+
+    // Auto-set end datetime to 2 hours after start if not already set
+    if (!formData.endDate || !formData.endTime) {
+      const startDateTime = new Date(`${datePart}T${time}:00`);
+      const endDateTime = new Date(startDateTime.getTime() + 2 * 60 * 60 * 1000); // Add 2 hours
+
+      const endYear = endDateTime.getFullYear();
+      const endMonth = String(endDateTime.getMonth() + 1).padStart(2, '0');
+      const endDay = String(endDateTime.getDate()).padStart(2, '0');
+      const endHours = String(endDateTime.getHours()).padStart(2, '0');
+      const endMinutes = String(endDateTime.getMinutes()).padStart(2, '0');
+
+      formData.endDate = `${endYear}-${endMonth}-${endDay}`;
+      formData.endTime = `${endHours}:${endMinutes}`;
+      tempEndDateTime.value = `${formData.endDate}T${formData.endTime}`;
     }
   }
   showServiceDateModal.value = false;

@@ -106,16 +106,6 @@
               </div>
             </div>
           </ion-card-header>
-
-          <ion-card-content v-if="service.availabilityDeadline">
-            <div class="deadline-info">
-              <ion-icon :icon="timerOutline" :color="isDeadlinePassed(service.availabilityDeadline) ? 'danger' : 'warning'"></ion-icon>
-              <span :class="{ 'deadline-passed': isDeadlinePassed(service.availabilityDeadline) }">
-                Date limite: {{ formatDeadlineShort(service.availabilityDeadline) }}
-                <span v-if="isDeadlinePassed(service.availabilityDeadline)" class="deadline-status"> (Dépassée)</span>
-              </span>
-            </div>
-          </ion-card-content>
         </ion-card>
       </div>
     </ion-content>
@@ -127,12 +117,12 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
-  IonIcon, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent,
+  IonIcon, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle,
   IonRefresher, IonRefresherContent, IonLoading, IonSegment, IonSegmentButton,
   IonLabel, IonChip, toastController
 } from '@ionic/vue';
 import {
-  addOutline, calendarOutline, checkmarkCircle, timeOutline, timerOutline,
+  addOutline, calendarOutline, checkmarkCircle, timeOutline,
   peopleOutline, documentTextOutline
 } from 'ionicons/icons';
 import { db } from '@/firebase/config';
@@ -175,19 +165,25 @@ const convertServiceDoc = (id: string, data: any): Service => {
   };
 };
 
-// Load user's team names from team IDs
+// Load user's team names by checking team membership in Team documents
 const loadUserTeamNames = async () => {
-  const userTeamIds = member.value?.teams || [];
-  if (userTeamIds.length > 0) {
-    try {
-      const teamPromises = userTeamIds.map(teamId => teamsService.getTeamById(teamId));
-      const teams = await Promise.all(teamPromises);
-      userTeamNames.value = teams.filter(team => team !== null).map(team => team!.name);
-    } catch (error) {
-      console.error('Error loading user team names:', error);
-      userTeamNames.value = [];
-    }
-  } else {
+  if (!member.value?.id) {
+    userTeamNames.value = [];
+    return;
+  }
+
+  try {
+    // Use getMemberTeams which checks the Team document's members array
+    const teams = await teamsService.getMemberTeams(member.value.id);
+    // Only include teams where the member has approved status
+    userTeamNames.value = teams
+      .filter(team => {
+        const membership = team.members.find(m => m.memberId === member.value!.id);
+        return membership && (membership.status === 'approved' || !membership.status);
+      })
+      .map(team => team.name);
+  } catch (error) {
+    console.error('Error loading user team names:', error);
     userTeamNames.value = [];
   }
 };
@@ -372,24 +368,6 @@ const hasServiceProgram = (service: Service) => {
   return service.isPublished;
 };
 
-const isDeadlinePassed = (deadlineStr: string) => {
-  const deadline = new Date(deadlineStr);
-  const now = new Date();
-  return deadline < now;
-};
-
-const formatDeadlineShort = (dateStr: string) => {
-  const date = new Date(dateStr);
-  return date.toLocaleString('fr-CA', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone: 'America/Toronto'
-  });
-};
-
 // Watch for member changes to reload team names
 watch(() => member.value, (newMember) => {
   if (newMember) {
@@ -477,23 +455,6 @@ onUnmounted(() => {
 .service-card {
   margin: 0rem;
   margin-bottom: 1rem;
-}
-
-.deadline-info {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
-  color: var(--ion-color-warning);
-  padding-top: 0.5rem;
-}
-
-.deadline-passed {
-  color: var(--ion-color-danger);
-}
-
-.deadline-status {
-  font-weight: 600;
 }
 
 /* Mobile responsive styles */

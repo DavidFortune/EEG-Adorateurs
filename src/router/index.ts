@@ -63,7 +63,7 @@ const routes: Array<RouteRecordRaw> = [
       },
       {
         path: 'disponibilites',
-        component: () => import('@/views/DisponibilitesPage.vue')
+        component: () => import('@/views/disponibilites/DisponibilitesPage.vue')
       },
       {
         path: 'teams',

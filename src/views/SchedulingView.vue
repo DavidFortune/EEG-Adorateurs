@@ -63,7 +63,7 @@
             :status-label="getTeamStatusLabel(team)"
             @enter-edit="enterEditMode(team.id)"
             @save="saveAndExitEditMode"
-            @member-click="(memberId) => toggleMemberAssignment(team.id, memberId)"
+            @member-click="(memberId) => handleMemberClick(team.id, memberId)"
           />
         </div>
       </div>
@@ -87,19 +87,23 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
 import { storeToRefs } from 'pinia';
-import { 
-  IonPage, 
-  IonHeader, 
-  IonToolbar, 
-  IonTitle, 
-  IonContent, 
-  IonButtons, 
-  IonButton, 
+import {
+  IonPage,
+  IonHeader,
+  IonToolbar,
+  IonTitle,
+  IonContent,
+  IonButtons,
+  IonButton,
   IonIcon,
   IonLoading,
-  IonBackButton
+  IonBackButton,
+  alertController,
+  toastController
 } from '@ionic/vue';
 import { searchOutline, peopleOutline } from 'ionicons/icons';
+import { timezoneUtils } from '@/utils/timezone';
+import type { Service } from '@/types/service';
 import { useSchedulingStore } from '@/stores/schedulingStore';
 import { authService } from '@/firebase/auth';
 import EventSelector from '@/components/scheduling/EventSelector.vue';
@@ -138,8 +142,93 @@ const {
   cancelService,
   loadServices,
   loadCurrentEventTeams,
-  setCurrentUserId
+  setCurrentUserId,
+  checkMemberConflictsForAssignment,
+  setMemberUnavailableForServices
 } = schedulingStore;
+
+// Format service info for conflict display
+const formatConflictService = (service: Service, teamName?: string): string => {
+  const dateTime = timezoneUtils.formatDateTimeForDisplay(service.date, service.time);
+  const teamText = teamName ? `\n   ${teamName}` : '';
+  return `• ${service.title}\n   ${dateTime}${teamText}`;
+};
+
+// Handle member click with conflict checking
+async function handleMemberClick(teamId: string, memberId: string) {
+  const serviceId = currentEvent.value?.id;
+  if (!serviceId) return;
+
+  // Find the member to check if they're already assigned
+  const teamData = filteredTeams.value.find(t => t.id === teamId);
+  const member = teamData?.members.find(m => m.id === memberId);
+
+  // If member is already assigned, just toggle (remove)
+  if (member?.isAssigned) {
+    await toggleMemberAssignment(teamId, memberId);
+    await loadCurrentEventTeams();
+    return;
+  }
+
+  // Check for conflicts before assigning
+  const { canAssign, assignedConflicts, availabilityConflicts } =
+    await checkMemberConflictsForAssignment(memberId, serviceId);
+
+  // Block if member is already assigned to a conflicting service
+  if (!canAssign) {
+    const conflictDetails = assignedConflicts
+      .map(c => formatConflictService(c.service, c.teamName))
+      .join('\n\n');
+
+    const alert = await alertController.create({
+      header: 'Double réservation impossible',
+      message: `Ce membre est déjà assigné à un service qui se chevauche:\n\n${conflictDetails}\n\nVeuillez d'abord retirer cette assignation.`,
+      cssClass: 'conflict-alert',
+      buttons: ['OK']
+    });
+    await alert.present();
+    return;
+  }
+
+  // Show warning for availability conflicts
+  if (availabilityConflicts.length > 0) {
+    const conflictDetails = availabilityConflicts
+      .map(s => formatConflictService(s))
+      .join('\n\n');
+
+    const alert = await alertController.create({
+      header: 'Conflit de disponibilité',
+      message: `Ce membre a des services qui se chevauchent:\n\n${conflictDetails}\n\nVoulez-vous continuer? Les services en conflit seront marqués comme indisponibles.`,
+      cssClass: 'conflict-alert',
+      buttons: [
+        { text: 'Annuler', role: 'cancel' },
+        { text: 'Confirmer', role: 'confirm' }
+      ]
+    });
+
+    await alert.present();
+    const { role } = await alert.onDidDismiss();
+
+    if (role !== 'confirm') return;
+
+    await setMemberUnavailableForServices(
+      memberId,
+      availabilityConflicts.map(s => s.id)
+    );
+  }
+
+  // Proceed with assignment
+  await toggleMemberAssignment(teamId, memberId);
+  await loadCurrentEventTeams();
+
+  const toast = await toastController.create({
+    message: 'Membre assigné avec succès',
+    duration: 2000,
+    color: 'success',
+    position: 'top'
+  });
+  await toast.present();
+}
 
 // Load data when component mounts
 onMounted(async () => {
@@ -204,5 +293,17 @@ async function handleEventSelect(index: number) {
   .teams-container {
     padding: 0 8px 16px 8px;
   }
+}
+</style>
+
+<style>
+/* Global styles for conflict alert (must be unscoped) */
+.conflict-alert .alert-message {
+  white-space: pre-line;
+  text-align: left;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  max-height: 60vh;
+  overflow-y: auto;
 }
 </style>

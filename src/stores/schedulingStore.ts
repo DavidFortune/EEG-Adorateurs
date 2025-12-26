@@ -272,15 +272,105 @@ export const useSchedulingStore = defineStore('scheduling', () => {
     }
   }
 
+  // Check if two services overlap in time
+  function doServicesOverlap(service1: Service, service2: Service): boolean {
+    const start1 = new Date(`${service1.date}T${service1.time}:00`).getTime();
+    const end1 = new Date(`${service1.endDate}T${service1.endTime}:00`).getTime();
+    const start2 = new Date(`${service2.date}T${service2.time}:00`).getTime();
+    const end2 = new Date(`${service2.endDate}T${service2.endTime}:00`).getTime();
+    return start1 < end2 && start2 < end1;
+  }
+
+  // Check for conflicts when assigning a member to a service
+  async function checkMemberConflictsForAssignment(memberId: string, targetServiceId: string): Promise<{
+    canAssign: boolean;
+    assignedConflicts: Array<{ service: Service; teamName: string }>;
+    availabilityConflicts: Service[];
+  }> {
+    const assignedConflicts: Array<{ service: Service; teamName: string }> = [];
+    const availabilityConflicts: Service[] = [];
+
+    try {
+      // Get all services
+      const allServices = await firestoreService.getAllServices();
+      const targetService = allServices.find(s => s.id === targetServiceId);
+
+      if (!targetService) {
+        return { canAssign: true, assignedConflicts: [], availabilityConflicts: [] };
+      }
+
+      // Get member's assignments across all services
+      const memberAssignments = await assignmentsService.getAllMemberAssignments(memberId);
+      const assignedServiceIds = new Set(memberAssignments.map(a => a.serviceId));
+
+      // Get member details for availabilities
+      const memberDetails = await membersService.getMemberById(memberId);
+      const memberAvailabilities = memberDetails?.availabilities || {};
+
+      // Check each service for conflicts
+      for (const service of allServices) {
+        if (service.id === targetServiceId) continue;
+
+        // Check if times overlap
+        if (!doServicesOverlap(targetService, service)) continue;
+
+        // Check if member is assigned to this overlapping service
+        if (assignedServiceIds.has(service.id)) {
+          const assignment = memberAssignments.find(a => a.serviceId === service.id);
+          assignedConflicts.push({
+            service,
+            teamName: assignment?.teamName || 'Équipe inconnue'
+          });
+        } else {
+          // Check availability - only add if available or unanswered (not unavailable)
+          const availability = memberAvailabilities[service.id];
+          if (availability !== 'unavailable') {
+            availabilityConflicts.push(service);
+          }
+        }
+      }
+
+      // Cannot assign if there are assigned conflicts (no double booking)
+      const canAssign = assignedConflicts.length === 0;
+
+      return { canAssign, assignedConflicts, availabilityConflicts };
+    } catch (error) {
+      console.error('Error checking member conflicts:', error);
+      return { canAssign: true, assignedConflicts: [], availabilityConflicts: [] };
+    }
+  }
+
+  // Update member availability for conflicting services
+  async function setMemberUnavailableForServices(memberId: string, serviceIds: string[]) {
+    if (serviceIds.length === 0) return;
+
+    try {
+      const memberDetails = await membersService.getMemberById(memberId);
+      if (!memberDetails) return;
+
+      const updatedAvailabilities = { ...(memberDetails.availabilities || {}) };
+      serviceIds.forEach(serviceId => {
+        updatedAvailabilities[serviceId] = 'unavailable';
+      });
+
+      await membersService.updateMember(memberId, {
+        availabilities: updatedAvailabilities
+      });
+    } catch (error) {
+      console.error('Error updating member availabilities:', error);
+      throw error;
+    }
+  }
+
   async function toggleMemberAssignmentReal(teamId: string, memberId: string) {
     const team = teams.value[teamId];
     const event = currentEvent.value;
-    
+
     if (!team || !event || !currentUserId.value) return;
-    
+
     const member = team.members.find(m => m.id === memberId);
     if (!member) return;
-    
+
     // Block assignment if:
     // - Member is unavailable, OR
     // - Member is already assigned to another team (and not currently assigned to this team)
@@ -331,6 +421,8 @@ export const useSchedulingStore = defineStore('scheduling', () => {
           title: service.title,
           date: service.date,
           time: service.time,
+          endDate: service.endDate,
+          endTime: service.endTime,
           category: service.category,
           isPublished: true,
           availabilityDeadline: service.availabilityDeadline,
@@ -389,6 +481,9 @@ export const useSchedulingStore = defineStore('scheduling', () => {
     loadServices,
     loadCurrentEventTeams,
     setCurrentUserId,
-    refreshCurrentEventData
+    refreshCurrentEventData,
+    // Conflict checking
+    checkMemberConflictsForAssignment,
+    setMemberUnavailableForServices
   };
 });

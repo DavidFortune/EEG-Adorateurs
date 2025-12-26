@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
-import DisponibilitesPage from '@/views/DisponibilitesPage.vue';
+import DisponibilitesPage from '@/views/disponibilites/DisponibilitesPage.vue';
 import { membersService } from '@/firebase/members';
 import { serviceService } from '@/services/serviceService';
 import { getDocs } from 'firebase/firestore';
