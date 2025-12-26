@@ -241,6 +241,24 @@ class UpdateService {
   async getReleaseNotes(): Promise<ReleaseNote[]> {
     return [
       {
+        version: '1.11.4',
+        date: '2025-12-26',
+        title: 'Synchronisation temps réel de l\'accueil',
+        description: 'Refactoring de la page d\'accueil pour utiliser Firestore temps réel et amélioration du filtrage des services',
+        features: [
+          'Affichage de la durée des services sur la page d\'accueil',
+          'Les services restent visibles 1 heure après leur fin avant de passer aux "Passés"'
+        ],
+        fixes: [
+          'Correction du statut d\'assignation qui ne s\'affichait pas correctement sur l\'accueil'
+        ],
+        improvements: [
+          'Synchronisation temps réel Firestore pour la page d\'accueil',
+          'Les services se mettent à jour instantanément sans rechargement',
+          'Nettoyage des fonctions de migration obsolètes'
+        ]
+      },
+      {
         version: '1.11.3',
         date: '2025-12-26',
         title: 'Durée des services et synchronisation temps réel',
