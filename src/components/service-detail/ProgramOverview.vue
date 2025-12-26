@@ -6,37 +6,45 @@
       <span>Chargement du programme...</span>
     </div>
 
-    <!-- Empty State -->
-    <div v-else-if="!program || program.items.length === 0" class="empty-state">
-      <ion-icon :icon="documentTextOutline" size="large" color="medium" />
-      <h3>Aucun programme</h3>
-      <p>Le programme de ce service n'a pas encore été créé.</p>
-    </div>
-
-    <!-- Program Summary & Items List -->
+    <!-- Content (with summary always visible) -->
     <div v-else class="program-list">
-      <!-- Summary Row -->
+      <!-- Summary Row (always visible) -->
       <div class="program-summary">
         <div class="summary-info">
-          <span v-if="program.conductor?.name" class="summary-item">
-            <ion-icon :icon="personOutline" />
-            {{ program.conductor.name }}
-          </span>
-          <span class="summary-item hide-mobile">
-            <ion-icon :icon="listOutline" />
-            {{ itemCount }} élément{{ itemCount !== 1 ? 's' : '' }}
-          </span>
-          <span v-if="program.totalDuration" class="summary-item hide-mobile">
-            <ion-icon :icon="timeOutline" />
-            {{ formatDuration(program.totalDuration) }}
+          <template v-if="hasProgram">
+            <span v-if="program?.conductor?.name" class="summary-item">
+              <ion-icon :icon="personOutline" />
+              {{ program.conductor.name }}
+            </span>
+            <span class="summary-item hide-mobile">
+              <ion-icon :icon="listOutline" />
+              {{ itemCount }} élément{{ itemCount !== 1 ? 's' : '' }}
+            </span>
+            <span v-if="program?.totalDuration" class="summary-item hide-mobile">
+              <ion-icon :icon="timeOutline" />
+              {{ formatDuration(program.totalDuration) }}
+            </span>
+          </template>
+          <span v-else class="summary-item empty-hint">
+            <ion-icon :icon="documentTextOutline" />
+            Aucun programme
           </span>
         </div>
         <ion-button fill="clear" size="small" @click="$emit('viewFull')">
-          Programme détaillé
+          {{ hasProgram ? 'Programme détaillé' : (isAdmin ? 'Créer le programme' : 'Voir le programme') }}
           <ion-icon :icon="chevronForwardOutline" slot="end" />
         </ion-button>
       </div>
-      <template v-for="(item, index) in sortedItems" :key="item.id">
+
+      <!-- Empty State (below summary) -->
+      <div v-if="!hasProgram" class="empty-state">
+        <ion-icon :icon="documentTextOutline" size="large" color="medium" />
+        <h3>Aucun programme</h3>
+        <p>Le programme de ce service n'a pas encore été créé.</p>
+      </div>
+
+      <!-- Program Items -->
+      <template v-else v-for="(item, index) in sortedItems" :key="item.id">
         <!-- Section Item (special styling) -->
         <div v-if="item.type === 'Section'" class="program-item section-item">
           <span class="section-title">{{ item.title }}</span>
@@ -72,6 +80,7 @@ import type { ServiceProgram, ProgramItemType } from '@/types/program';
 interface Props {
   program: ServiceProgram | null;
   loading: boolean;
+  isAdmin: boolean;
 }
 
 const props = defineProps<Props>();
@@ -79,6 +88,10 @@ const props = defineProps<Props>();
 defineEmits<{
   viewFull: [];
 }>();
+
+const hasProgram = computed(() => {
+  return props.program && props.program.items.length > 0;
+});
 
 const itemCount = computed(() => {
   if (!props.program) return 0;
@@ -196,6 +209,14 @@ const getTypeColor = (type: ProgramItemType): string => {
 .summary-item ion-icon {
   font-size: 0.85rem;
   color: var(--ion-color-primary);
+}
+
+.summary-item.empty-hint {
+  color: var(--ion-color-medium);
+}
+
+.summary-item.empty-hint ion-icon {
+  color: var(--ion-color-medium);
 }
 
 .program-summary ion-button {

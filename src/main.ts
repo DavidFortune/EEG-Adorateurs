@@ -56,7 +56,16 @@ const app = createApp(App)
 
 router.isReady().then(async () => {
   app.mount('#app');
-  
+
+  // Hide splash screen with fade animation
+  const splashScreen = document.getElementById('splash-screen');
+  if (splashScreen) {
+    splashScreen.classList.add('fade-out');
+    setTimeout(() => {
+      splashScreen.remove();
+    }, 400); // Match the CSS transition duration
+  }
+
   // Initialize push notifications
   await pushNotificationService.initialize();
   

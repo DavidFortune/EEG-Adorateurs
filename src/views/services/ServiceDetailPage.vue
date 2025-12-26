@@ -43,6 +43,7 @@
             v-if="selectedSegment === 'programme'"
             :program="program"
             :loading="loadingProgram"
+            :is-admin="isAdmin"
             @view-full="goToProgram"
           />
 

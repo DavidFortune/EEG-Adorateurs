@@ -241,6 +241,24 @@ class UpdateService {
   async getReleaseNotes(): Promise<ReleaseNote[]> {
     return [
       {
+        version: '1.12.2',
+        date: '2025-12-26',
+        title: 'Écran de chargement animé',
+        description: 'Amélioration de l\'expérience de chargement initial avec un splash screen animé',
+        features: [
+          'Écran de chargement animé avec logo EEG Adorateurs',
+          'Animation de pulsation du logo et anneau tournant',
+          'Points de chargement animés',
+          'Transition fluide en fondu vers l\'application'
+        ],
+        fixes: [],
+        improvements: [
+          'Élimination de l\'écran blanc pendant le chargement initial',
+          'Affichage immédiat du splash screen avant le chargement de Vue',
+          'Bouton "Créer le programme" affiché pour les admins quand aucun programme n\'existe'
+        ]
+      },
+      {
         version: '1.12.1',
         date: '2025-12-26',
         title: 'Ressources directes pour les services',
