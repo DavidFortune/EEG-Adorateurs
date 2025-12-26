@@ -12,8 +12,10 @@ export interface TeamRequirement {
 export interface Service {
   id: string;
   title: string;
-  date: string; // YYYY-MM-DD format in America/Toronto timezone
-  time: string; // HH:MM format in America/Toronto timezone
+  date: string; // YYYY-MM-DD format in America/Toronto timezone (start date)
+  time: string; // HH:MM format in America/Toronto timezone (start time)
+  endDate?: string; // YYYY-MM-DD format in America/Toronto timezone (end date, optional)
+  endTime?: string; // HH:MM format in America/Toronto timezone (end time, optional)
   category: ServiceCategory;
   isPublished: boolean;
   availabilityDeadline?: string; // ISO 8601 datetime format (YYYY-MM-DDTHH:MM:SS) for deadline to submit availability
@@ -25,8 +27,10 @@ export interface Service {
 
 export interface CreateServiceRequest {
   title: string;
-  date: string; // YYYY-MM-DD format in America/Toronto timezone
-  time: string; // HH:MM format in America/Toronto timezone
+  date: string; // YYYY-MM-DD format in America/Toronto timezone (start date)
+  time: string; // HH:MM format in America/Toronto timezone (start time)
+  endDate?: string; // YYYY-MM-DD format in America/Toronto timezone (end date, optional)
+  endTime?: string; // HH:MM format in America/Toronto timezone (end time, optional)
   category: ServiceCategory;
   isPublished: boolean;
   availabilityDeadline?: string; // ISO 8601 datetime format (YYYY-MM-DDTHH:MM:SS) for deadline to submit availability

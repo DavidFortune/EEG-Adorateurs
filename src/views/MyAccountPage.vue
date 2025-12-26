@@ -306,9 +306,9 @@ const handleAvatarSelect = async (event: Event) => {
     return;
   }
 
-  // Validate file size (max 5MB)
-  if (file.size > 5 * 1024 * 1024) {
-    await showToast('L\'image ne doit pas dépasser 5 Mo', 'danger');
+  // Validate file size (max 10MB - will be optimized by Cloud Function)
+  if (file.size > 10 * 1024 * 1024) {
+    await showToast('L\'image ne doit pas dépasser 10 Mo', 'danger');
     return;
   }
 

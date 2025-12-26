@@ -41,10 +41,18 @@ function convertServiceToFirestore(service: Omit<Service, 'id'>): any {
   };
 
   // Only add optional fields if they are defined
+  if (service.endDate !== undefined) {
+    result.endDate = service.endDate;
+  }
+
+  if (service.endTime !== undefined) {
+    result.endTime = service.endTime;
+  }
+
   if (service.availabilityDeadline !== undefined) {
     result.availabilityDeadline = service.availabilityDeadline;
   }
-  
+
   if (service.teamRequirements !== undefined) {
     result.teamRequirements = service.teamRequirements;
   }
@@ -134,6 +142,8 @@ export const firestoreService = {
         title: request.title,
         date: request.date,
         time: request.time,
+        endDate: request.endDate,
+        endTime: request.endTime,
         category: request.category,
         isPublished: request.isPublished,
         availabilityDeadline: request.availabilityDeadline,

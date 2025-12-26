@@ -33,12 +33,20 @@
           
           <ion-item button @click="openServiceDatePicker">
             <ion-label>
-              <p>Date et heure du service</p>
+              <p>Date et heure de début</p>
               <h3>{{ formData.date && formData.time ? formatServiceDateTime() : 'Sélectionner' }}</h3>
             </ion-label>
             <ion-icon :icon="calendarOutline" slot="end" color="primary"></ion-icon>
           </ion-item>
-          
+
+          <ion-item button @click="openEndDatePicker">
+            <ion-label>
+              <p>Date et heure de fin</p>
+              <h3>{{ formData.endDate && formData.endTime ? formatEndDateTime() : 'Optionnel' }}</h3>
+            </ion-label>
+            <ion-icon :icon="calendarOutline" slot="end" color="secondary"></ion-icon>
+          </ion-item>
+
           <ion-item>
             <ion-select 
               v-model="formData.category"
@@ -216,6 +224,36 @@
         </div>
       </ion-content>
     </ion-modal>
+
+    <!-- End DateTime Modal -->
+    <ion-modal :is-open="showEndDateModal" @didDismiss="showEndDateModal = false" class="datetime-modal">
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>Date et heure de fin</ion-title>
+          <ion-buttons slot="end">
+            <ion-button @click="showEndDateModal = false">Fermer</ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="datetime-content">
+        <div class="datetime-container">
+          <ion-datetime
+            v-model="tempEndDateTime"
+            presentation="date-time"
+            :min="minEndDateTime"
+            locale="fr-FR"
+            :hour-cycle="'h23'"
+            :first-day-of-week="1"
+            size="cover"
+          >
+          </ion-datetime>
+        </div>
+        <div class="ion-padding">
+          <ion-button expand="block" @click="confirmEndDateTime">Confirmer</ion-button>
+          <ion-button expand="block" fill="clear" @click="clearEndDateTime">Supprimer la date de fin</ion-button>
+        </div>
+      </ion-content>
+    </ion-modal>
   </ion-page>
 </template>
 
@@ -239,8 +277,10 @@ const loading = ref(false);
 
 // Modal states
 const showServiceDateModal = ref(false);
+const showEndDateModal = ref(false);
 const showDeadlineModal = ref(false);
 const tempServiceDateTime = ref('');
+const tempEndDateTime = ref('');
 const tempDeadlineDateTime = ref('');
 
 const isEditing = computed(() => !!route.params.id);
@@ -269,10 +309,21 @@ const maxDeadlineDateTime = computed(() => {
   return new Date().toISOString().slice(0, 16);
 });
 
+const minEndDateTime = computed(() => {
+  // End date/time must be at or after the service start date/time
+  if (formData.date && formData.time) {
+    return `${formData.date}T${formData.time}`;
+  }
+  // Fallback to current date
+  return new Date().toISOString().slice(0, 16);
+});
+
 const formData = reactive({
   title: '',
   date: '',
   time: '10:00',
+  endDate: '',
+  endTime: '',
   category: ServiceCategory.SERVICE,
   isPublished: false,
   availabilityDeadline: ''
@@ -324,6 +375,8 @@ const loadService = async () => {
         title: service.title,
         date: service.date,
         time: service.time,
+        endDate: service.endDate || '',
+        endTime: service.endTime || '',
         category: service.category,
         isPublished: service.isPublished,
         availabilityDeadline: service.availabilityDeadline || ''
@@ -362,12 +415,14 @@ const saveService = async () => {
         title: formData.title.trim(),
         date: formData.date,
         time: formData.time,
+        endDate: formData.endDate || undefined,
+        endTime: formData.endTime || undefined,
         category: formData.category,
         isPublished: formData.isPublished,
         availabilityDeadline: formData.availabilityDeadline || undefined,
         teamRequirements: activeTeamRequirements.value
       };
-      
+
       const updated = await serviceService.updateService(updateRequest);
       if (updated) {
         await showToast('Service mis à jour avec succès', 'success');
@@ -378,6 +433,8 @@ const saveService = async () => {
         title: formData.title.trim(),
         date: formData.date,
         time: formData.time,
+        endDate: formData.endDate || undefined,
+        endTime: formData.endTime || undefined,
         category: formData.category,
         isPublished: formData.isPublished,
         availabilityDeadline: formData.availabilityDeadline || undefined,
@@ -443,6 +500,75 @@ const confirmServiceDateTime = () => {
 
 const formatServiceDateTime = () => {
   const date = new Date(`${formData.date}T${formData.time}`);
+  return date.toLocaleString('fr-CA', {
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'America/Toronto'
+  });
+};
+
+// End date and time picker functions
+const openEndDatePicker = () => {
+  if (formData.endDate && formData.endTime) {
+    tempEndDateTime.value = `${formData.endDate}T${formData.endTime}`;
+  } else if (formData.date && formData.time) {
+    // Default to same day, 2 hours after start time
+    const startDate = new Date(`${formData.date}T${formData.time}:00`);
+    startDate.setHours(startDate.getHours() + 2);
+
+    const year = startDate.getFullYear();
+    const month = String(startDate.getMonth() + 1).padStart(2, '0');
+    const day = String(startDate.getDate()).padStart(2, '0');
+    const hours = String(startDate.getHours()).padStart(2, '0');
+    const minutes = String(startDate.getMinutes()).padStart(2, '0');
+
+    tempEndDateTime.value = `${year}-${month}-${day}T${hours}:${minutes}`;
+  } else {
+    // Fallback to tomorrow at 12:00
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(12, 0, 0, 0);
+
+    const year = tomorrow.getFullYear();
+    const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
+    const day = String(tomorrow.getDate()).padStart(2, '0');
+    const hours = String(tomorrow.getHours()).padStart(2, '0');
+    const minutes = String(tomorrow.getMinutes()).padStart(2, '0');
+
+    tempEndDateTime.value = `${year}-${month}-${day}T${hours}:${minutes}`;
+  }
+  showEndDateModal.value = true;
+};
+
+const confirmEndDateTime = () => {
+  if (tempEndDateTime.value) {
+    const [datePart, timePart] = tempEndDateTime.value.split('T');
+    formData.endDate = datePart;
+
+    if (timePart) {
+      const timeComponents = timePart.split(':');
+      formData.endTime = `${timeComponents[0]}:${timeComponents[1]}`;
+    } else {
+      formData.endTime = '12:00';
+    }
+  }
+  showEndDateModal.value = false;
+};
+
+const clearEndDateTime = () => {
+  formData.endDate = '';
+  formData.endTime = '';
+  tempEndDateTime.value = '';
+  showEndDateModal.value = false;
+};
+
+const formatEndDateTime = () => {
+  const date = new Date(`${formData.endDate}T${formData.endTime}`);
   return date.toLocaleString('fr-CA', {
     weekday: 'short',
     year: 'numeric',

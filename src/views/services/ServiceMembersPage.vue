@@ -170,7 +170,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonBackButton,
@@ -181,15 +181,13 @@ import {
 import {
   peopleOutline, calendarOutline, alertCircleOutline, peopleCircleOutline, personAddOutline
 } from 'ionicons/icons';
-import { assignmentsService } from '@/firebase/assignments';
-import { serviceService } from '@/services/serviceService';
-import { teamsService } from '@/firebase/teams';
+import { db } from '@/firebase/config';
+import { doc, collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
 import { membersService } from '@/firebase/members';
 import { useUser } from '@/composables/useUser';
 import { timezoneUtils } from '@/utils/timezone';
 import type { Service } from '@/types/service';
 import type { ServiceAssignment } from '@/types/assignment';
-import type { Team } from '@/types/team';
 import type { Member } from '@/types/member';
 
 interface TeamAssignmentGroup {
@@ -208,6 +206,10 @@ const loadingAssignments = ref(true);
 const service = ref<Service | null>(null);
 const teamAssignments = ref<TeamAssignmentGroup[]>([]);
 const guestMembers = ref<Member[]>([]);
+
+// Realtime subscription cleanup
+let unsubscribeService: (() => void) | null = null;
+let unsubscribeAssignments: (() => void) | null = null;
 
 const serviceId = computed(() => route.params.id as string);
 
@@ -253,37 +255,123 @@ const getTeamStatusText = (team: TeamAssignmentGroup): string => {
   return 'Vide';
 };
 
-const loadService = async () => {
-  try {
-    service.value = await serviceService.getServiceById(serviceId.value);
-  } catch (error) {
-    console.error('Error loading service:', error);
-  } finally {
-    loading.value = false;
-  }
+// Convert Firestore document to Service type
+const convertServiceDoc = (id: string, data: any): Service => {
+  return {
+    id,
+    title: data.title,
+    date: data.date,
+    time: data.time,
+    endDate: data.endDate,
+    endTime: data.endTime,
+    category: data.category,
+    isPublished: data.isPublished,
+    availabilityDeadline: data.availabilityDeadline,
+    teamRequirements: data.teamRequirements,
+    guestMemberIds: data.guestMemberIds,
+    createdAt: data.createdAt instanceof Timestamp
+      ? data.createdAt.toDate().toISOString()
+      : data.createdAt,
+    modifiedAt: data.modifiedAt instanceof Timestamp
+      ? data.modifiedAt.toDate().toISOString()
+      : data.modifiedAt
+  };
 };
 
-const loadAssignments = async () => {
-  if (!service.value) return;
-  
-  loadingAssignments.value = true;
-  try {
-    // Get all assignments for this service
-    const assignments = await assignmentsService.getServiceAssignments(serviceId.value);
-    
-    // Get team requirements for this service as a map
-    const teamRequirements = new Map<string, number>();
-    if (service.value.teamRequirements) {
-      service.value.teamRequirements.forEach(req => {
-        teamRequirements.set(req.teamName, req.membersNeeded);
-      });
+// Convert Firestore assignment document
+const convertAssignmentDoc = (id: string, data: any): ServiceAssignment => {
+  return {
+    id,
+    serviceId: data.serviceId,
+    memberId: data.memberId,
+    memberName: data.memberName,
+    teamId: data.teamId,
+    teamName: data.teamName,
+    assignedAt: data.assignedAt instanceof Timestamp
+      ? data.assignedAt.toDate().toISOString()
+      : data.assignedAt,
+    assignedBy: data.assignedBy
+  };
+};
+
+// Subscribe to realtime updates for the service
+const subscribeToService = () => {
+  const serviceRef = doc(db, 'services', serviceId.value);
+
+  unsubscribeService = onSnapshot(
+    serviceRef,
+    async (docSnapshot) => {
+      if (docSnapshot.exists()) {
+        const previousGuestIds = service.value?.guestMemberIds;
+        service.value = convertServiceDoc(docSnapshot.id, docSnapshot.data());
+
+        // Reload guest members if guest list changed
+        const currentGuestIds = service.value?.guestMemberIds;
+        if (JSON.stringify(previousGuestIds) !== JSON.stringify(currentGuestIds)) {
+          await loadGuestMembers();
+        }
+
+        // Load guests on first load
+        if (loading.value) {
+          await loadGuestMembers();
+        }
+      } else {
+        service.value = null;
+      }
+      loading.value = false;
+    },
+    (error) => {
+      console.error('Error in service realtime listener:', error);
+      loading.value = false;
     }
-    
-    // Get member details for avatars
-    const memberIds = [...new Set(assignments.map(a => a.memberId))];
-    const memberDetails = new Map<string, Member>();
-    
-    for (const memberId of memberIds) {
+  );
+};
+
+// Subscribe to realtime updates for assignments
+const subscribeToAssignments = () => {
+  const assignmentsRef = collection(db, 'assignments');
+  const q = query(assignmentsRef, where('serviceId', '==', serviceId.value));
+
+  unsubscribeAssignments = onSnapshot(
+    q,
+    async (querySnapshot) => {
+      const assignments: ServiceAssignment[] = [];
+      querySnapshot.forEach((doc) => {
+        assignments.push(convertAssignmentDoc(doc.id, doc.data()));
+      });
+
+      // Process assignments into team groups
+      await processAssignments(assignments);
+      loadingAssignments.value = false;
+    },
+    (error) => {
+      console.error('Error in assignments realtime listener:', error);
+      loadingAssignments.value = false;
+    }
+  );
+};
+
+// Process assignments into grouped team structure
+const processAssignments = async (assignments: ServiceAssignment[]) => {
+  if (assignments.length === 0) {
+    teamAssignments.value = [];
+    return;
+  }
+
+  // Get team requirements from service
+  const teamRequirements = new Map<string, number>();
+  if (service.value?.teamRequirements) {
+    service.value.teamRequirements.forEach(req => {
+      teamRequirements.set(req.teamName, req.membersNeeded);
+    });
+  }
+
+  // Get member details for avatars
+  const memberIds = [...new Set(assignments.map(a => a.memberId))];
+  const memberDetails = new Map<string, Member>();
+
+  await Promise.all(
+    memberIds.map(async (memberId) => {
       try {
         const member = await membersService.getMemberById(memberId);
         if (member) {
@@ -292,13 +380,15 @@ const loadAssignments = async () => {
       } catch (error) {
         console.error(`Error loading member ${memberId}:`, error);
       }
-    }
-    
-    // Get admin names for "assigned by" info
-    const adminIds = [...new Set(assignments.map(a => a.assignedBy).filter(Boolean))];
-    const adminDetails = new Map<string, string>();
-    
-    for (const adminId of adminIds) {
+    })
+  );
+
+  // Get admin names for "assigned by" info
+  const adminIds = [...new Set(assignments.map(a => a.assignedBy).filter(Boolean))];
+  const adminDetails = new Map<string, string>();
+
+  await Promise.all(
+    adminIds.map(async (adminId) => {
       if (adminId) {
         try {
           const admin = await membersService.getMemberById(adminId);
@@ -309,42 +399,37 @@ const loadAssignments = async () => {
           console.error(`Error loading admin ${adminId}:`, error);
         }
       }
+    })
+  );
+
+  // Group assignments by team
+  const groupedByTeam = assignments.reduce((acc, assignment) => {
+    if (!acc[assignment.teamId]) {
+      acc[assignment.teamId] = {
+        teamId: assignment.teamId,
+        teamName: assignment.teamName,
+        members: [],
+        requiredMembers: teamRequirements.get(assignment.teamName)
+      };
     }
-    
-    // Group assignments by team
-    const groupedByTeam = assignments.reduce((acc, assignment) => {
-      if (!acc[assignment.teamId]) {
-        acc[assignment.teamId] = {
-          teamId: assignment.teamId,
-          teamName: assignment.teamName,
-          members: [],
-          requiredMembers: teamRequirements.get(assignment.teamName)
-        };
-      }
-      
-      const member = memberDetails.get(assignment.memberId);
-      acc[assignment.teamId].members.push({
-        ...assignment,
-        avatar: member?.avatar,
-        assignedByName: assignment.assignedBy ? adminDetails.get(assignment.assignedBy) : undefined
-      });
-      
-      return acc;
-    }, {} as Record<string, TeamAssignmentGroup>);
-    
-    // Sort teams alphabetically and members within each team
-    teamAssignments.value = Object.values(groupedByTeam)
-      .sort((a, b) => a.teamName.localeCompare(b.teamName))
-      .map(team => ({
-        ...team,
-        members: team.members.sort((a, b) => a.memberName.localeCompare(b.memberName))
-      }));
-      
-  } catch (error) {
-    console.error('Error loading assignments:', error);
-  } finally {
-    loadingAssignments.value = false;
-  }
+
+    const member = memberDetails.get(assignment.memberId);
+    acc[assignment.teamId].members.push({
+      ...assignment,
+      avatar: member?.avatar,
+      assignedByName: assignment.assignedBy ? adminDetails.get(assignment.assignedBy) : undefined
+    });
+
+    return acc;
+  }, {} as Record<string, TeamAssignmentGroup>);
+
+  // Sort teams alphabetically and members within each team
+  teamAssignments.value = Object.values(groupedByTeam)
+    .sort((a, b) => a.teamName.localeCompare(b.teamName))
+    .map(team => ({
+      ...team,
+      members: team.members.sort((a, b) => a.memberName.localeCompare(b.memberName))
+    }));
 };
 
 const loadGuestMembers = async () => {
@@ -376,12 +461,21 @@ const goToScheduling = () => {
   router.push(`/scheduling?serviceId=${serviceId.value}`);
 };
 
-onMounted(async () => {
-  await loadService();
-  await Promise.all([
-    loadAssignments(),
-    loadGuestMembers()
-  ]);
+onMounted(() => {
+  subscribeToService();
+  subscribeToAssignments();
+});
+
+onUnmounted(() => {
+  // Clean up realtime subscriptions
+  if (unsubscribeService) {
+    unsubscribeService();
+    unsubscribeService = null;
+  }
+  if (unsubscribeAssignments) {
+    unsubscribeAssignments();
+    unsubscribeAssignments = null;
+  }
 });
 </script>
 

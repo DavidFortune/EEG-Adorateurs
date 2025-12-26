@@ -1,8 +1,12 @@
 const {https} = require('firebase-functions/v2');
+const {onObjectFinalized} = require('firebase-functions/v2/storage');
 const {logger} = require('firebase-functions/v2');
 const {defineString} = require('firebase-functions/params');
 const admin = require('firebase-admin');
 const twilio = require('twilio');
+const sharp = require('sharp');
+const path = require('path');
+const os = require('os');
 
 // Define environment parameters for Twilio
 const twilioAccountSid = defineString('TWILIO_ACCOUNT_SID', {default: ''});
@@ -901,5 +905,259 @@ exports.importMusicTempos = https.onCall(async (request) => {
   } catch (error) {
     logger.error('Error importing music tempos', {error: error.message});
     throw new https.HttpsError('internal', `Failed to import music tempos: ${error.message}`);
+  }
+});
+
+/**
+ * Migration function to set end date/time for existing services
+ *
+ * Sets the end date/time to 2 hours after the service start time
+ * for all services that don't already have an end date/time set.
+ *
+ * This is a one-time migration function that can be called by admins.
+ */
+exports.migrateServicesEndTime = https.onCall(async (request) => {
+  // Verify authentication
+  if (!request.auth) {
+    throw new https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  // Verify admin status
+  const memberSnapshot = await db.collection('members')
+    .where('firebaseUserId', '==', request.auth.uid)
+    .limit(1)
+    .get();
+
+  if (memberSnapshot.empty) {
+    throw new https.HttpsError('permission-denied', 'User profile not found.');
+  }
+
+  const userData = memberSnapshot.docs[0].data();
+  if (!userData.isAdmin) {
+    throw new https.HttpsError('permission-denied', 'Only admins can run migrations');
+  }
+
+  logger.info('Starting services end time migration');
+
+  try {
+    // Get all services
+    const servicesSnapshot = await db.collection('services').get();
+
+    if (servicesSnapshot.empty) {
+      logger.info('No services found to migrate');
+      return {
+        success: true,
+        migrated: 0,
+        skipped: 0,
+        message: 'No services found to migrate'
+      };
+    }
+
+    let migratedCount = 0;
+    let skippedCount = 0;
+    const errors = [];
+
+    for (const serviceDoc of servicesSnapshot.docs) {
+      const service = serviceDoc.data();
+
+      // Skip if already has end date/time
+      if (service.endDate && service.endTime) {
+        logger.info(`Skipping service ${serviceDoc.id} - already has end time`);
+        skippedCount++;
+        continue;
+      }
+
+      // Skip if missing start date/time
+      if (!service.date || !service.time) {
+        logger.warn(`Skipping service ${serviceDoc.id} - missing start date/time`);
+        skippedCount++;
+        continue;
+      }
+
+      try {
+        // Parse start date and time
+        const [year, month, day] = service.date.split('-').map(Number);
+        const [hours, minutes] = service.time.split(':').map(Number);
+
+        // Create date object and add 2 hours
+        const startDate = new Date(year, month - 1, day, hours, minutes);
+        const endDate = new Date(startDate.getTime() + (2 * 60 * 60 * 1000)); // Add 2 hours
+
+        // Format end date and time
+        const endDateStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
+        const endTimeStr = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
+
+        // Update the service
+        await serviceDoc.ref.update({
+          endDate: endDateStr,
+          endTime: endTimeStr
+        });
+
+        logger.info(`Migrated service ${serviceDoc.id}: ${service.date} ${service.time} -> end: ${endDateStr} ${endTimeStr}`);
+        migratedCount++;
+      } catch (updateError) {
+        logger.error(`Failed to migrate service ${serviceDoc.id}:`, updateError.message);
+        errors.push({
+          serviceId: serviceDoc.id,
+          error: updateError.message
+        });
+      }
+    }
+
+    logger.info(`Migration complete: ${migratedCount} migrated, ${skippedCount} skipped, ${errors.length} errors`);
+
+    return {
+      success: true,
+      migrated: migratedCount,
+      skipped: skippedCount,
+      errors: errors.length > 0 ? errors : undefined,
+      message: `Migration complete: ${migratedCount} services updated, ${skippedCount} skipped`
+    };
+  } catch (error) {
+    logger.error('Error during services migration:', error.message);
+    throw new https.HttpsError('internal', `Migration failed: ${error.message}`);
+  }
+});
+
+/**
+ * Cloud Function to optimize avatar images on upload
+ *
+ * Triggers when an image is uploaded to the avatars/ folder.
+ * Optimizes the image to standard profile picture dimensions:
+ * - Maximum size: 400x400 pixels (standard for profile pictures, good for retina)
+ * - Format: JPEG with quality 80 (optimal balance for web)
+ * - Strips metadata (EXIF, etc.) for smaller file size
+ * - Uses progressive JPEG for better perceived loading
+ *
+ * This allows users to upload images up to 10MB which are then
+ * automatically compressed to typically < 50KB.
+ */
+exports.optimizeAvatarImage = onObjectFinalized({
+  cpu: 1,
+  memory: '512MiB',
+  timeoutSeconds: 120,
+  region: 'us-east1'
+}, async (event) => {
+  const filePath = event.data.name;
+  const contentType = event.data.contentType;
+  const metadata = event.data.metadata || {};
+
+  // Only process files in the avatars folder
+  if (!filePath.startsWith('avatars/')) {
+    logger.info('File not in avatars folder, skipping:', filePath);
+    return null;
+  }
+
+  // Skip if already optimized (prevents infinite loop)
+  if (metadata.optimized === 'true') {
+    logger.info('Image already optimized, skipping:', filePath);
+    return null;
+  }
+
+  // Only process images
+  if (!contentType || !contentType.startsWith('image/')) {
+    logger.info('File is not an image, skipping:', filePath);
+    return null;
+  }
+
+  logger.info('Optimizing avatar image:', {filePath, contentType, size: event.data.size});
+
+  const bucket = admin.storage().bucket(event.data.bucket);
+  const file = bucket.file(filePath);
+  const fileName = path.basename(filePath);
+  const tempFilePath = path.join(os.tmpdir(), `original_${fileName}`);
+  const tempOptimizedPath = path.join(os.tmpdir(), `optimized_${fileName}`);
+
+  try {
+    // Download the original image
+    await file.download({destination: tempFilePath});
+    logger.info('Downloaded original image to:', tempFilePath);
+
+    // Get original image metadata for logging
+    const originalStats = await sharp(tempFilePath).metadata();
+    const originalSizeKB = Math.round(event.data.size / 1024);
+    logger.info('Original image stats:', {
+      width: originalStats.width,
+      height: originalStats.height,
+      format: originalStats.format,
+      sizeKB: originalSizeKB
+    });
+
+    // Optimize the image:
+    // - Resize to max 400x400 (standard profile picture size for web/retina)
+    // - Convert to JPEG with quality 80
+    // - Strip metadata (EXIF, etc.) for smaller size
+    // - Use progressive JPEG for better perceived loading
+    await sharp(tempFilePath)
+      .resize(400, 400, {
+        fit: 'cover', // Crop to fill the square, maintaining aspect ratio
+        position: 'centre', // Center the crop
+        withoutEnlargement: true // Don't upscale smaller images
+      })
+      .jpeg({
+        quality: 80,
+        progressive: true,
+        mozjpeg: true // Use mozjpeg for better compression
+      })
+      .toFile(tempOptimizedPath);
+
+    // Get optimized file size
+    const fs = require('fs');
+    const optimizedSize = fs.statSync(tempOptimizedPath).size;
+    const optimizedSizeKB = Math.round(optimizedSize / 1024);
+    const compressionRatio = Math.round((1 - optimizedSize / event.data.size) * 100);
+
+    logger.info('Optimized image stats:', {
+      sizeKB: optimizedSizeKB,
+      compressionRatio: `${compressionRatio}%`
+    });
+
+    // Upload the optimized image back to the SAME path
+    // This preserves the existing download URL that's stored in Firestore
+    await bucket.upload(tempOptimizedPath, {
+      destination: filePath,
+      metadata: {
+        contentType: 'image/jpeg',
+        metadata: {
+          optimized: 'true',
+          originalName: metadata.originalName || fileName,
+          originalSize: String(event.data.size),
+          optimizedSize: String(optimizedSize),
+          uploadedBy: metadata.uploadedBy || '',
+          uploadDate: metadata.uploadDate || new Date().toISOString()
+        }
+      }
+    });
+
+    logger.info('Avatar optimization complete:', {
+      path: filePath,
+      originalSizeKB,
+      optimizedSizeKB,
+      compressionRatio: `${compressionRatio}%`
+    });
+
+    return {
+      success: true,
+      path: filePath,
+      originalSize: event.data.size,
+      optimizedSize,
+      compressionRatio
+    };
+  } catch (error) {
+    logger.error('Error optimizing avatar image:', {
+      error: error.message,
+      stack: error.stack,
+      filePath
+    });
+    throw error;
+  } finally {
+    // Clean up temp files
+    const fs = require('fs');
+    try {
+      if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
+      if (fs.existsSync(tempOptimizedPath)) fs.unlinkSync(tempOptimizedPath);
+    } catch (cleanupError) {
+      logger.warn('Error cleaning up temp files:', cleanupError.message);
+    }
   }
 });

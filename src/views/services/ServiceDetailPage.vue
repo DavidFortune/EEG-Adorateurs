@@ -49,11 +49,19 @@
               <ion-item>
                 <ion-icon :icon="calendarOutline" slot="start" />
                 <ion-label>
-                  <h3>Date et heure</h3>
+                  <h3>Date et heure de début</h3>
                   <p>{{ formatDateTime(service.date, service.time) }}</p>
                 </ion-label>
               </ion-item>
-              
+
+              <ion-item v-if="service.endDate && service.endTime">
+                <ion-icon :icon="calendarOutline" slot="start" color="secondary" />
+                <ion-label>
+                  <h3>Date et heure de fin</h3>
+                  <p>{{ formatDateTime(service.endDate, service.endTime) }}</p>
+                </ion-label>
+              </ion-item>
+
               <ion-item>
                 <ion-icon :icon="informationCircleOutline" slot="start" />
                 <ion-label>
@@ -245,7 +253,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonBackButton,
@@ -262,6 +270,8 @@ import {
 } from 'ionicons/icons';
 import { Service, ServiceCategory } from '@/types/service';
 import { serviceService } from '@/services/serviceService';
+import { db } from '@/firebase/config';
+import { doc, onSnapshot, Timestamp } from 'firebase/firestore';
 import { assignmentsService } from '@/firebase/assignments';
 import { membersService } from '@/firebase/members';
 import { timezoneUtils } from '@/utils/timezone';
@@ -290,28 +300,74 @@ const loadingAllMembers = ref(false);
 const guestSearchQuery = ref('');
 const savingGuests = ref(false);
 
-const loadService = async () => {
-  const id = route.params.id as string;
-  try {
-    service.value = await serviceService.getServiceById(id);
+// Realtime subscription cleanup
+let unsubscribeService: (() => void) | null = null;
 
-    // Load member count and program in parallel for better performance
-    await Promise.allSettled([
-      loadMemberCount(),
-      loadProgram()
-    ]);
-  } catch (error) {
-    console.error('Error loading service:', error);
-    // Show user-friendly error
-    const toast = await toastController.create({
-      message: 'Erreur lors du chargement du service',
-      duration: 3000,
-      color: 'danger'
-    });
-    await toast.present();
-  } finally {
-    loading.value = false;
-  }
+// Convert Firestore document to Service type
+const convertFirestoreDoc = (id: string, data: any): Service => {
+  return {
+    id,
+    title: data.title,
+    date: data.date,
+    time: data.time,
+    endDate: data.endDate,
+    endTime: data.endTime,
+    category: data.category,
+    isPublished: data.isPublished,
+    availabilityDeadline: data.availabilityDeadline,
+    teamRequirements: data.teamRequirements,
+    guestMemberIds: data.guestMemberIds,
+    createdAt: data.createdAt instanceof Timestamp
+      ? data.createdAt.toDate().toISOString()
+      : data.createdAt,
+    modifiedAt: data.modifiedAt instanceof Timestamp
+      ? data.modifiedAt.toDate().toISOString()
+      : data.modifiedAt
+  };
+};
+
+// Subscribe to realtime updates for the service
+const subscribeToService = () => {
+  const id = route.params.id as string;
+  const serviceRef = doc(db, 'services', id);
+
+  unsubscribeService = onSnapshot(
+    serviceRef,
+    async (docSnapshot) => {
+      if (docSnapshot.exists()) {
+        const previousGuestIds = service.value?.guestMemberIds;
+        service.value = convertFirestoreDoc(docSnapshot.id, docSnapshot.data());
+
+        // Reload guest members if guest list changed
+        const currentGuestIds = service.value?.guestMemberIds;
+        if (JSON.stringify(previousGuestIds) !== JSON.stringify(currentGuestIds)) {
+          await loadGuestMembers();
+        }
+
+        // Load member count, program, and guests on first load
+        if (loading.value) {
+          await Promise.allSettled([
+            loadMemberCount(),
+            loadProgram(),
+            loadGuestMembers()
+          ]);
+        }
+      } else {
+        service.value = null;
+      }
+      loading.value = false;
+    },
+    async (error) => {
+      console.error('Error in service realtime listener:', error);
+      loading.value = false;
+      const toast = await toastController.create({
+        message: 'Erreur lors du chargement du service',
+        duration: 3000,
+        color: 'danger'
+      });
+      await toast.present();
+    }
+  );
 };
 
 const loadMemberCount = async () => {
@@ -446,16 +502,19 @@ const togglePublishStatus = async () => {
   updating.value = true;
 
   try {
-    const updatedService = await serviceService.updateService({
+    await serviceService.updateService({
       ...service.value,
       isPublished: !service.value.isPublished
     });
-
-    if (updatedService) {
-      service.value = updatedService;
-    }
+    // Realtime listener will automatically update service.value
   } catch (error) {
     console.error('Error updating publish status:', error);
+    const toast = await toastController.create({
+      message: 'Erreur lors de la mise à jour du statut',
+      duration: 3000,
+      color: 'danger'
+    });
+    await toast.present();
   } finally {
     updating.value = false;
   }
@@ -519,9 +578,10 @@ const toggleGuestMember = async (member: Member) => {
   if (!service.value) return;
 
   const currentGuests = service.value.guestMemberIds || [];
+  const isRemoving = currentGuests.includes(member.id);
   let newGuests: string[];
 
-  if (currentGuests.includes(member.id)) {
+  if (isRemoving) {
     newGuests = currentGuests.filter(id => id !== member.id);
   } else {
     newGuests = [...currentGuests, member.id];
@@ -529,18 +589,14 @@ const toggleGuestMember = async (member: Member) => {
 
   savingGuests.value = true;
   try {
-    const updatedService = await serviceService.updateService({
+    await serviceService.updateService({
       ...service.value,
       guestMemberIds: newGuests
     });
-
-    if (updatedService) {
-      service.value = updatedService;
-      await loadGuestMembers();
-    }
+    // Realtime listener will automatically update service.value and reload guest members
 
     const toast = await toastController.create({
-      message: currentGuests.includes(member.id)
+      message: isRemoving
         ? `${member.fullName} retiré des invités`
         : `${member.fullName} ajouté comme invité`,
       duration: 2000,
@@ -590,9 +646,16 @@ const getInitials = (name: string): string => {
 
 const guestCount = computed(() => service.value?.guestMemberIds?.length || 0);
 
-onMounted(async () => {
-  await loadService();
-  await loadGuestMembers();
+onMounted(() => {
+  subscribeToService();
+});
+
+onUnmounted(() => {
+  // Clean up realtime subscription
+  if (unsubscribeService) {
+    unsubscribeService();
+    unsubscribeService = null;
+  }
 });
 </script>
 

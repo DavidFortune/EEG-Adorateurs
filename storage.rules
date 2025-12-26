@@ -41,11 +41,12 @@ service firebase.storage {
     }
 
     // Avatars directory - allow authenticated users to upload and read profile pictures
+    // Images are automatically optimized by Cloud Function after upload
     match /avatars/{userId}/{allPaths=**} {
-      // Users can only upload to their own avatar folder
+      // Users can only upload to their own avatar folder (max 10MB, optimized by Cloud Function)
       allow create: if request.auth != null &&
         request.auth.uid == userId &&
-        request.resource.size <= 5 * 1024 * 1024 && // Max 5MB for avatars
+        request.resource.size <= 10 * 1024 * 1024 && // Max 10MB for avatars (optimized by Cloud Function)
         request.resource.contentType.matches('image/.*');
       // Anyone authenticated can read avatars
       allow read: if request.auth != null;

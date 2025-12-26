@@ -4,6 +4,9 @@
       <ion-toolbar>
         <ion-title>Services</ion-title>
         <ion-buttons slot="end">
+          <ion-button v-if="canManageServices" @click="runMigration" fill="clear" color="dark" :disabled="migrating">
+            <ion-icon :icon="syncOutline" />
+          </ion-button>
           <ion-button v-if="canManageServices" @click="goToScheduling" fill="clear" color="dark">
             <ion-icon :icon="calendarOutline" />
           </ion-button>
@@ -120,7 +123,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
@@ -130,10 +133,12 @@ import {
 } from '@ionic/vue';
 import {
   addOutline, calendarOutline, checkmarkCircle, timeOutline, timerOutline,
-  peopleOutline, documentTextOutline
+  peopleOutline, documentTextOutline, syncOutline
 } from 'ionicons/icons';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { db } from '@/firebase/config';
+import { collection, query, orderBy, onSnapshot, Timestamp } from 'firebase/firestore';
 import { Service, ServiceCategory } from '@/types/service';
-import { serviceService } from '@/services/serviceService';
 import { teamsService } from '@/firebase/teams';
 import { timezoneUtils } from '@/utils/timezone';
 import { useUser } from '@/composables/useUser';
@@ -141,9 +146,36 @@ import { useUser } from '@/composables/useUser';
 const router = useRouter();
 const { canManageServices, member } = useUser();
 const services = ref<Service[]>([]);
-const loading = ref(false);
+const loading = ref(true);
+const migrating = ref(false);
 const filterMode = ref('upcoming');
 const userTeamNames = ref<string[]>([]);
+
+// Realtime subscription cleanup
+let unsubscribeServices: (() => void) | null = null;
+
+// Convert Firestore document to Service type
+const convertServiceDoc = (id: string, data: any): Service => {
+  return {
+    id,
+    title: data.title,
+    date: data.date,
+    time: data.time,
+    endDate: data.endDate,
+    endTime: data.endTime,
+    category: data.category,
+    isPublished: data.isPublished,
+    availabilityDeadline: data.availabilityDeadline,
+    teamRequirements: data.teamRequirements,
+    guestMemberIds: data.guestMemberIds,
+    createdAt: data.createdAt instanceof Timestamp
+      ? data.createdAt.toDate().toISOString()
+      : data.createdAt,
+    modifiedAt: data.modifiedAt instanceof Timestamp
+      ? data.modifiedAt.toDate().toISOString()
+      : data.modifiedAt
+  };
+};
 
 // Load user's team names from team IDs
 const loadUserTeamNames = async () => {
@@ -225,26 +257,37 @@ const filteredServices = computed(() => {
   });
 });
 
-const loadServices = async () => {
-  loading.value = true;
-  try {
-    services.value = await serviceService.getAllServices();
-  } catch (error) {
-    console.error('Error loading services:', error);
-    // Show user-friendly error message
-    const toast = await toastController.create({
-      message: 'Erreur lors du chargement des services',
-      duration: 3000,
-      color: 'danger'
-    });
-    await toast.present();
-  } finally {
-    loading.value = false;
-  }
+// Subscribe to realtime updates for all services
+const subscribeToServices = () => {
+  const servicesRef = collection(db, 'services');
+  const q = query(servicesRef, orderBy('createdAt', 'desc'));
+
+  unsubscribeServices = onSnapshot(
+    q,
+    (querySnapshot) => {
+      const loadedServices: Service[] = [];
+      querySnapshot.forEach((doc) => {
+        loadedServices.push(convertServiceDoc(doc.id, doc.data()));
+      });
+      services.value = loadedServices;
+      loading.value = false;
+    },
+    async (error) => {
+      console.error('Error in services realtime listener:', error);
+      loading.value = false;
+      const toast = await toastController.create({
+        message: 'Erreur lors du chargement des services',
+        duration: 3000,
+        color: 'danger'
+      });
+      await toast.present();
+    }
+  );
 };
 
-const handleRefresh = async (event: any) => {
-  await loadServices();
+const handleRefresh = (event: any) => {
+  // With realtime updates, data is always fresh
+  // Just complete the refresher
   event.target.complete();
 };
 
@@ -287,6 +330,34 @@ const goToCreateService = () => {
 
 const goToScheduling = () => {
   router.push('/scheduling');
+};
+
+const runMigration = async () => {
+  migrating.value = true;
+  try {
+    const functions = getFunctions();
+    const migrateServicesEndTime = httpsCallable(functions, 'migrateServicesEndTime');
+    const result = await migrateServicesEndTime();
+    const data = result.data as { success: boolean; migrated: number; skipped: number; message: string };
+
+    const toast = await toastController.create({
+      message: data.message,
+      duration: 3000,
+      color: data.success ? 'success' : 'danger'
+    });
+    await toast.present();
+    // Realtime listener will automatically update services
+  } catch (error: any) {
+    console.error('Migration error:', error);
+    const toast = await toastController.create({
+      message: error.message || 'Erreur lors de la migration',
+      duration: 3000,
+      color: 'danger'
+    });
+    await toast.present();
+  } finally {
+    migrating.value = false;
+  }
 };
 
 const goToServiceMembers = (serviceId: string) => {
@@ -332,8 +403,16 @@ watch(() => member.value, (newMember) => {
 }, { immediate: true });
 
 onMounted(() => {
-  loadServices();
+  subscribeToServices();
   loadUserTeamNames();
+});
+
+onUnmounted(() => {
+  // Clean up realtime subscription
+  if (unsubscribeServices) {
+    unsubscribeServices();
+    unsubscribeServices = null;
+  }
 });
 </script>
 
