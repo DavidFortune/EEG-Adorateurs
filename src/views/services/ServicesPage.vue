@@ -64,6 +64,9 @@
                 <ion-card-title>{{ service.title }}</ion-card-title>
                 <ion-card-subtitle class="service-datetime">
                   {{ formatDateTime(service.date, service.time) }}
+                  <span v-if="service.endDate && service.endTime" class="service-duration">
+                    ({{ calculateDuration(service.date, service.time, service.endDate, service.endTime) }})
+                  </span>
                 </ion-card-subtitle>
                 <!-- Status and Category moved below date -->
                 <div class="service-badges">
@@ -300,6 +303,21 @@ const formatDateTime = (dateStr: string, timeStr: string) => {
   return timezoneUtils.formatDateTimeForDisplay(dateStr, timeStr);
 };
 
+// Calculate duration between start and end datetime in HH:MM format
+const calculateDuration = (startDate: string, startTime: string, endDate: string, endTime: string): string => {
+  const start = new Date(`${startDate}T${startTime}:00`);
+  const end = new Date(`${endDate}T${endTime}:00`);
+
+  const diffMs = end.getTime() - start.getTime();
+  if (diffMs <= 0) return '00:00';
+
+  const totalMinutes = Math.floor(diffMs / (1000 * 60));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+};
+
 
 const getCategoryColor = (category: ServiceCategory) => {
   return category === ServiceCategory.SERVICE ? 'primary' : 'secondary';
@@ -430,6 +448,12 @@ onUnmounted(() => {
 
 .service-datetime {
   margin-bottom: 8px !important;
+}
+
+.service-duration {
+  color: var(--ion-color-medium);
+  font-weight: 500;
+  margin-left: 4px;
 }
 
 .service-badges {

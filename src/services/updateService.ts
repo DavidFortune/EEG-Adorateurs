@@ -241,6 +241,28 @@ class UpdateService {
   async getReleaseNotes(): Promise<ReleaseNote[]> {
     return [
       {
+        version: '1.11.3',
+        date: '2025-12-26',
+        title: 'Durée des services et synchronisation temps réel',
+        description: 'Ajout de la date/heure de fin pour les services avec affichage de la durée et synchronisation Firestore temps réel',
+        features: [
+          'Nouveau champ date et heure de fin pour les services (optionnel)',
+          'Affichage de la durée au format HH:MM dans la liste des services',
+          'Limite de téléversement d\'avatar augmentée à 10 Mo avec optimisation automatique',
+          'Cloud Function pour optimiser les avatars (400x400px, JPEG qualité 80)',
+          'Cloud Function de migration pour définir la durée des services existants',
+          'Bouton de migration dans la page Services (admin)'
+        ],
+        fixes: [],
+        improvements: [
+          'Synchronisation temps réel Firestore pour ServicesPage',
+          'Synchronisation temps réel Firestore pour ServiceDetailPage',
+          'Synchronisation temps réel Firestore pour ServiceMembersPage',
+          'Les modifications sont visibles instantanément sans rechargement',
+          'Nettoyage automatique des abonnements Firestore'
+        ]
+      },
+      {
         version: '1.11.2',
         date: '2025-12-21',
         title: 'Affichage PDF et sections de programme',
