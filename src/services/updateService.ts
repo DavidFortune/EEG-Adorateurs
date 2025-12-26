@@ -241,6 +241,28 @@ class UpdateService {
   async getReleaseNotes(): Promise<ReleaseNote[]> {
     return [
       {
+        version: '1.12.0',
+        date: '2025-12-26',
+        title: 'Refonte de la page détail de service',
+        description: 'Nouvelle interface modulaire avec onglets pour Programme, Ressources et Membres',
+        features: [
+          'Nouvelle page de détail de service avec navigation par onglets (Programme, Ressources, Membres)',
+          'Composant ServiceInfoHeader avec catégorie, statut, titre et durée',
+          'Composant ProgramOverview avec résumé (dirigeant, nombre d\'éléments, durée) et lien vers le programme détaillé',
+          'Composant ResourcesOverview avec ressources cliquables vers la page de détail',
+          'Composant MembersOverview avec membres groupés par équipe et section invités',
+          'Actions admin regroupées dans un menu contextuel (3 points)'
+        ],
+        fixes: [],
+        improvements: [
+          'Interface moderne avec onglets segmentés (texte blanc sur fond primaire)',
+          'Sections de programme affichées en rouge avec titre centré',
+          'Sous-titres affichés à côté des titres dans le programme',
+          'Résumé compact du programme avec icônes modernes',
+          'Ressources cliquables avec effet de feedback tactile'
+        ]
+      },
+      {
         version: '1.11.5',
         date: '2025-12-26',
         title: 'Gestion des conflits de disponibilités',

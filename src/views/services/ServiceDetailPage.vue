@@ -9,185 +9,60 @@
         </ion-buttons>
         <ion-title>Détail du Service</ion-title>
         <ion-buttons slot="end">
-          <ion-button
-            v-if="isAdmin"
-            @click="togglePublishStatus"
-            fill="clear"
-            :disabled="updating"
-          >
-            <ion-icon :icon="service?.isPublished ? eyeOffOutline : eyeOutline" />
-          </ion-button>
-          <ion-button v-if="isAdmin" @click="goToEdit" fill="clear">
-            <ion-icon :icon="pencil" />
+          <ion-button v-if="isAdmin" @click="openAdminActions" fill="clear">
+            <ion-icon :icon="ellipsisVertical" />
           </ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
-    
+
     <ion-content :fullscreen="true">
       <ion-loading :is-open="loading" message="Chargement..."></ion-loading>
-      
-      <div v-if="service" class="ion-padding">
-        <ion-card>
-          <ion-card-header>
-            <ion-card-title>{{ service.title }}</ion-card-title>
-            <ion-card-subtitle>
-              <ion-chip :color="getCategoryColor(service.category)">
-                {{ service.category }}
-              </ion-chip>
-              <ion-chip v-if="service.isPublished" color="success">
-                <ion-icon :icon="checkmarkCircle" />
-                <ion-label>Publié</ion-label>
-              </ion-chip>
-              <ion-chip v-else color="warning">
-                <ion-icon :icon="timeOutline" />
-                <ion-label>Brouillon</ion-label>
-              </ion-chip>
-            </ion-card-subtitle>
-          </ion-card-header>
-          
-          <ion-card-content>
-            <ion-list>
-              <ion-item>
-                <ion-icon :icon="calendarOutline" slot="start" />
-                <ion-label>
-                  <h3>Date et heure de début</h3>
-                  <p>{{ formatDateTime(service.date, service.time) }}</p>
-                </ion-label>
-              </ion-item>
 
-              <ion-item v-if="service.endDate && service.endTime">
-                <ion-icon :icon="calendarOutline" slot="start" color="secondary" />
-                <ion-label>
-                  <h3>Date et heure de fin</h3>
-                  <p>{{ formatDateTime(service.endDate, service.endTime) }}</p>
-                </ion-label>
-              </ion-item>
+      <div v-if="service">
+        <!-- Service Info Header -->
+        <ServiceInfoHeader :service="service" />
 
-              <ion-item>
-                <ion-icon :icon="informationCircleOutline" slot="start" />
-                <ion-label>
-                  <h3>Catégorie</h3>
-                  <p>{{ service.category }}</p>
-                </ion-label>
-              </ion-item>
-              
-              <ion-item v-if="service.availabilityDeadline">
-                <ion-icon :icon="timerOutline" slot="start" :color="isDeadlinePassed ? 'danger' : 'warning'" />
-                <ion-label>
-                  <h3>Date limite pour les disponibilités</h3>
-                  <p :class="{ 'deadline-passed': isDeadlinePassed }">
-                    {{ formatDeadline(service.availabilityDeadline) }}
-                    <span v-if="isDeadlinePassed"> (Dépassée)</span>
-                  </p>
-                </ion-label>
-              </ion-item>
-              
-              <ion-item :button="service.isPublished" @click="service.isPublished ? goToMembers() : null">
-                <ion-icon :icon="peopleOutline" slot="start" :color="service.isPublished ? undefined : 'medium'" />
-                <ion-label>
-                  <h3 :class="{ 'disabled-text': !service.isPublished }">Membres assignés</h3>
-                  <p v-if="loadingMembers">Chargement...</p>
-                  <p v-else-if="service.isPublished">
-                    {{ memberCount }} membre{{ memberCount !== 1 ? 's' : '' }} assigné{{ memberCount !== 1 ? 's' : '' }}
-                  </p>
-                  <p v-else class="disabled-text">
-                    Disponible une fois publié
-                  </p>
-                </ion-label>
-                <ion-icon v-if="service.isPublished" :icon="chevronForwardOutline" slot="end" />
-                <ion-icon v-else :icon="lockClosedOutline" slot="end" color="medium" />
-              </ion-item>
+        <!-- Segment Tabs -->
+        <ion-segment v-model="selectedSegment" class="segment-tabs">
+          <ion-segment-button value="programme">
+            <ion-label>Programme</ion-label>
+          </ion-segment-button>
+          <ion-segment-button value="ressources">
+            <ion-label>Ressources</ion-label>
+          </ion-segment-button>
+          <ion-segment-button value="members">
+            <ion-label>Membres</ion-label>
+          </ion-segment-button>
+        </ion-segment>
 
-              <ion-item :button="service.isPublished" @click="service.isPublished ? goToProgram() : null">
-                <ion-icon :icon="documentTextOutline" slot="start" :color="service.isPublished ? (canCreateProgram ? 'warning' : undefined) : 'medium'" />
-                <ion-label>
-                  <h3 :class="{ 'disabled-text': !service.isPublished }">Programme du service</h3>
-                  <p v-if="service.isPublished" :class="{ 'create-program-text': canCreateProgram }">
-                    {{ programDescription }}
-                  </p>
-                  <p v-else class="disabled-text">
-                    Disponible une fois publié
-                  </p>
-                </ion-label>
-                <ion-icon v-if="service.isPublished" :icon="canCreateProgram ? createOutline : chevronForwardOutline" slot="end" :color="canCreateProgram ? 'warning' : undefined" />
-                <ion-icon v-else :icon="lockClosedOutline" slot="end" color="medium" />
-              </ion-item>
-              
-              <ion-item>
-                <ion-icon :icon="createOutline" slot="start" />
-                <ion-label>
-                  <h3>Créé le</h3>
-                  <p>{{ formatTimestamp(service.createdAt) }}</p>
-                </ion-label>
-              </ion-item>
-              
-              <ion-item>
-                <ion-icon :icon="syncOutline" slot="start" />
-                <ion-label>
-                  <h3>Modifié le</h3>
-                  <p>{{ formatTimestamp(service.modifiedAt) }}</p>
-                </ion-label>
-              </ion-item>
-            </ion-list>
-          </ion-card-content>
-        </ion-card>
+        <!-- Tab Content -->
+        <div class="tab-content">
+          <!-- Programme Tab -->
+          <ProgramOverview
+            v-if="selectedSegment === 'programme'"
+            :program="program"
+            :loading="loadingProgram"
+            @view-full="goToProgram"
+          />
 
-        <!-- Guests Section (Admin only) -->
-        <ion-card v-if="isAdmin" class="guests-card">
-          <ion-card-header>
-            <ion-card-title class="guests-title">
-              <ion-icon :icon="personAddOutline" />
-              Invités spéciaux
-            </ion-card-title>
-            <ion-card-subtitle>
-              Personnes ayant accès au service sans être membres d'une équipe requise
-            </ion-card-subtitle>
-          </ion-card-header>
-          <ion-card-content>
-            <div v-if="loadingGuests" class="loading-guests">
-              <ion-spinner name="crescent" />
-              <span>Chargement...</span>
-            </div>
+          <!-- Ressources Tab -->
+          <ResourcesOverview
+            v-if="selectedSegment === 'ressources'"
+            :resources="resources"
+            :loading="loadingResources"
+          />
 
-            <div v-else-if="guestMembers.length > 0" class="guests-list">
-              <div v-for="guest in guestMembers" :key="guest.id" class="guest-item">
-                <ion-avatar>
-                  <img v-if="guest.avatar" :src="guest.avatar" :alt="guest.fullName" />
-                  <div v-else class="avatar-initials">{{ getInitials(guest.fullName) }}</div>
-                </ion-avatar>
-                <div class="guest-info">
-                  <span class="guest-name">{{ guest.fullName }}</span>
-                  <span class="guest-email">{{ guest.email }}</span>
-                </div>
-                <ion-button fill="clear" color="danger" size="small" @click="removeGuest(guest)">
-                  <ion-icon :icon="removeCircleOutline" slot="icon-only" />
-                </ion-button>
-              </div>
-            </div>
-
-            <div v-else class="no-guests">
-              <p>Aucun invité pour ce service</p>
-            </div>
-
-            <ion-button expand="block" fill="outline" @click="openGuestModal" class="add-guest-btn">
-              <ion-icon :icon="addOutline" slot="start" />
-              Gérer les invités
-            </ion-button>
-          </ion-card-content>
-        </ion-card>
-        
-        <ion-button v-if="isAdmin" expand="block" color="primary" @click="goToEdit" class="ion-margin-top">
-          <ion-icon :icon="pencil" slot="start" />
-          Modifier ce service
-        </ion-button>
-        
-        <ion-button v-if="isAdmin" expand="block" color="danger" fill="outline" @click="confirmDelete" class="ion-margin-top">
-          <ion-icon :icon="trashOutline" slot="start" />
-          Supprimer ce service
-        </ion-button>
+          <!-- Members Tab -->
+          <MembersOverview
+            v-if="selectedSegment === 'members'"
+            :team-assignments="teamAssignments"
+            :guest-members="guestMembers"
+            :loading="loadingMembers"
+          />
+        </div>
       </div>
-      
+
       <div v-else-if="!loading" class="ion-text-center ion-padding">
         <ion-icon :icon="alertCircleOutline" size="large" color="warning" />
         <h2>Service non trouvé</h2>
@@ -255,48 +130,74 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons,
-  IonButton, IonIcon, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle,
-  IonCardContent, IonList, IonItem, IonLabel, IonChip, IonLoading, IonModal,
-  IonSearchbar, IonAvatar, IonSpinner, alertController, toastController
+  IonButton, IonIcon, IonLoading, IonModal, IonSearchbar, IonAvatar,
+  IonSpinner, IonList, IonItem, IonLabel, IonChip, IonSegment, IonSegmentButton,
+  alertController, toastController, actionSheetController
 } from '@ionic/vue';
 import {
-  pencil, calendarOutline, timeOutline, informationCircleOutline, createOutline,
-  syncOutline, checkmarkCircle, trashOutline, alertCircleOutline, timerOutline,
-  peopleOutline, chevronForwardOutline, documentTextOutline, eyeOutline,
-  eyeOffOutline, lockClosedOutline, personAddOutline, closeOutline, addOutline,
-  removeCircleOutline, arrowBackOutline
+  arrowBackOutline, ellipsisVertical, checkmarkCircle, alertCircleOutline,
+  closeOutline, pencilOutline, personAddOutline, eyeOutline, eyeOffOutline,
+  trashOutline
 } from 'ionicons/icons';
-import { Service, ServiceCategory } from '@/types/service';
+import { Service } from '@/types/service';
 import { serviceService } from '@/services/serviceService';
 import { db } from '@/firebase/config';
-import { doc, onSnapshot, Timestamp } from 'firebase/firestore';
-import { assignmentsService } from '@/firebase/assignments';
+import { doc, onSnapshot, Timestamp, collection, query, where } from 'firebase/firestore';
 import { membersService } from '@/firebase/members';
-import { timezoneUtils } from '@/utils/timezone';
 import { getProgramByServiceId } from '@/firebase/programs';
+import { getResourceById, getResourceCollectionById } from '@/firebase/resources';
 import { useUser } from '@/composables/useUser';
 import type { ServiceProgram } from '@/types/program';
 import type { Member } from '@/types/member';
+import type { Resource } from '@/types/resource';
+import type { ServiceAssignment } from '@/types/assignment';
+
+// Components
+import ServiceInfoHeader from '@/components/service-detail/ServiceInfoHeader.vue';
+import ProgramOverview from '@/components/service-detail/ProgramOverview.vue';
+import ResourcesOverview from '@/components/service-detail/ResourcesOverview.vue';
+import MembersOverview from '@/components/service-detail/MembersOverview.vue';
+
+interface ResourceWithCollection extends Resource {
+  collectionName?: string;
+}
+
+interface TeamAssignmentGroup {
+  teamId: string;
+  teamName: string;
+  members: Array<ServiceAssignment & { avatar?: string }>;
+  requiredMembers?: number;
+}
 
 const route = useRoute();
 const router = useRouter();
 const { isAdmin } = useUser();
+
+// Core state
 const service = ref<Service | null>(null);
 const loading = ref(true);
 const updating = ref(false);
-const memberCount = ref(0);
-const loadingMembers = ref(false);
+const selectedSegment = ref<'programme' | 'ressources' | 'members'>('programme');
+
+// Program state
 const program = ref<ServiceProgram | null>(null);
 const loadingProgram = ref(false);
+
+// Resources state
+const resources = ref<ResourceWithCollection[]>([]);
+const loadingResources = ref(false);
+
+// Members state
+const teamAssignments = ref<TeamAssignmentGroup[]>([]);
+const loadingMembers = ref(false);
 
 // Guest management
 const showGuestModal = ref(false);
 const guestMembers = ref<Member[]>([]);
-const loadingGuests = ref(false);
 const allMembers = ref<Member[]>([]);
 const loadingAllMembers = ref(false);
 const guestSearchQuery = ref('');
@@ -304,6 +205,7 @@ const savingGuests = ref(false);
 
 // Realtime subscription cleanup
 let unsubscribeService: (() => void) | null = null;
+let unsubscribeAssignments: (() => void) | null = null;
 
 // Convert Firestore document to Service type
 const convertFirestoreDoc = (id: string, data: any): Service => {
@@ -328,6 +230,22 @@ const convertFirestoreDoc = (id: string, data: any): Service => {
   };
 };
 
+// Convert Firestore assignment document
+const convertAssignmentDoc = (id: string, data: any): ServiceAssignment => {
+  return {
+    id,
+    serviceId: data.serviceId,
+    memberId: data.memberId,
+    memberName: data.memberName,
+    teamId: data.teamId,
+    teamName: data.teamName,
+    assignedAt: data.assignedAt instanceof Timestamp
+      ? data.assignedAt.toDate().toISOString()
+      : data.assignedAt,
+    assignedBy: data.assignedBy
+  };
+};
+
 // Subscribe to realtime updates for the service
 const subscribeToService = () => {
   const id = route.params.id as string;
@@ -346,10 +264,9 @@ const subscribeToService = () => {
           await loadGuestMembers();
         }
 
-        // Load member count, program, and guests on first load
+        // Load data on first load
         if (loading.value) {
           await Promise.allSettled([
-            loadMemberCount(),
             loadProgram(),
             loadGuestMembers()
           ]);
@@ -372,21 +289,93 @@ const subscribeToService = () => {
   );
 };
 
-const loadMemberCount = async () => {
+// Subscribe to realtime updates for assignments
+const subscribeToAssignments = () => {
   const id = route.params.id as string;
-  loadingMembers.value = true;
-  try {
-    const assignments = await assignmentsService.getServiceAssignments(id);
-    memberCount.value = assignments.length;
-  } catch (error) {
-    console.error('Error loading member count:', error);
-    memberCount.value = 0;
-    // Silent fail for member count as it's not critical
-  } finally {
-    loadingMembers.value = false;
-  }
+  const assignmentsRef = collection(db, 'assignments');
+  const q = query(assignmentsRef, where('serviceId', '==', id));
+
+  unsubscribeAssignments = onSnapshot(
+    q,
+    async (querySnapshot) => {
+      const assignments: ServiceAssignment[] = [];
+      querySnapshot.forEach((doc) => {
+        assignments.push(convertAssignmentDoc(doc.id, doc.data()));
+      });
+
+      // Process assignments into team groups
+      await processAssignments(assignments);
+      loadingMembers.value = false;
+    },
+    (error) => {
+      console.error('Error in assignments realtime listener:', error);
+      loadingMembers.value = false;
+    }
+  );
 };
 
+// Process assignments into grouped team structure
+const processAssignments = async (assignments: ServiceAssignment[]) => {
+  if (assignments.length === 0) {
+    teamAssignments.value = [];
+    return;
+  }
+
+  // Get team requirements from service
+  const teamRequirements = new Map<string, number>();
+  if (service.value?.teamRequirements) {
+    service.value.teamRequirements.forEach(req => {
+      teamRequirements.set(req.teamName, req.membersNeeded);
+    });
+  }
+
+  // Get member details for avatars
+  const memberIds = [...new Set(assignments.map(a => a.memberId))];
+  const memberDetails = new Map<string, Member>();
+
+  await Promise.all(
+    memberIds.map(async (memberId) => {
+      try {
+        const member = await membersService.getMemberById(memberId);
+        if (member) {
+          memberDetails.set(memberId, member);
+        }
+      } catch (error) {
+        console.error(`Error loading member ${memberId}:`, error);
+      }
+    })
+  );
+
+  // Group assignments by team
+  const groupedByTeam = assignments.reduce((acc, assignment) => {
+    if (!acc[assignment.teamId]) {
+      acc[assignment.teamId] = {
+        teamId: assignment.teamId,
+        teamName: assignment.teamName,
+        members: [],
+        requiredMembers: teamRequirements.get(assignment.teamName)
+      };
+    }
+
+    const member = memberDetails.get(assignment.memberId);
+    acc[assignment.teamId].members.push({
+      ...assignment,
+      avatar: member?.avatar
+    });
+
+    return acc;
+  }, {} as Record<string, TeamAssignmentGroup>);
+
+  // Sort teams alphabetically and members within each team
+  teamAssignments.value = Object.values(groupedByTeam)
+    .sort((a, b) => a.teamName.localeCompare(b.teamName))
+    .map(team => ({
+      ...team,
+      members: team.members.sort((a, b) => a.memberName.localeCompare(b.memberName))
+    }));
+};
+
+// Load program
 const loadProgram = async () => {
   const id = route.params.id as string;
   loadingProgram.value = true;
@@ -395,132 +384,70 @@ const loadProgram = async () => {
   } catch (error) {
     console.error('Error loading program:', error);
     program.value = null;
-    // Silent fail for program as it's not critical
   } finally {
     loadingProgram.value = false;
   }
 };
 
-const formatDateTime = (dateStr: string, timeStr: string) => {
-  return timezoneUtils.formatDateTimeForDisplay(dateStr, timeStr);
-};
-
-const formatTimestamp = (dateTimeStr: string) => {
-  return new Date(dateTimeStr).toLocaleString('fr-CA', {
-    timeZone: 'America/Toronto'
-  });
-};
-
-const getCategoryColor = (category: ServiceCategory) => {
-  return category === ServiceCategory.SERVICE ? 'primary' : 'secondary';
-};
-
-const isDeadlinePassed = computed(() => {
-  if (!service.value?.availabilityDeadline) return false;
-  const deadline = new Date(service.value.availabilityDeadline);
-  const now = new Date();
-  return deadline < now;
-});
-
-const formatDeadline = (dateStr: string) => {
-  const date = new Date(dateStr);
-  return date.toLocaleString('fr-CA', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone: 'America/Toronto'
-  });
-};
-
-const programItemCount = computed(() => {
-  return program.value?.items.length || 0;
-});
-
-const programDescription = computed(() => {
-  if (loadingProgram.value) return 'Chargement...';
-  if (!program.value) {
-    return isAdmin.value ? 'Aucun programme - Cliquez pour en créer un' : 'Aucun programme disponible';
+// Extract and load resources from program
+const loadResources = async () => {
+  if (!program.value || program.value.items.length === 0) {
+    resources.value = [];
+    return;
   }
-  return `${programItemCount.value} élément${programItemCount.value !== 1 ? 's' : ''} au programme`;
-});
 
-const canCreateProgram = computed(() => {
-  return isAdmin.value && !program.value;
-});
-
-const goToEdit = () => {
-  router.push(`/service-form/${service.value?.id}`);
-};
-
-const goToMembers = () => {
-  router.push(`/service-members/${service.value?.id}`);
-};
-
-const goToProgram = () => {
-  if (canCreateProgram.value) {
-    // Navigate to program page which will handle program creation
-    router.push(`/service-program/${service.value?.id}`);
-  } else {
-    router.push(`/service-program/${service.value?.id}`);
-  }
-};
-
-const goBack = () => {
-  router.push('/services');
-};
-
-const confirmDelete = async () => {
-  const alert = await alertController.create({
-    header: 'Confirmer la suppression',
-    message: 'Êtes-vous sûr de vouloir supprimer ce service ? Cette action est irréversible.',
-    buttons: [
-      {
-        text: 'Annuler',
-        role: 'cancel'
-      },
-      {
-        text: 'Supprimer',
-        role: 'destructive',
-        handler: async () => {
-          if (service.value) {
-            await serviceService.deleteService(service.value.id);
-            router.push('/services');
-          }
-        }
-      }
-    ]
-  });
-  
-  await alert.present();
-};
-
-const togglePublishStatus = async () => {
-  if (!service.value || updating.value) return;
-
-  updating.value = true;
-
+  loadingResources.value = true;
   try {
-    await serviceService.updateService({
-      ...service.value,
-      isPublished: !service.value.isPublished
+    // Extract resource IDs from program items
+    const resourceIds: string[] = [];
+    program.value.items.forEach(item => {
+      if (item.resourceId) resourceIds.push(item.resourceId);
+      item.subItems?.forEach(sub => {
+        if (sub.resourceId) resourceIds.push(sub.resourceId);
+      });
     });
-    // Realtime listener will automatically update service.value
+
+    // Dedupe
+    const uniqueIds = [...new Set(resourceIds)];
+
+    if (uniqueIds.length === 0) {
+      resources.value = [];
+      return;
+    }
+
+    // Fetch resources
+    const loadedResources: ResourceWithCollection[] = [];
+    for (const id of uniqueIds) {
+      try {
+        const resource = await getResourceById(id);
+        if (resource) {
+          // Get collection name
+          const resourceCollection = await getResourceCollectionById(resource.collectionId);
+          loadedResources.push({
+            ...resource,
+            collectionName: resourceCollection?.name
+          });
+        }
+      } catch (error) {
+        console.error(`Error loading resource ${id}:`, error);
+      }
+    }
+
+    resources.value = loadedResources;
   } catch (error) {
-    console.error('Error updating publish status:', error);
-    const toast = await toastController.create({
-      message: 'Erreur lors de la mise à jour du statut',
-      duration: 3000,
-      color: 'danger'
-    });
-    await toast.present();
+    console.error('Error loading resources:', error);
+    resources.value = [];
   } finally {
-    updating.value = false;
+    loadingResources.value = false;
   }
 };
+
+// Watch program changes to reload resources
+watch(program, (newProgram) => {
+  if (newProgram) {
+    loadResources();
+  }
+});
 
 // Guest management functions
 const loadGuestMembers = async () => {
@@ -529,7 +456,6 @@ const loadGuestMembers = async () => {
     return;
   }
 
-  loadingGuests.value = true;
   try {
     const members = await Promise.all(
       service.value.guestMemberIds.map(id => membersService.getMemberById(id))
@@ -538,8 +464,6 @@ const loadGuestMembers = async () => {
   } catch (error) {
     console.error('Error loading guest members:', error);
     guestMembers.value = [];
-  } finally {
-    loadingGuests.value = false;
   }
 };
 
@@ -547,7 +471,6 @@ const openGuestModal = async () => {
   showGuestModal.value = true;
   guestSearchQuery.value = '';
 
-  // Load all members for selection if not already loaded
   if (allMembers.value.length === 0) {
     loadingAllMembers.value = true;
     try {
@@ -565,10 +488,10 @@ const filteredMembers = computed(() => {
     return allMembers.value;
   }
 
-  const query = guestSearchQuery.value.toLowerCase();
+  const searchQuery = guestSearchQuery.value.toLowerCase();
   return allMembers.value.filter(member =>
-    member.fullName.toLowerCase().includes(query) ||
-    member.email.toLowerCase().includes(query)
+    member.fullName.toLowerCase().includes(searchQuery) ||
+    member.email.toLowerCase().includes(searchQuery)
   );
 });
 
@@ -595,7 +518,6 @@ const toggleGuestMember = async (member: Member) => {
       ...service.value,
       guestMemberIds: newGuests
     });
-    // Realtime listener will automatically update service.value and reload guest members
 
     const toast = await toastController.create({
       message: isRemoving
@@ -618,27 +540,6 @@ const toggleGuestMember = async (member: Member) => {
   }
 };
 
-const removeGuest = async (member: Member) => {
-  const alert = await alertController.create({
-    header: 'Retirer l\'invité',
-    message: `Voulez-vous retirer ${member.fullName} des invités de ce service ?`,
-    buttons: [
-      {
-        text: 'Annuler',
-        role: 'cancel'
-      },
-      {
-        text: 'Retirer',
-        role: 'destructive',
-        handler: () => {
-          toggleGuestMember(member);
-        }
-      }
-    ]
-  });
-  await alert.present();
-};
-
 const getInitials = (name: string): string => {
   const names = name.split(' ').filter(n => n.length > 0);
   if (names.length === 0) return '?';
@@ -646,128 +547,148 @@ const getInitials = (name: string): string => {
   return names[0].charAt(0).toUpperCase() + names[names.length - 1].charAt(0).toUpperCase();
 };
 
-const guestCount = computed(() => service.value?.guestMemberIds?.length || 0);
+// Navigation
+const goBack = () => {
+  router.push('/services');
+};
+
+const goToEdit = () => {
+  router.push(`/service-form/${service.value?.id}`);
+};
+
+const goToProgram = () => {
+  router.push(`/service-program/${service.value?.id}`);
+};
+
+// Admin actions
+const openAdminActions = async () => {
+  const buttons = [
+    {
+      text: 'Modifier le service',
+      icon: pencilOutline,
+      handler: () => goToEdit()
+    },
+    {
+      text: 'Gérer les invités',
+      icon: personAddOutline,
+      handler: () => openGuestModal()
+    },
+    {
+      text: service.value?.isPublished ? 'Dépublier' : 'Publier',
+      icon: service.value?.isPublished ? eyeOffOutline : eyeOutline,
+      handler: () => togglePublishStatus()
+    },
+    {
+      text: 'Supprimer',
+      icon: trashOutline,
+      role: 'destructive' as const,
+      handler: () => confirmDelete()
+    },
+    {
+      text: 'Annuler',
+      role: 'cancel' as const
+    }
+  ];
+
+  const actionSheet = await actionSheetController.create({
+    header: 'Actions',
+    buttons
+  });
+
+  await actionSheet.present();
+};
+
+const togglePublishStatus = async () => {
+  if (!service.value || updating.value) return;
+
+  updating.value = true;
+
+  try {
+    await serviceService.updateService({
+      ...service.value,
+      isPublished: !service.value.isPublished
+    });
+
+    const toast = await toastController.create({
+      message: service.value.isPublished ? 'Service dépublié' : 'Service publié',
+      duration: 2000,
+      color: 'success'
+    });
+    await toast.present();
+  } catch (error) {
+    console.error('Error updating publish status:', error);
+    const toast = await toastController.create({
+      message: 'Erreur lors de la mise à jour du statut',
+      duration: 3000,
+      color: 'danger'
+    });
+    await toast.present();
+  } finally {
+    updating.value = false;
+  }
+};
+
+const confirmDelete = async () => {
+  const alert = await alertController.create({
+    header: 'Confirmer la suppression',
+    message: 'Êtes-vous sûr de vouloir supprimer ce service ? Cette action est irréversible.',
+    buttons: [
+      {
+        text: 'Annuler',
+        role: 'cancel'
+      },
+      {
+        text: 'Supprimer',
+        role: 'destructive',
+        handler: async () => {
+          if (service.value) {
+            await serviceService.deleteService(service.value.id);
+            router.push('/services');
+          }
+        }
+      }
+    ]
+  });
+
+  await alert.present();
+};
 
 onMounted(() => {
   subscribeToService();
+  subscribeToAssignments();
+  loadingMembers.value = true;
 });
 
 onUnmounted(() => {
-  // Clean up realtime subscription
   if (unsubscribeService) {
     unsubscribeService();
     unsubscribeService = null;
+  }
+  if (unsubscribeAssignments) {
+    unsubscribeAssignments();
+    unsubscribeAssignments = null;
   }
 });
 </script>
 
 <style scoped>
-.deadline-passed {
-  color: var(--ion-color-danger);
-  font-weight: 600;
-}
-
-.create-program-text {
-  color: var(--ion-color-warning);
-  font-weight: 500;
-  font-style: italic;
-}
-
-.disabled-text {
-  color: var(--ion-color-medium);
-  font-style: italic;
-}
-
-/* Guests Section Styles */
-.guests-card {
-  margin-top: 16px;
-}
-
-.guests-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.guests-title ion-icon {
-  font-size: 1.25rem;
-  color: var(--ion-color-primary);
-}
-
-.loading-guests {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px 0;
-  color: var(--ion-color-medium);
-}
-
-.guests-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.guest-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px;
-  background: var(--ion-color-light);
-  border-radius: 8px;
-}
-
-.guest-item ion-avatar {
-  width: 40px;
-  height: 40px;
-}
-
-.avatar-initials {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--ion-color-primary);
-  color: white;
-  font-weight: 600;
-  font-size: 0.9rem;
-  border-radius: 50%;
-}
-
-.guest-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.guest-name {
-  font-weight: 600;
-  color: var(--ion-color-dark);
-}
-
-.guest-email {
-  font-size: 0.85rem;
-  color: var(--ion-color-medium);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.no-guests {
-  text-align: center;
-  padding: 16px;
-  color: var(--ion-color-medium);
-}
-
-.no-guests p {
+.segment-tabs {
   margin: 0;
+  --background: var(--ion-color-light);
 }
 
-.add-guest-btn {
-  margin-top: 8px;
+.segment-tabs ion-segment-button {
+  --indicator-color: var(--ion-color-primary);
+  --color: var(--ion-color-medium);
+  --color-checked: white;
+  --background-checked: var(--ion-color-primary);
+  font-weight: 500;
+  text-transform: none;
+  min-height: 44px;
+}
+
+.tab-content {
+  min-height: 200px;
 }
 
 /* Modal Styles */
@@ -788,5 +709,18 @@ onUnmounted(() => {
   text-align: center;
   padding: 32px 16px;
   color: var(--ion-color-medium);
+}
+
+.avatar-initials {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ion-color-primary);
+  color: white;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border-radius: 50%;
 }
 </style>
