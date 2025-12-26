@@ -4,9 +4,6 @@
       <ion-toolbar>
         <ion-title>Services</ion-title>
         <ion-buttons slot="end">
-          <ion-button v-if="canManageServices" @click="runMigration" fill="clear" color="dark" :disabled="migrating">
-            <ion-icon :icon="syncOutline" />
-          </ion-button>
           <ion-button v-if="canManageServices" @click="goToScheduling" fill="clear" color="dark">
             <ion-icon :icon="calendarOutline" />
           </ion-button>
@@ -136,9 +133,8 @@ import {
 } from '@ionic/vue';
 import {
   addOutline, calendarOutline, checkmarkCircle, timeOutline, timerOutline,
-  peopleOutline, documentTextOutline, syncOutline
+  peopleOutline, documentTextOutline
 } from 'ionicons/icons';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db } from '@/firebase/config';
 import { collection, query, orderBy, onSnapshot, Timestamp } from 'firebase/firestore';
 import { Service, ServiceCategory } from '@/types/service';
@@ -150,7 +146,6 @@ const router = useRouter();
 const { canManageServices, member } = useUser();
 const services = ref<Service[]>([]);
 const loading = ref(true);
-const migrating = ref(false);
 const filterMode = ref('upcoming');
 const userTeamNames = ref<string[]>([]);
 
@@ -203,9 +198,17 @@ const servicesWithParsedDates = computed(() => {
 
   return services.value.map(service => {
     const serviceDateTime = new Date(`${service.date}T${service.time}:00`);
+    // Calculate end datetime (use endDate/endTime if available, otherwise use start datetime)
+    const endDateTime = service.endDate && service.endTime
+      ? new Date(`${service.endDate}T${service.endTime}:00`)
+      : serviceDateTime;
+    // Add 1 hour buffer after end time for determining "past" status
+    const pastThreshold = new Date(endDateTime.getTime() + 60 * 60 * 1000);
     return {
       ...service,
       parsedDateTime: serviceDateTime,
+      parsedEndDateTime: endDateTime,
+      pastThreshold: pastThreshold,
       isValidDate: !isNaN(serviceDateTime.getTime())
     };
   }).filter(service => service.isValidDate);
@@ -223,10 +226,12 @@ const filteredServices = computed(() => {
 
   switch (filterMode.value) {
     case 'upcoming':
-      filtered = validServices.filter(service => service.parsedDateTime.getTime() > nowTime);
+      // Show as upcoming until 1 hour after end time
+      filtered = validServices.filter(service => service.pastThreshold.getTime() > nowTime);
       break;
     case 'past':
-      filtered = validServices.filter(service => service.parsedDateTime.getTime() <= nowTime);
+      // Only show as past after 1 hour of the end datetime
+      filtered = validServices.filter(service => service.pastThreshold.getTime() <= nowTime);
       break;
     default:
       filtered = validServices;
@@ -348,34 +353,6 @@ const goToCreateService = () => {
 
 const goToScheduling = () => {
   router.push('/scheduling');
-};
-
-const runMigration = async () => {
-  migrating.value = true;
-  try {
-    const functions = getFunctions();
-    const migrateServicesEndTime = httpsCallable(functions, 'migrateServicesEndTime');
-    const result = await migrateServicesEndTime();
-    const data = result.data as { success: boolean; migrated: number; skipped: number; message: string };
-
-    const toast = await toastController.create({
-      message: data.message,
-      duration: 3000,
-      color: data.success ? 'success' : 'danger'
-    });
-    await toast.present();
-    // Realtime listener will automatically update services
-  } catch (error: any) {
-    console.error('Migration error:', error);
-    const toast = await toastController.create({
-      message: error.message || 'Erreur lors de la migration',
-      duration: 3000,
-      color: 'danger'
-    });
-    await toast.present();
-  } finally {
-    migrating.value = false;
-  }
 };
 
 const goToServiceMembers = (serviceId: string) => {

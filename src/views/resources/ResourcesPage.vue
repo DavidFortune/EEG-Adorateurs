@@ -4,12 +4,6 @@
       <ion-toolbar>
         <ion-title>Ressources</ion-title>
         <ion-buttons slot="end">
-          <ion-button v-if="isAdmin" @click="migrateMediaMetadata" fill="clear" title="Migrer métadonnées médias">
-            <ion-icon :icon="syncOutline" />
-          </ion-button>
-          <ion-button v-if="isAdmin" @click="importMusicStyles" fill="clear" title="Importer styles musicaux">
-            <ion-icon :icon="cloudDownloadOutline" />
-          </ion-button>
           <ion-button v-if="isAdmin" @click="goToCollections" fill="clear">
             <ion-icon :icon="folderOutline" />
           </ion-button>
@@ -191,16 +185,13 @@ import {
 } from '@ionic/vue';
 import {
   addOutline, folderOutline, swapVerticalOutline, closeCircle,
-  documentTextOutline, eyeOutline, pencilOutline, musicalNotesOutline,
+  documentTextOutline, eyeOutline, musicalNotesOutline,
   videocamOutline, volumeHighOutline, logoYoutube, documentOutline,
-  checkmarkOutline, cloudDownloadOutline, syncOutline
+  checkmarkOutline
 } from 'ionicons/icons';
 import { Resource, ResourceCollection, ResourceType, SortOption, ResourceOption } from '@/types/resource';
 import { getResourceCollections, subscribeToResources, getAllResourceOptions } from '@/firebase/resources';
 import { useUser } from '@/composables/useUser';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { app } from '@/firebase/config';
-import { toastController } from '@ionic/vue';
 
 const router = useRouter();
 const { isAdmin } = useUser();
@@ -512,128 +503,6 @@ const goToCollections = () => {
 
 const editResource = (resourceId: string) => {
   router.push(`/resource-form/${resourceId}`);
-};
-
-// Import resource options (music styles, keys, beats, and tempos)
-const importMusicStyles = async () => {
-  try {
-    const functions = getFunctions(app);
-    const importStylesFn = httpsCallable(functions, 'importMusicStyles');
-    const importKeysFn = httpsCallable(functions, 'importMusicKeys');
-    const importBeatsFn = httpsCallable(functions, 'importMusicBeats');
-    const importTemposFn = httpsCallable(functions, 'importMusicTempos');
-
-    const toast = await toastController.create({
-      message: 'Importation en cours...',
-      duration: 0,
-      position: 'bottom'
-    });
-    await toast.present();
-
-    // Import music styles, keys, beats, and tempos
-    const [stylesResult, keysResult, beatsResult, temposResult] = await Promise.all([
-      importStylesFn({}),
-      importKeysFn({}),
-      importBeatsFn({}),
-      importTemposFn({})
-    ]);
-
-    const stylesData = stylesResult.data as { success: boolean; count: number; alreadyExists?: boolean };
-    const keysData = keysResult.data as { success: boolean; count: number; alreadyExists?: boolean };
-    const beatsData = beatsResult.data as { success: boolean; count: number; alreadyExists?: boolean };
-    const temposData = temposResult.data as { success: boolean; count: number; alreadyExists?: boolean };
-
-    await toast.dismiss();
-
-    const messages: string[] = [];
-    if (stylesData.alreadyExists) {
-      messages.push('Styles: ✓');
-    } else {
-      messages.push(`${stylesData.count} styles`);
-    }
-    if (keysData.alreadyExists) {
-      messages.push('Tonalités: ✓');
-    } else {
-      messages.push(`${keysData.count} tonalités`);
-    }
-    if (beatsData.alreadyExists) {
-      messages.push('Mesures: ✓');
-    } else {
-      messages.push(`${beatsData.count} mesures`);
-    }
-    if (temposData.alreadyExists) {
-      messages.push('Tempos: ✓');
-    } else {
-      messages.push(`${temposData.count} tempos`);
-    }
-
-    const allExist = stylesData.alreadyExists && keysData.alreadyExists && beatsData.alreadyExists && temposData.alreadyExists;
-
-    const successToast = await toastController.create({
-      message: messages.join(' | '),
-      duration: 3000,
-      position: 'bottom',
-      color: allExist ? 'warning' : 'success'
-    });
-    await successToast.present();
-
-  } catch (error: any) {
-    console.error('Import error:', error);
-    const errorToast = await toastController.create({
-      message: `Erreur: ${error.message || 'Échec de l\'importation'}`,
-      duration: 3000,
-      position: 'bottom',
-      color: 'danger'
-    });
-    await errorToast.present();
-  }
-};
-
-// Migrate media metadata (add names, timestamps, types)
-const migrateMediaMetadata = async () => {
-  try {
-    const functions = getFunctions(app);
-    const migrateFn = httpsCallable(functions, 'migrateMediaMetadata');
-
-    const toast = await toastController.create({
-      message: 'Migration en cours...',
-      duration: 0,
-      position: 'bottom'
-    });
-    await toast.present();
-
-    const result = await migrateFn({});
-    const data = result.data as {
-      success: boolean;
-      totalResources: number;
-      updatedResources: number;
-      totalMediaItems: number;
-      updatedMediaItems: number;
-      message: string;
-    };
-
-    await toast.dismiss();
-
-    const successToast = await toastController.create({
-      message: data.updatedMediaItems > 0
-        ? `${data.updatedMediaItems} médias mis à jour dans ${data.updatedResources} ressources`
-        : 'Tous les médias sont déjà à jour',
-      duration: 4000,
-      position: 'bottom',
-      color: data.updatedMediaItems > 0 ? 'success' : 'warning'
-    });
-    await successToast.present();
-
-  } catch (error: any) {
-    console.error('Migration error:', error);
-    const errorToast = await toastController.create({
-      message: `Erreur: ${error.message || 'Échec de la migration'}`,
-      duration: 3000,
-      position: 'bottom',
-      color: 'danger'
-    });
-    await errorToast.present();
-  }
 };
 
 onMounted(() => {

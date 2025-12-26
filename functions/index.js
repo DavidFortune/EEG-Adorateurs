@@ -524,10 +524,6 @@ exports.searchYouTube = youtubeSearch.searchYouTube;
 exports.getVideoMetadata = youtubeSearch.getVideoMetadata;
 exports.createResourceFromYouTube = youtubeSearch.createResourceFromYouTube;
 
-// Export media migration functions
-const mediaMigration = require('./media-migration');
-exports.migrateMediaMetadata = mediaMigration.migrateMediaMetadata;
-
 /**
  * Import music styles into resource_options collection
  * This is a one-time admin function to seed the database
@@ -905,117 +901,6 @@ exports.importMusicTempos = https.onCall(async (request) => {
   } catch (error) {
     logger.error('Error importing music tempos', {error: error.message});
     throw new https.HttpsError('internal', `Failed to import music tempos: ${error.message}`);
-  }
-});
-
-/**
- * Migration function to set end date/time for existing services
- *
- * Sets the end date/time to 2 hours after the service start time
- * for all services that don't already have an end date/time set.
- *
- * This is a one-time migration function that can be called by admins.
- */
-exports.migrateServicesEndTime = https.onCall(async (request) => {
-  // Verify authentication
-  if (!request.auth) {
-    throw new https.HttpsError('unauthenticated', 'User must be authenticated');
-  }
-
-  // Verify admin status
-  const memberSnapshot = await db.collection('members')
-    .where('firebaseUserId', '==', request.auth.uid)
-    .limit(1)
-    .get();
-
-  if (memberSnapshot.empty) {
-    throw new https.HttpsError('permission-denied', 'User profile not found.');
-  }
-
-  const userData = memberSnapshot.docs[0].data();
-  if (!userData.isAdmin) {
-    throw new https.HttpsError('permission-denied', 'Only admins can run migrations');
-  }
-
-  logger.info('Starting services end time migration');
-
-  try {
-    // Get all services
-    const servicesSnapshot = await db.collection('services').get();
-
-    if (servicesSnapshot.empty) {
-      logger.info('No services found to migrate');
-      return {
-        success: true,
-        migrated: 0,
-        skipped: 0,
-        message: 'No services found to migrate'
-      };
-    }
-
-    let migratedCount = 0;
-    let skippedCount = 0;
-    const errors = [];
-
-    for (const serviceDoc of servicesSnapshot.docs) {
-      const service = serviceDoc.data();
-
-      // Skip if already has end date/time
-      if (service.endDate && service.endTime) {
-        logger.info(`Skipping service ${serviceDoc.id} - already has end time`);
-        skippedCount++;
-        continue;
-      }
-
-      // Skip if missing start date/time
-      if (!service.date || !service.time) {
-        logger.warn(`Skipping service ${serviceDoc.id} - missing start date/time`);
-        skippedCount++;
-        continue;
-      }
-
-      try {
-        // Parse start date and time
-        const [year, month, day] = service.date.split('-').map(Number);
-        const [hours, minutes] = service.time.split(':').map(Number);
-
-        // Create date object and add 2 hours
-        const startDate = new Date(year, month - 1, day, hours, minutes);
-        const endDate = new Date(startDate.getTime() + (2 * 60 * 60 * 1000)); // Add 2 hours
-
-        // Format end date and time
-        const endDateStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
-        const endTimeStr = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
-
-        // Update the service
-        await serviceDoc.ref.update({
-          endDate: endDateStr,
-          endTime: endTimeStr
-        });
-
-        logger.info(`Migrated service ${serviceDoc.id}: ${service.date} ${service.time} -> end: ${endDateStr} ${endTimeStr}`);
-        migratedCount++;
-      } catch (updateError) {
-        logger.error(`Failed to migrate service ${serviceDoc.id}:`, updateError.message);
-        errors.push({
-          serviceId: serviceDoc.id,
-          error: updateError.message
-        });
-      }
-    }
-
-    logger.info(`Migration complete: ${migratedCount} migrated, ${skippedCount} skipped, ${errors.length} errors`);
-
-    return {
-      success: true,
-      migrated: migratedCount,
-      skipped: skippedCount,
-      errors: errors.length > 0 ? errors : undefined,
-      message: `Migration complete: ${migratedCount} services updated, ${skippedCount} skipped`
-    };
-  } catch (error) {
-    logger.error('Error during services migration:', error.message);
-    throw new https.HttpsError('internal', `Migration failed: ${error.message}`);
   }
 });
 

@@ -137,7 +137,12 @@
               >
                 <div class="service-info">
                   <h4 class="service-title">{{ service.title }}</h4>
-                  <p class="service-date">{{ formatServiceDateTime(service.date, service.time) }}</p>
+                  <p class="service-date">
+                    {{ formatServiceDateTime(service.date, service.time) }}
+                    <span v-if="service.endDate && service.endTime" class="service-duration">
+                      ({{ calculateDuration(service.date, service.time, service.endDate, service.endTime) }})
+                    </span>
+                  </p>
 
                   <!-- Assignment Status -->
                   <div class="assignment-status">
@@ -284,10 +289,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import {
-  IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonCard, IonCardHeader, IonCardTitle, 
+  IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonCard, IonCardHeader, IonCardTitle,
   IonCardContent, IonButtons, IonButton, IonAvatar, IonIcon, IonRefresher, IonRefresherContent,
   IonChip, IonLabel
 } from '@ionic/vue';
@@ -296,8 +301,9 @@ import {
   helpOutline, arrowForwardOutline, homeOutline, phonePortraitOutline,
   addOutline, handRightOutline, cameraOutline, sparklesOutline, closeOutline
 } from 'ionicons/icons';
+import { db } from '@/firebase/config';
+import { collection, query, orderBy, onSnapshot, Timestamp } from 'firebase/firestore';
 import { useUser } from '@/composables/useUser';
-import { serviceService } from '@/services/serviceService';
 import { assignmentsService } from '@/firebase/assignments';
 import { teamsService } from '@/firebase/teams';
 import { timezoneUtils } from '@/utils/timezone';
@@ -311,9 +317,13 @@ import type { ServiceAssignment } from '@/types/assignment';
 const router = useRouter();
 const { userAvatar, userInitials, userName, member, loadMemberData } = useUser();
 const isUserMenuOpen = ref(false);
-const upcomingServices = ref<Service[]>([]);
+const allServices = ref<Service[]>([]);
+const userTeamNames = ref<string[]>([]);
 const userAssignments = ref<ServiceAssignment[]>([]);
 const showPhoneModal = ref(false);
+
+// Realtime subscription cleanup
+let unsubscribeServices: (() => void) | null = null;
 
 // Avatar announcement - show only if user hasn't dismissed it and doesn't have a custom avatar
 const AVATAR_ANNOUNCEMENT_KEY = 'avatar_announcement_dismissed';
@@ -346,6 +356,77 @@ const memberMinistries = computed(() => {
 
 const memberPhone = computed(() => {
   return member.value?.phone;
+});
+
+// Convert Firestore document to Service type
+const convertServiceDoc = (id: string, data: any): Service => {
+  return {
+    id,
+    title: data.title,
+    date: data.date,
+    time: data.time,
+    endDate: data.endDate,
+    endTime: data.endTime,
+    category: data.category,
+    isPublished: data.isPublished,
+    availabilityDeadline: data.availabilityDeadline,
+    teamRequirements: data.teamRequirements,
+    guestMemberIds: data.guestMemberIds,
+    createdAt: data.createdAt instanceof Timestamp
+      ? data.createdAt.toDate().toISOString()
+      : data.createdAt,
+    modifiedAt: data.modifiedAt instanceof Timestamp
+      ? data.modifiedAt.toDate().toISOString()
+      : data.modifiedAt
+  };
+};
+
+// Computed upcoming services filtered from realtime data
+const upcomingServices = computed(() => {
+  if (!allServices.value.length) return [];
+
+  const now = new Date();
+  const nowTime = now.getTime();
+
+  // Filter only published services first
+  return allServices.value
+    .filter(service => service.isPublished)
+    .map(service => {
+      const parsedDateTime = new Date(`${service.date}T${service.time}:00`);
+      // Calculate end datetime (use endDate/endTime if available, otherwise use start datetime)
+      const endDateTime = service.endDate && service.endTime
+        ? new Date(`${service.endDate}T${service.endTime}:00`)
+        : parsedDateTime;
+      // Add 1 hour buffer after end time
+      const pastThreshold = new Date(endDateTime.getTime() + 60 * 60 * 1000);
+      return {
+        ...service,
+        parsedDateTime,
+        pastThreshold
+      };
+    })
+    .filter(service => {
+      // Hide service 1 hour after end datetime
+      if (service.pastThreshold.getTime() <= nowTime) return false;
+
+      // Check if user is a guest for this service
+      const isGuest = service.guestMemberIds?.includes(member.value?.id || '');
+      if (isGuest) return true;
+
+      // Filter by user membership in needed teams
+      if (service.teamRequirements && service.teamRequirements.length > 0) {
+        const activeTeamNames = service.teamRequirements
+          .filter(req => req.isActive)
+          .map(req => req.teamName);
+
+        // Only show service if user is member of at least one needed team
+        return activeTeamNames.some(teamName => userTeamNames.value.includes(teamName));
+      }
+
+      // If no team requirements, show the service
+      return true;
+    })
+    .sort((a, b) => a.parsedDateTime.getTime() - b.parsedDateTime.getTime());
 });
 
 const getServiceAvailability = (serviceId: string): 'available' | 'unavailable' | 'maybe' | null => {
@@ -385,6 +466,21 @@ const hasBeenPrompted = ref(false);
 
 const formatServiceDateTime = (date: string, time: string) => {
   return timezoneUtils.formatDateTimeForDisplay(date, time);
+};
+
+// Calculate duration between start and end datetime in HH:MM format
+const calculateDuration = (startDate: string, startTime: string, endDate: string, endTime: string): string => {
+  const start = new Date(`${startDate}T${startTime}:00`);
+  const end = new Date(`${endDate}T${endTime}:00`);
+
+  const diffMs = end.getTime() - start.getTime();
+  if (diffMs <= 0) return '00:00';
+
+  const totalMinutes = Math.floor(diffMs / (1000 * 60));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 };
 
 const getUserAssignmentStatus = (serviceId: string): boolean => {
@@ -434,66 +530,55 @@ const loadUserAssignments = async () => {
   }
 };
 
-const loadUpcomingServices = async () => {
-  try {
-    const services = await serviceService.getPublishedServices();
-    const now = new Date();
-    const nowTime = now.getTime();
-    const userTeamIds = member.value?.teams || [];
-
-    // Get team names for user's team IDs
-    let userTeamNames: string[] = [];
-    if (userTeamIds.length > 0) {
+// Load user's team names from team IDs
+const loadUserTeamNames = async () => {
+  const userTeamIds = member.value?.teams || [];
+  if (userTeamIds.length > 0) {
+    try {
       const teamPromises = userTeamIds.map(teamId => teamsService.getTeamById(teamId));
       const teams = await Promise.all(teamPromises);
-      userTeamNames = teams.filter(team => team !== null).map(team => team!.name);
+      userTeamNames.value = teams.filter(team => team !== null).map(team => team!.name);
+    } catch (error) {
+      console.error('Error loading user team names:', error);
+      userTeamNames.value = [];
     }
-
-    // Pre-parse dates and filter/sort in a single pass for better performance
-    const servicesWithDates = services
-      .map(service => ({
-        ...service,
-        parsedDateTime: new Date(`${service.date}T${service.time}:00`)
-      }))
-      .filter(service => {
-        // Filter by date
-        if (service.parsedDateTime.getTime() <= nowTime) return false;
-
-        // Check if user is a guest for this service
-        const isGuest = service.guestMemberIds?.includes(member.value?.id || '');
-        if (isGuest) return true;
-
-        // Filter by user membership in needed teams
-        if (service.teamRequirements && service.teamRequirements.length > 0) {
-          const activeTeamNames = service.teamRequirements
-            .filter(req => req.isActive)
-            .map(req => req.teamName);
-
-          // Only show service if user is member of at least one needed team
-          return activeTeamNames.some(teamName => userTeamNames.includes(teamName));
-        }
-
-        // If no team requirements, show the service
-        return true;
-      })
-      .sort((a, b) => a.parsedDateTime.getTime() - b.parsedDateTime.getTime());
-
-    upcomingServices.value = servicesWithDates;
-  } catch (error) {
-    console.error('Error loading upcoming services:', error);
-    upcomingServices.value = [];
+  } else {
+    userTeamNames.value = [];
   }
 };
 
-const loadData = async () => {
-  // Load services first, then assignments (since assignments depend on services)
-  await loadUpcomingServices();
-  await loadUserAssignments();
+// Subscribe to realtime updates for services (filter isPublished in computed)
+const subscribeToServices = () => {
+  const servicesRef = collection(db, 'services');
+  const q = query(servicesRef, orderBy('createdAt', 'desc'));
+
+  unsubscribeServices = onSnapshot(
+    q,
+    (querySnapshot) => {
+      const loadedServices: Service[] = [];
+      querySnapshot.forEach((doc) => {
+        loadedServices.push(convertServiceDoc(doc.id, doc.data()));
+      });
+      allServices.value = loadedServices;
+    },
+    (error) => {
+      console.error('Error in services realtime listener:', error);
+      allServices.value = [];
+    }
+  );
 };
 
-const handleRefresh = async (event: any) => {
-  await loadData();
-  event.target.complete();
+const loadData = async () => {
+  // Load user team names for filtering (assignments are loaded via watch on upcomingServices)
+  await loadUserTeamNames();
+};
+
+const handleRefresh = (event: any) => {
+  // With realtime updates, data is always fresh
+  // Just reload team names and assignments, then complete
+  loadData().then(() => {
+    event.target.complete();
+  });
 };
 
 
@@ -588,14 +673,23 @@ const onAppInstalled = () => {
   hasBeenPrompted.value = true;
 };
 
-// Watch for member data changes
+// Watch for member data changes to reload team names
 watch(() => member.value, (newMember) => {
   if (newMember) {
-    loadData();
+    loadUserTeamNames();
+  }
+}, { immediate: true });
+
+// Watch for services changes to reload assignments
+watch(() => upcomingServices.value, (newServices) => {
+  if (newServices.length > 0 && member.value?.id) {
+    loadUserAssignments();
   }
 }, { immediate: true });
 
 onMounted(() => {
+  // Subscribe to realtime services updates
+  subscribeToServices();
   loadData();
 
   // Auto-show phone popup after 5 seconds if user doesn't have phone
@@ -618,6 +712,14 @@ onMounted(() => {
     console.log('PWA was installed');
     onAppInstalled();
   });
+});
+
+onUnmounted(() => {
+  // Clean up realtime subscription
+  if (unsubscribeServices) {
+    unsubscribeServices();
+    unsubscribeServices = null;
+  }
 });
 </script>
 
@@ -903,6 +1005,12 @@ onMounted(() => {
   font-size: 0.875rem;
   color: #6B7280;
   margin: 0 0 0.5rem 0;
+}
+
+.service-duration {
+  color: var(--ion-color-medium);
+  font-weight: 500;
+  margin-left: 4px;
 }
 
 .assignment-status {
