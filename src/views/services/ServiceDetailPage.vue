@@ -51,6 +51,10 @@
             v-if="selectedSegment === 'ressources'"
             :resources="resources"
             :loading="loadingResources"
+            :service-id="service?.id || ''"
+            :is-admin="isAdmin"
+            :existing-resource-ids="existingResourceIds"
+            @add-resources="handleAddResources"
           />
 
           <!-- Members Tab -->
@@ -164,6 +168,7 @@ import MembersOverview from '@/components/service-detail/MembersOverview.vue';
 
 interface ResourceWithCollection extends Resource {
   collectionName?: string;
+  isDirect?: boolean; // true if directly associated with service, false if from program
 }
 
 interface TeamAssignmentGroup {
@@ -207,6 +212,11 @@ const savingGuests = ref(false);
 let unsubscribeService: (() => void) | null = null;
 let unsubscribeAssignments: (() => void) | null = null;
 
+// Computed property for all existing resource IDs (to exclude from add modal)
+const existingResourceIds = computed(() => {
+  return resources.value.map(r => r.id);
+});
+
 // Convert Firestore document to Service type
 const convertFirestoreDoc = (id: string, data: any): Service => {
   return {
@@ -221,6 +231,7 @@ const convertFirestoreDoc = (id: string, data: any): Service => {
     availabilityDeadline: data.availabilityDeadline,
     teamRequirements: data.teamRequirements,
     guestMemberIds: data.guestMemberIds,
+    resourceIds: data.resourceIds,
     createdAt: data.createdAt instanceof Timestamp
       ? data.createdAt.toDate().toISOString()
       : data.createdAt,
@@ -389,47 +400,59 @@ const loadProgram = async () => {
   }
 };
 
-// Extract and load resources from program
+// Extract and load resources from program AND direct service association
 const loadResources = async () => {
-  if (!program.value || program.value.items.length === 0) {
-    resources.value = [];
-    return;
-  }
-
   loadingResources.value = true;
   try {
-    // Extract resource IDs from program items
-    const resourceIds: string[] = [];
-    program.value.items.forEach(item => {
-      if (item.resourceId) resourceIds.push(item.resourceId);
-      item.subItems?.forEach(sub => {
-        if (sub.resourceId) resourceIds.push(sub.resourceId);
-      });
-    });
-
-    // Dedupe
-    const uniqueIds = [...new Set(resourceIds)];
-
-    if (uniqueIds.length === 0) {
-      resources.value = [];
-      return;
-    }
-
-    // Fetch resources
     const loadedResources: ResourceWithCollection[] = [];
-    for (const id of uniqueIds) {
+    const loadedIds = new Set<string>();
+
+    // 1. First, load directly associated resources (from service.resourceIds)
+    const directResourceIds = service.value?.resourceIds || [];
+    for (const id of directResourceIds) {
+      if (loadedIds.has(id)) continue;
       try {
         const resource = await getResourceById(id);
         if (resource) {
-          // Get collection name
           const resourceCollection = await getResourceCollectionById(resource.collectionId);
           loadedResources.push({
             ...resource,
-            collectionName: resourceCollection?.name
+            collectionName: resourceCollection?.name,
+            isDirect: true
           });
+          loadedIds.add(id);
         }
       } catch (error) {
-        console.error(`Error loading resource ${id}:`, error);
+        console.error(`Error loading direct resource ${id}:`, error);
+      }
+    }
+
+    // 2. Then, load resources from program items
+    if (program.value && program.value.items.length > 0) {
+      const programResourceIds: string[] = [];
+      program.value.items.forEach(item => {
+        if (item.resourceId) programResourceIds.push(item.resourceId);
+        item.subItems?.forEach(sub => {
+          if (sub.resourceId) programResourceIds.push(sub.resourceId);
+        });
+      });
+
+      for (const id of programResourceIds) {
+        if (loadedIds.has(id)) continue; // Skip if already loaded as direct
+        try {
+          const resource = await getResourceById(id);
+          if (resource) {
+            const resourceCollection = await getResourceCollectionById(resource.collectionId);
+            loadedResources.push({
+              ...resource,
+              collectionName: resourceCollection?.name,
+              isDirect: false
+            });
+            loadedIds.add(id);
+          }
+        } catch (error) {
+          console.error(`Error loading program resource ${id}:`, error);
+        }
       }
     }
 
@@ -442,11 +465,42 @@ const loadResources = async () => {
   }
 };
 
-// Watch program changes to reload resources
-watch(program, (newProgram) => {
-  if (newProgram) {
-    loadResources();
+// Handle adding resources to the service
+const handleAddResources = async (resourceIds: string[]) => {
+  if (!service.value || resourceIds.length === 0) return;
+
+  try {
+    const currentResourceIds = service.value.resourceIds || [];
+    const newResourceIds = [...new Set([...currentResourceIds, ...resourceIds])];
+
+    await serviceService.updateService({
+      ...service.value,
+      resourceIds: newResourceIds
+    });
+
+    const toast = await toastController.create({
+      message: `${resourceIds.length} ressource${resourceIds.length > 1 ? 's' : ''} ajoutée${resourceIds.length > 1 ? 's' : ''}`,
+      duration: 2000,
+      color: 'success'
+    });
+    await toast.present();
+
+    // Reload resources to show the new ones
+    await loadResources();
+  } catch (error) {
+    console.error('Error adding resources:', error);
+    const toast = await toastController.create({
+      message: 'Erreur lors de l\'ajout des ressources',
+      duration: 3000,
+      color: 'danger'
+    });
+    await toast.present();
   }
+};
+
+// Watch program and service changes to reload resources
+watch([program, () => service.value?.resourceIds], () => {
+  loadResources();
 });
 
 // Guest management functions

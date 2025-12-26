@@ -22,11 +22,11 @@
             <ion-icon :icon="personOutline" />
             {{ program.conductor.name }}
           </span>
-          <span class="summary-item">
+          <span class="summary-item hide-mobile">
             <ion-icon :icon="listOutline" />
             {{ itemCount }} élément{{ itemCount !== 1 ? 's' : '' }}
           </span>
-          <span v-if="program.totalDuration" class="summary-item">
+          <span v-if="program.totalDuration" class="summary-item hide-mobile">
             <ion-icon :icon="timeOutline" />
             {{ formatDuration(program.totalDuration) }}
           </span>
@@ -206,6 +206,13 @@ const getTypeColor = (type: ProgramItemType): string => {
   height: 32px;
   margin: 0;
   --color: var(--ion-color-primary);
+}
+
+/* Hide on mobile devices */
+@media (max-width: 576px) {
+  .hide-mobile {
+    display: none;
+  }
 }
 
 .program-item {

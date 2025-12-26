@@ -241,6 +241,24 @@ class UpdateService {
   async getReleaseNotes(): Promise<ReleaseNote[]> {
     return [
       {
+        version: '1.12.1',
+        date: '2025-12-26',
+        title: 'Ressources directes pour les services',
+        description: 'Possibilité d\'associer des ressources directement à un service, indépendamment du programme',
+        features: [
+          'Nouveau champ resourceIds dans les services pour associer des ressources directement',
+          'Bouton "Ajouter" dans l\'onglet Ressources pour ajouter des ressources au service (admin)',
+          'Modal de sélection multiple de ressources avec recherche et filtre par collection',
+          'Icône de lien pour distinguer les ressources directes des ressources du programme'
+        ],
+        fixes: [],
+        improvements: [
+          'Fusion des ressources directes et du programme avec déduplication',
+          'Affichage simplifié du résumé programme sur mobile (dirigeant + bouton uniquement)',
+          'Rétrocompatibilité complète avec les services existants'
+        ]
+      },
+      {
         version: '1.12.0',
         date: '2025-12-26',
         title: 'Refonte de la page détail de service',
