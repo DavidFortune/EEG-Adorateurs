@@ -241,6 +241,25 @@ class UpdateService {
   async getReleaseNotes(): Promise<ReleaseNote[]> {
     return [
       {
+        version: '1.12.6',
+        date: '2025-12-27',
+        title: 'Participants et conducteur améliorés',
+        description: 'Sélection de participants et conducteur avec avatars, et numéros de versets en exposant',
+        features: [
+          'Sélecteur de participant unifié pour le conducteur (même interface que les éléments du programme)',
+          'Affichage de l\'avatar du conducteur avec initiales en fallback',
+          'Numéros de versets bibliques affichés en exposant dans les lectures'
+        ],
+        fixes: [
+          'Correction de la suppression de participant/conducteur (champ correctement vidé dans Firestore)',
+          'Correction de l\'erreur "undefined not supported" lors de la mise à jour des éléments'
+        ],
+        improvements: [
+          'Style distinctif pour les numéros de versets (couleur primaire, gras)',
+          'Gestion cohérente des valeurs null/undefined dans les mises à jour Firestore'
+        ]
+      },
+      {
         version: '1.12.4',
         date: '2025-12-27',
         title: 'Liens d\'invitation aux services',

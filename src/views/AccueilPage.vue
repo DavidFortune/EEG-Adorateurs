@@ -133,7 +133,8 @@
               <div
                 v-for="service in upcomingServices.slice(0, 3)"
                 :key="service.id"
-                class="service-item"
+                class="service-item clickable"
+                @click="goToServiceDetail(service.id)"
               >
                 <div class="service-info">
                   <h4 class="service-title">{{ service.title }}</h4>
@@ -493,6 +494,10 @@ const hasTeamRequirements = (service: Service) => {
 
 const hasServiceProgram = (service: Service) => {
   return service.isPublished;
+};
+
+const goToServiceDetail = (serviceId: string) => {
+  router.push(`/service-detail/${serviceId}`);
 };
 
 const goToServiceMembers = (serviceId: string) => {
@@ -984,6 +989,22 @@ onUnmounted(() => {
   align-items: flex-start;
   padding: 1rem 0;
   border-bottom: 1px solid #F3F4F6;
+}
+
+.service-item.clickable {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  margin: 0 -1rem;
+  padding: 1rem;
+  border-radius: 8px;
+}
+
+.service-item.clickable:hover {
+  background-color: #F9FAFB;
+}
+
+.service-item.clickable:active {
+  background-color: #F3F4F6;
 }
 
 .service-item:last-child {

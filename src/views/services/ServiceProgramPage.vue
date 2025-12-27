@@ -78,7 +78,12 @@
               <!-- Conductor Information -->
               <div v-if="program.conductor" class="conductor-info">
                 <div class="conductor-section">
-                  <ion-icon :icon="personCircleOutline" class="conductor-icon" />
+                  <ion-avatar v-if="program.conductor.avatar" class="conductor-avatar">
+                    <img :src="program.conductor.avatar" :alt="program.conductor.name" />
+                  </ion-avatar>
+                  <div v-else class="conductor-initials">
+                    {{ getParticipantInitials(program.conductor.name) }}
+                  </div>
                   <div class="conductor-details">
                     <span class="conductor-label">Dirigeant</span>
                     <span class="conductor-name">{{ program.conductor.name }}</span>
@@ -232,7 +237,10 @@
                       {{ item.duration }}min
                     </div>
                     <div v-if="item.participant" class="item-participant">
-                      <ion-icon :icon="personOutline" />
+                      <ion-avatar v-if="item.participant.avatar" class="participant-avatar">
+                        <img :src="item.participant.avatar" :alt="item.participant.name" />
+                      </ion-avatar>
+                      <span v-else class="participant-initials">{{ getParticipantInitials(item.participant.name) }}</span>
                       {{ item.participant.name }}
                       <span v-if="item.participant.role" class="participant-role">({{ item.participant.role }})</span>
                     </div>
@@ -322,14 +330,12 @@
           </ion-toolbar>
         </ion-header>
         <ion-content class="ion-padding">
-          <ion-item>
-            <ion-label position="stacked">Nom du dirigeant</ion-label>
-            <ion-input v-model="editProgramForm.conductorName" placeholder="Ex: Sr. Nadège"></ion-input>
-          </ion-item>
-
-          <ion-item>
-            <ion-label position="stacked">Rôle (optionnel)</ion-label>
-            <ion-input v-model="editProgramForm.conductorRole" placeholder="Ex: Dirigeante"></ion-input>
+          <ion-item lines="none">
+            <ion-label position="stacked">Dirigeant</ion-label>
+            <ParticipantSelector
+              v-model="editProgramForm.conductor"
+              :service-id="route.params.id as string"
+            />
           </ion-item>
 
           <ion-button @click="updateProgramInfo" expand="block" class="ion-margin-top">
@@ -411,7 +417,7 @@
                   <ion-icon :icon="closeOutline" slot="icon-only" />
                 </ion-button>
               </div>
-              <div class="scripture-text">{{ itemForm.scriptureText }}</div>
+              <div class="scripture-text" v-html="formatScriptureWithSuperscript(itemForm.scriptureText)"></div>
             </div>
           </div>
 
@@ -420,9 +426,12 @@
             <ion-input v-model="itemForm.subtitle"></ion-input>
           </ion-item>
 
-          <ion-item>
+          <ion-item lines="none">
             <ion-label position="stacked">Participant (optionnel)</ion-label>
-            <ion-input v-model="itemForm.participantName" placeholder="Ex: Pasteur Hugues-Dieu"></ion-input>
+            <ParticipantSelector
+              v-model="itemForm.participant"
+              :service-id="route.params.id as string"
+            />
           </ion-item>
 
           <ion-item>
@@ -783,7 +792,7 @@
               <span class="scripture-modal-reference">{{ selectedScriptureItem.scriptureReference }}</span>
               <span class="scripture-modal-version">{{ selectedScriptureItem.scriptureVersion }}</span>
             </div>
-            <div class="scripture-modal-text">{{ selectedScriptureItem.scriptureText }}</div>
+            <div class="scripture-modal-text" v-html="formatScriptureWithSuperscript(selectedScriptureItem.scriptureText || '')"></div>
             <div class="scripture-modal-actions">
               <ion-button @click="copyScriptureToClipboard" expand="block" fill="outline" color="primary">
                 <ion-icon :icon="copyOutline" slot="start" />
@@ -893,7 +902,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonBackButton,
-  IonButton, IonIcon, IonCard, IonCardContent, IonLoading, IonModal,
+  IonButton, IonIcon, IonCard, IonCardContent, IonLoading, IonModal, IonAvatar,
   IonItem, IonLabel, IonInput, IonTextarea, IonSelect, IonSelectOption,
   IonSpinner, toastController, alertController
 } from '@ionic/vue';
@@ -909,6 +918,7 @@ import {
   removeOutline, bookOutline, copyOutline
 } from 'ionicons/icons';
 import ResourceSelector from '@/components/ResourceSelector.vue';
+import ParticipantSelector from '@/components/ParticipantSelector.vue';
 import SendProgramSMSModal from '@/components/SendProgramSMSModal.vue';
 import { serviceService } from '@/services/serviceService';
 import { timezoneUtils } from '@/utils/timezone';
@@ -930,7 +940,7 @@ import type { ServiceProgram, ProgramItem, ProgramParticipant, ProgramSubItem } 
 import { ProgramItemType } from '@/types/program';
 import type { Resource, ResourceOption } from '@/types/resource';
 import { getResourceById, getAllResourceOptions, updateResource, subscribeToResource } from '@/firebase/resources';
-import type { Unsubscribe } from 'firebase/firestore';
+import { deleteField, type Unsubscribe } from 'firebase/firestore';
 import { isYouTubeUrl, getYouTubeEmbedUrl, getSpotifyEmbedUrl } from '@/utils/resource-utils';
 import { bibleService } from '@/services/bibleService';
 
@@ -953,8 +963,7 @@ const musicStyles = ref<ResourceOption[]>([]);
 // Edit Program Modal
 const showEditProgramModalState = ref(false);
 const editProgramForm = ref({
-  conductorName: '',
-  conductorRole: ''
+  conductor: null as ProgramParticipant | null
 });
 
 // Item Form Modal
@@ -965,7 +974,7 @@ const itemForm = ref({
   type: '' as ProgramItemType,
   title: '',
   subtitle: '',
-  participantName: '',
+  participant: null as ProgramParticipant | null,
   duration: 5,
   notes: '',
   resourceId: null as string | null,
@@ -1094,6 +1103,22 @@ const hasYouTubeVideos = computed(() => {
 const formatDateTime = (dateStr: string | undefined, timeStr: string | undefined): string => {
   if (!dateStr || !timeStr) return '';
   return timezoneUtils.formatDateTimeForDisplay(dateStr, timeStr);
+};
+
+const getParticipantInitials = (name: string): string => {
+  const parts = name.trim().split(' ');
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  return name.substring(0, 2).toUpperCase();
+};
+
+// Format scripture text with verse numbers as superscripts
+const formatScriptureWithSuperscript = (text: string): string => {
+  if (!text) return '';
+  // Replace verse numbers at the start of lines/paragraphs with superscript
+  // Format: "16 Text here..." → "<sup>16</sup> Text here..."
+  return text.replace(/^(\d+)\s/gm, '<sup>$1</sup> ');
 };
 
 const getItemIcon = (type: ProgramItemType) => {
@@ -1351,8 +1376,7 @@ const toggleEditMode = () => {
 const showEditProgramModal = () => {
   if (program.value) {
     editProgramForm.value = {
-      conductorName: program.value.conductor?.name || '',
-      conductorRole: program.value.conductor?.role || ''
+      conductor: program.value.conductor || null
     };
   }
   showEditProgramModalState.value = true;
@@ -1368,24 +1392,9 @@ const updateProgramInfo = async () => {
   try {
     loading.value = true;
 
-    // Build conductor object, excluding undefined values
-    let conductor: ProgramParticipant | undefined = undefined;
-    if (editProgramForm.value.conductorName) {
-      conductor = {
-        id: `custom_${Date.now()}`,
-        name: editProgramForm.value.conductorName,
-        isCustom: true
-      } as ProgramParticipant;
-
-      // Only add role if it has a value
-      if (editProgramForm.value.conductorRole) {
-        conductor.role = editProgramForm.value.conductorRole;
-      }
-    }
-
     await updateProgram(
       program.value.id,
-      { conductor },
+      { conductor: editProgramForm.value.conductor ?? deleteField() } as any,
       user.value.uid
     );
 
@@ -1406,7 +1415,7 @@ const showAddItemModal = () => {
     type: '' as ProgramItemType,
     title: '',
     subtitle: '',
-    participantName: '',
+    participant: null,
     duration: 5,
     notes: '',
     resourceId: null,
@@ -1423,7 +1432,7 @@ const showEditItemModalForItem = (item: ProgramItem) => {
     type: item.type,
     title: item.title,
     subtitle: item.subtitle || '',
-    participantName: item.participant?.name || '',
+    participant: item.participant || null,
     duration: item.duration || 5,
     notes: item.notes || '',
     resourceId: item.resourceId || null,
@@ -1506,14 +1515,6 @@ const addItem = async () => {
   try {
     loading.value = true;
 
-    const participant: ProgramParticipant | undefined = itemForm.value.participantName
-      ? {
-          id: `custom_${Date.now()}`,
-          name: itemForm.value.participantName,
-          isCustom: true
-        }
-      : undefined;
-
     // Build item object, excluding undefined values
     const newItem: any = {
       order: program.value.items.length,
@@ -1523,7 +1524,7 @@ const addItem = async () => {
 
     // Only add optional fields if they have values
     if (itemForm.value.subtitle) newItem.subtitle = itemForm.value.subtitle;
-    if (participant) newItem.participant = participant;
+    if (itemForm.value.participant) newItem.participant = itemForm.value.participant;
     if (itemForm.value.duration) newItem.duration = itemForm.value.duration;
     if (itemForm.value.notes) newItem.notes = itemForm.value.notes;
     if (itemForm.value.resourceId) newItem.resourceId = itemForm.value.resourceId;
@@ -1554,14 +1555,6 @@ const updateItem = async () => {
   try {
     loading.value = true;
 
-    const participant: ProgramParticipant | undefined = itemForm.value.participantName
-      ? {
-          id: `custom_${Date.now()}`,
-          name: itemForm.value.participantName,
-          isCustom: true
-        }
-      : undefined;
-
     // Build update object, excluding undefined values
     const updates: any = {
       type: itemForm.value.type,
@@ -1570,7 +1563,8 @@ const updateItem = async () => {
 
     // Only add optional fields if they have values
     if (itemForm.value.subtitle) updates.subtitle = itemForm.value.subtitle;
-    if (participant) updates.participant = participant;
+    // Always include participant (null to remove, object to set)
+    updates.participant = itemForm.value.participant || undefined;
     if (itemForm.value.duration) updates.duration = itemForm.value.duration;
     if (itemForm.value.notes) updates.notes = itemForm.value.notes;
     if (itemForm.value.resourceId) updates.resourceId = itemForm.value.resourceId;
@@ -2316,9 +2310,24 @@ onUnmounted(() => {
   gap: 0.75rem;
 }
 
-.conductor-icon {
-  font-size: 2rem;
-  color: var(--ion-color-primary);
+.conductor-avatar {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+.conductor-initials {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ion-color-primary);
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 50%;
 }
 
 .conductor-details {
@@ -2636,6 +2645,26 @@ onUnmounted(() => {
   gap: 0.5rem;
   font-size: 0.9rem;
   color: var(--ion-color-medium-shade);
+}
+
+.participant-avatar {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.participant-initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: var(--ion-color-primary);
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .participant-role {
@@ -3487,6 +3516,15 @@ onUnmounted(() => {
   padding: 8px;
   background: white;
   border-radius: 8px;
+}
+
+.scripture-text :deep(sup),
+.scripture-modal-text :deep(sup) {
+  font-size: 0.7em;
+  font-weight: 600;
+  color: var(--ion-color-primary);
+  margin-right: 2px;
+  vertical-align: super;
 }
 
 /* Scripture Chip in View Mode */

@@ -11,6 +11,7 @@ export interface ProgramParticipant {
   id: string;
   name: string;
   role?: string;
+  avatar?: string; // Member avatar URL (only for non-custom participants)
   isCustom: boolean; // true for custom participants, false for members
 }
 

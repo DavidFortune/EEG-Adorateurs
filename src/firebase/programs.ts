@@ -372,11 +372,19 @@ export const updateItemInProgram = async (
     }
     
     const programData = programDoc.data() as FirestoreProgram;
-    const updatedItems = programData.items.map(item => 
-      item.id === itemId 
-        ? { ...item, ...updates }
-        : item
-    );
+    const updatedItems = programData.items.map(item => {
+      if (item.id === itemId) {
+        const updated = { ...item, ...updates };
+        // Remove undefined values (Firestore doesn't accept them)
+        Object.keys(updated).forEach(key => {
+          if ((updated as any)[key] === undefined) {
+            delete (updated as any)[key];
+          }
+        });
+        return updated;
+      }
+      return item;
+    });
     
     await updateDoc(programRef, {
       items: updatedItems,
