@@ -35,6 +35,10 @@ export interface ProgramItem {
   lyrics?: string; // For songs
   resourceId?: string; // Link to a single resource (1:1 relationship)
   subItems?: ProgramSubItem[]; // Optional sub-items (e.g., list of songs)
+  // Scripture fields for "Lecture biblique" items
+  scriptureReference?: string; // Parsed reference (e.g., "Jean 3:16-18")
+  scriptureText?: string; // Fetched verse text from Bible API
+  scriptureVersion?: string; // Bible version used (default: "LSG")
   // DEPRECATED: sectionId is no longer used in flat structure
   sectionId?: string; // Kept for backward compatibility
 }

@@ -202,6 +202,14 @@
                       </div>
                     </div>
 
+                    <!-- Scripture Chip (for "Lecture biblique" items with fetched text) -->
+                    <div v-if="item.scriptureText" class="item-scripture">
+                      <button @click="openScriptureModal(item)" class="scripture-chip">
+                        <ion-icon :icon="bookOutline" />
+                        <span>{{ item.scriptureReference || 'Versets' }}</span>
+                      </button>
+                    </div>
+
                     <!-- View All Lyrics Button (for items with sub-items) -->
                     <div v-if="hasSubItems(item) && hasLyricsInSubItems(item)" class="item-lyrics-button">
                       <ion-button
@@ -371,11 +379,41 @@
 
           <ion-item class="title-field-with-button">
             <ion-label position="stacked">Titre *</ion-label>
-            <ion-input v-model="itemForm.title" placeholder="Ex: Moment d'adoration"></ion-input>
+            <ion-input
+              v-model="itemForm.title"
+              :placeholder="itemForm.type === 'Lecture biblique' ? 'Ex: Jean 3:16-18' : 'Ex: Moment d\'adoration'"
+            ></ion-input>
             <div slot="end" class="resource-selector-inline">
               <ResourceSelector v-model="itemForm.resourceId" button-fill="solid" button-size="small" />
             </div>
           </ion-item>
+
+          <!-- Scripture Fetch Button (only for "Lecture biblique") -->
+          <div v-if="itemForm.type === 'Lecture biblique'" class="scripture-fetch-section">
+            <ion-button
+              @click="handleFetchScripture"
+              :disabled="!itemForm.title || fetchingScripture"
+              expand="block"
+              fill="outline"
+              color="primary"
+            >
+              <ion-icon v-if="!fetchingScripture" :icon="bookOutline" slot="start" />
+              <ion-spinner v-else name="crescent" slot="start" />
+              {{ fetchingScripture ? 'Recherche...' : 'Chercher les versets' }}
+            </ion-button>
+
+            <!-- Scripture Preview -->
+            <div v-if="itemForm.scriptureText" class="scripture-preview">
+              <div class="scripture-header">
+                <span class="scripture-reference">{{ itemForm.scriptureReference }}</span>
+                <span class="scripture-version">{{ itemForm.scriptureVersion }}</span>
+                <ion-button fill="clear" size="small" color="medium" @click="clearScripture">
+                  <ion-icon :icon="closeOutline" slot="icon-only" />
+                </ion-button>
+              </div>
+              <div class="scripture-text">{{ itemForm.scriptureText }}</div>
+            </div>
+          </div>
 
           <ion-item>
             <ion-label position="stacked">Sous-titre (optionnel)</ion-label>
@@ -727,6 +765,35 @@
         </ion-content>
       </ion-modal>
 
+      <!-- Scripture Display Modal -->
+      <ion-modal :is-open="showScriptureModalState" @ionModalDidDismiss="closeScriptureModal" :initial-breakpoint="0.7" :breakpoints="[0, 0.5, 0.7, 1]">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>Lecture biblique</ion-title>
+            <ion-buttons slot="end">
+              <ion-button @click="closeScriptureModal">
+                <ion-icon :icon="closeOutline" />
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="ion-padding">
+          <div v-if="selectedScriptureItem" class="scripture-modal-content">
+            <div class="scripture-modal-header">
+              <span class="scripture-modal-reference">{{ selectedScriptureItem.scriptureReference }}</span>
+              <span class="scripture-modal-version">{{ selectedScriptureItem.scriptureVersion }}</span>
+            </div>
+            <div class="scripture-modal-text">{{ selectedScriptureItem.scriptureText }}</div>
+            <div class="scripture-modal-actions">
+              <ion-button @click="copyScriptureToClipboard" expand="block" fill="outline" color="primary">
+                <ion-icon :icon="copyOutline" slot="start" />
+                Copier les versets
+              </ion-button>
+            </div>
+          </div>
+        </ion-content>
+      </ion-modal>
+
       <!-- SMS Notification Modal -->
       <SendProgramSMSModal
         :is-open="showSMSModalState"
@@ -828,7 +895,7 @@ import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonBackButton,
   IonButton, IonIcon, IonCard, IonCardContent, IonLoading, IonModal,
   IonItem, IonLabel, IonInput, IonTextarea, IonSelect, IonSelectOption,
-  toastController, alertController
+  IonSpinner, toastController, alertController
 } from '@ionic/vue';
 import {
   calendarOutline, createOutline, listOutline, timeOutline,
@@ -839,7 +906,7 @@ import {
   playCircleOutline, volumeHighOutline, documentOutline,
   chatboxEllipsesOutline, chevronDownOutline, chevronForwardOutline,
   arrowBackOutline, logoYoutube, playBackOutline, playForwardOutline,
-  removeOutline
+  removeOutline, bookOutline, copyOutline
 } from 'ionicons/icons';
 import ResourceSelector from '@/components/ResourceSelector.vue';
 import SendProgramSMSModal from '@/components/SendProgramSMSModal.vue';
@@ -865,6 +932,7 @@ import type { Resource, ResourceOption } from '@/types/resource';
 import { getResourceById, getAllResourceOptions, updateResource, subscribeToResource } from '@/firebase/resources';
 import type { Unsubscribe } from 'firebase/firestore';
 import { isYouTubeUrl, getYouTubeEmbedUrl, getSpotifyEmbedUrl } from '@/utils/resource-utils';
+import { bibleService } from '@/services/bibleService';
 
 const route = useRoute();
 const { user, isAdmin } = useUser();
@@ -892,6 +960,7 @@ const editProgramForm = ref({
 // Item Form Modal
 const showItemFormModal = ref(false);
 const editingItemId = ref<string | null>(null);
+const fetchingScripture = ref(false);
 const itemForm = ref({
   type: '' as ProgramItemType,
   title: '',
@@ -899,7 +968,10 @@ const itemForm = ref({
   participantName: '',
   duration: 5,
   notes: '',
-  resourceId: null as string | null
+  resourceId: null as string | null,
+  scriptureReference: '',
+  scriptureText: '',
+  scriptureVersion: ''
 });
 
 // Sub-item state
@@ -933,6 +1005,10 @@ const showSMSModalState = ref(false);
 // Item Lyrics View Modal
 const showItemLyricsModalState = ref(false);
 const selectedItemForLyrics = ref<ProgramItem | null>(null);
+
+// Scripture Modal
+const showScriptureModalState = ref(false);
+const selectedScriptureItem = ref<ProgramItem | null>(null);
 
 // YouTube Playlist Modal
 const showYouTubePlaylistModalState = ref(false);
@@ -1319,7 +1395,10 @@ const showAddItemModal = () => {
     participantName: '',
     duration: 5,
     notes: '',
-    resourceId: null
+    resourceId: null,
+    scriptureReference: '',
+    scriptureText: '',
+    scriptureVersion: ''
   };
   showItemFormModal.value = true;
 };
@@ -1333,7 +1412,10 @@ const showEditItemModalForItem = (item: ProgramItem) => {
     participantName: item.participant?.name || '',
     duration: item.duration || 5,
     notes: item.notes || '',
-    resourceId: item.resourceId || null
+    resourceId: item.resourceId || null,
+    scriptureReference: item.scriptureReference || '',
+    scriptureText: item.scriptureText || '',
+    scriptureVersion: item.scriptureVersion || ''
   };
   showItemFormModal.value = true;
 };
@@ -1341,6 +1423,67 @@ const showEditItemModalForItem = (item: ProgramItem) => {
 const closeItemFormModal = () => {
   showItemFormModal.value = false;
   editingItemId.value = null;
+};
+
+// Fetch Bible verses for "Lecture biblique" items
+const handleFetchScripture = async () => {
+  if (!itemForm.value.title) {
+    await showToast('Veuillez entrer une référence biblique', 'warning');
+    return;
+  }
+
+  fetchingScripture.value = true;
+  try {
+    const result = await bibleService.getScripture(itemForm.value.title);
+
+    if (!result) {
+      await showToast('Référence biblique non reconnue. Exemple: Jean 3:16 ou Psaume 23:1-6', 'warning');
+      return;
+    }
+
+    itemForm.value.scriptureReference = result.reference;
+    itemForm.value.scriptureText = result.text;
+    itemForm.value.scriptureVersion = result.version;
+
+    await showToast('Versets récupérés avec succès', 'success');
+  } catch (error) {
+    console.error('Error fetching scripture:', error);
+    await showToast('Erreur lors de la récupération des versets', 'danger');
+  } finally {
+    fetchingScripture.value = false;
+  }
+};
+
+const clearScripture = () => {
+  itemForm.value.scriptureReference = '';
+  itemForm.value.scriptureText = '';
+  itemForm.value.scriptureVersion = '';
+};
+
+// Scripture Modal Functions
+const openScriptureModal = (item: ProgramItem) => {
+  if (item.scriptureText) {
+    selectedScriptureItem.value = item;
+    showScriptureModalState.value = true;
+  }
+};
+
+const closeScriptureModal = () => {
+  showScriptureModalState.value = false;
+  selectedScriptureItem.value = null;
+};
+
+const copyScriptureToClipboard = async () => {
+  if (!selectedScriptureItem.value?.scriptureText) return;
+
+  try {
+    const textToCopy = `${selectedScriptureItem.value.scriptureReference}\n\n${selectedScriptureItem.value.scriptureText}\n\n— ${selectedScriptureItem.value.scriptureVersion}`;
+    await navigator.clipboard.writeText(textToCopy);
+    await showToast('Versets copiés dans le presse-papiers', 'success');
+  } catch (error) {
+    console.error('Error copying to clipboard:', error);
+    await showToast('Erreur lors de la copie', 'danger');
+  }
 };
 
 const addItem = async () => {
@@ -1370,6 +1513,10 @@ const addItem = async () => {
     if (itemForm.value.duration) newItem.duration = itemForm.value.duration;
     if (itemForm.value.notes) newItem.notes = itemForm.value.notes;
     if (itemForm.value.resourceId) newItem.resourceId = itemForm.value.resourceId;
+    // Scripture fields for "Lecture biblique" items
+    if (itemForm.value.scriptureReference) newItem.scriptureReference = itemForm.value.scriptureReference;
+    if (itemForm.value.scriptureText) newItem.scriptureText = itemForm.value.scriptureText;
+    if (itemForm.value.scriptureVersion) newItem.scriptureVersion = itemForm.value.scriptureVersion;
 
     await addItemToProgram(
       program.value.id,
@@ -1413,6 +1560,10 @@ const updateItem = async () => {
     if (itemForm.value.duration) updates.duration = itemForm.value.duration;
     if (itemForm.value.notes) updates.notes = itemForm.value.notes;
     if (itemForm.value.resourceId) updates.resourceId = itemForm.value.resourceId;
+    // Scripture fields for "Lecture biblique" items
+    if (itemForm.value.scriptureReference) updates.scriptureReference = itemForm.value.scriptureReference;
+    if (itemForm.value.scriptureText) updates.scriptureText = itemForm.value.scriptureText;
+    if (itemForm.value.scriptureVersion) updates.scriptureVersion = itemForm.value.scriptureVersion;
 
     await updateItemInProgram(
       program.value.id,
@@ -3266,5 +3417,124 @@ onUnmounted(() => {
 
 .edit-mode .program-item-wrapper.is-section .item-actions ion-button {
   --color: white;
+}
+
+/* Scripture Fetch Section */
+.scripture-fetch-section {
+  padding: 12px 16px;
+}
+
+.scripture-fetch-section ion-button {
+  margin-bottom: 12px;
+}
+
+.scripture-preview {
+  background: var(--ion-color-light);
+  border-radius: 12px;
+  padding: 12px;
+  border: 1px solid var(--ion-color-light-shade);
+}
+
+.scripture-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.scripture-reference {
+  font-weight: 600;
+  color: var(--ion-color-primary);
+  font-size: 0.95rem;
+}
+
+.scripture-version {
+  font-size: 0.75rem;
+  color: var(--ion-color-medium);
+  background: var(--ion-color-light-shade);
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.scripture-header ion-button {
+  margin-left: auto;
+  --padding-start: 4px;
+  --padding-end: 4px;
+}
+
+.scripture-text {
+  white-space: pre-wrap;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--ion-color-dark);
+  max-height: 350px;
+  overflow-y: auto;
+  padding: 8px;
+  background: white;
+  border-radius: 8px;
+}
+
+/* Scripture Chip in View Mode */
+.scripture-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--ion-color-tertiary);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.scripture-chip:hover {
+  opacity: 0.85;
+}
+
+.scripture-chip ion-icon {
+  font-size: 14px;
+}
+
+/* Scripture Modal */
+.scripture-modal-content {
+  padding: 16px;
+}
+
+.scripture-modal-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ion-color-light-shade);
+}
+
+.scripture-modal-reference {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--ion-color-primary);
+}
+
+.scripture-modal-version {
+  font-size: 0.85rem;
+  color: var(--ion-color-medium);
+}
+
+.scripture-modal-text {
+  white-space: pre-wrap;
+  font-size: 1rem;
+  line-height: 1.8;
+  color: var(--ion-color-dark);
+}
+
+.scripture-modal-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ion-color-light-shade);
 }
 </style>
