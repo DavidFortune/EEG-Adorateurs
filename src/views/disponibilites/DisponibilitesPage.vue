@@ -273,6 +273,10 @@ const availableServices = computed(() => {
       // Filter by date - show until 1 hour after end
       if (service.pastThreshold.getTime() <= nowTime) return false;
 
+      // Check if user is a guest for this service
+      const isGuest = service.guestMemberIds?.includes(member.value?.id || '');
+      if (isGuest) return true;
+
       // Filter by user membership in needed teams
       if (service.teamRequirements && service.teamRequirements.length > 0) {
         const activeTeamNames = service.teamRequirements

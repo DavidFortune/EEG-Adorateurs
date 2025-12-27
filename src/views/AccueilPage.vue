@@ -165,8 +165,8 @@
                   </div>
                 </div>
 
-                <!-- Action Buttons -->
-                <div class="service-actions">
+                <!-- Action Buttons - hidden for now -->
+                <div v-if="false" class="service-actions">
                   <ion-button
                     v-if="hasTeamRequirements(service)"
                     @click="goToServiceMembers(service.id)"

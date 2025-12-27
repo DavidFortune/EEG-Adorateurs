@@ -81,8 +81,8 @@
                 </div>
               </div>
 
-              <!-- Quick Action Buttons moved to the right -->
-              <div class="header-actions" v-if="hasTeamRequirements(service) || hasServiceProgram(service)">
+              <!-- Quick Action Buttons - hidden for now -->
+              <div v-if="false" class="header-actions">
                 <ion-button
                   v-if="hasTeamRequirements(service)"
                   @click.stop="goToServiceMembers(service.id)"

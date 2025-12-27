@@ -147,16 +147,27 @@ const handleGoogleSignIn = async () => {
     // Check if user has completed onboarding
     const hasCompletedOnboarding = await membersService.hasCompletedOnboarding(user.uid);
 
-    // Check for pending redirect from invitation link
+    // Check for pending redirect and invited service from invitation link
     const pendingRedirect = invitationService.getAndClearPostLoginRedirect();
+    const invitedServiceId = invitationService.getAndClearInvitedServiceId();
 
     if (hasCompletedOnboarding) {
+      // Add user as guest to the invited service
+      if (invitedServiceId) {
+        const member = await membersService.getMemberByFirebaseUserId(user.uid);
+        if (member) {
+          await invitationService.addMemberAsGuest(invitedServiceId, member.id);
+        }
+      }
       await showToast('Connexion réussie !', 'success');
       router.replace(pendingRedirect || '/accueil');
     } else {
-      // If there's a pending redirect, re-save it for after onboarding
+      // If there's a pending redirect/invite, re-save it for after onboarding
       if (pendingRedirect) {
         invitationService.setPostLoginRedirect(pendingRedirect);
+      }
+      if (invitedServiceId) {
+        invitationService.setInvitedServiceId(invitedServiceId);
       }
       onboardingStore.updateFormData({
         email: user.email || ''
@@ -207,15 +218,26 @@ onMounted(async () => {
       // Check if user has completed onboarding
       const hasCompletedOnboarding = await membersService.hasCompletedOnboarding(currentUser.uid);
 
-      // Check for pending redirect from invitation link
+      // Check for pending redirect and invited service from invitation link
       const pendingRedirect = invitationService.getAndClearPostLoginRedirect();
+      const invitedServiceId = invitationService.getAndClearInvitedServiceId();
 
       if (hasCompletedOnboarding) {
+        // Add user as guest to the invited service
+        if (invitedServiceId) {
+          const member = await membersService.getMemberByFirebaseUserId(currentUser.uid);
+          if (member) {
+            await invitationService.addMemberAsGuest(invitedServiceId, member.id);
+          }
+        }
         router.replace(pendingRedirect || '/accueil');
       } else {
-        // If there's a pending redirect, re-save it for after onboarding
+        // If there's a pending redirect/invite, re-save it for after onboarding
         if (pendingRedirect) {
           invitationService.setPostLoginRedirect(pendingRedirect);
+        }
+        if (invitedServiceId) {
+          invitationService.setInvitedServiceId(invitedServiceId);
         }
         router.replace('/onboarding/welcome');
       }

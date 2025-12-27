@@ -40,22 +40,29 @@ onMounted(async () => {
       const hasCompletedOnboarding = await membersService.hasCompletedOnboarding(user.uid);
 
       if (hasCompletedOnboarding) {
-        // Fully onboarded user - redirect directly to service
+        // Fully onboarded user - add as guest and redirect to service
+        const member = await membersService.getMemberByFirebaseUserId(user.uid);
+        if (member) {
+          await invitationService.addMemberAsGuest(serviceId, member.id);
+        }
         router.replace(redirectPath);
       } else {
-        // User needs to complete onboarding
+        // User needs to complete onboarding - save serviceId for later
         invitationService.setPostLoginRedirect(redirectPath);
+        invitationService.setInvitedServiceId(serviceId);
         router.replace('/onboarding/welcome');
       }
     } else {
-      // User is not authenticated - save redirect and go to login
+      // User is not authenticated - save redirect and serviceId, go to login
       invitationService.setPostLoginRedirect(redirectPath);
+      invitationService.setInvitedServiceId(serviceId);
       router.replace('/login');
     }
   } catch (error) {
     console.error('Error processing invitation:', error);
-    // On error, save redirect and go to login
+    // On error, save redirect and serviceId, go to login
     invitationService.setPostLoginRedirect(redirectPath);
+    invitationService.setInvitedServiceId(serviceId);
     router.replace('/login');
   }
 });

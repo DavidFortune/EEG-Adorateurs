@@ -57,6 +57,10 @@ function convertServiceToFirestore(service: Omit<Service, 'id'>): any {
     result.teamRequirements = service.teamRequirements;
   }
 
+  if (service.guestMemberIds !== undefined) {
+    result.guestMemberIds = service.guestMemberIds;
+  }
+
   return result;
 }
 
@@ -148,6 +152,7 @@ export const firestoreService = {
         isPublished: request.isPublished,
         availabilityDeadline: request.availabilityDeadline,
         teamRequirements: request.teamRequirements,
+        guestMemberIds: request.guestMemberIds,
         modifiedAt: new Date().toISOString()
       };
       

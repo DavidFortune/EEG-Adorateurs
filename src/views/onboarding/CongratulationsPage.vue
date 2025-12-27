@@ -149,9 +149,22 @@ const saveUserData = async () => {
   }
 };
 
-const navigateToHome = () => {
-  // Check for pending redirect from invitation link
+const navigateToHome = async () => {
+  // Check for pending redirect and invited service from invitation link
   const pendingRedirect = invitationService.getAndClearPostLoginRedirect();
+  const invitedServiceId = invitationService.getAndClearInvitedServiceId();
+
+  // Add user as guest to the invited service
+  if (invitedServiceId) {
+    const user = authService.getCurrentUser();
+    if (user) {
+      const member = await membersService.getMemberByFirebaseUserId(user.uid);
+      if (member) {
+        await invitationService.addMemberAsGuest(invitedServiceId, member.id);
+      }
+    }
+  }
+
   router.replace(pendingRedirect || '/accueil');
 };
 

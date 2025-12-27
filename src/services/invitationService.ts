@@ -1,8 +1,11 @@
 import { Share } from '@capacitor/share';
 import type { Service } from '@/types/service';
+import { serviceService } from '@/services/serviceService';
+import { teamsService } from '@/firebase/teams';
 
 const BASE_URL = 'https://adorateurs.eglisegalilee.com';
 const REDIRECT_KEY = 'postLoginRedirect';
+const INVITED_SERVICE_KEY = 'invitedServiceId';
 
 /**
  * Format service date and time for sharing
@@ -70,5 +73,77 @@ export const invitationService = {
    */
   hasPendingRedirect(): boolean {
     return localStorage.getItem(REDIRECT_KEY) !== null;
+  },
+
+  /**
+   * Store the service ID that the user was invited to
+   */
+  setInvitedServiceId(serviceId: string): void {
+    localStorage.setItem(INVITED_SERVICE_KEY, serviceId);
+  },
+
+  /**
+   * Get and clear the invited service ID
+   */
+  getAndClearInvitedServiceId(): string | null {
+    const serviceId = localStorage.getItem(INVITED_SERVICE_KEY);
+    localStorage.removeItem(INVITED_SERVICE_KEY);
+    return serviceId;
+  },
+
+  /**
+   * Add a member as a guest to a service (if not already a guest or team member)
+   */
+  async addMemberAsGuest(serviceId: string, memberId: string): Promise<boolean> {
+    try {
+      const service = await serviceService.getServiceById(serviceId);
+      if (!service) {
+        console.error('Service not found:', serviceId);
+        return false;
+      }
+
+      // Check if member is already a guest
+      const currentGuests = service.guestMemberIds || [];
+      if (currentGuests.includes(memberId)) {
+        // Already a guest, no need to add
+        return true;
+      }
+
+      // Check if member is already part of a team required for this service
+      if (service.teamRequirements && service.teamRequirements.length > 0) {
+        const memberTeams = await teamsService.getMemberTeams(memberId);
+        const memberTeamNames = memberTeams
+          .filter(team => {
+            const membership = team.members.find(m => m.memberId === memberId);
+            return membership && (membership.status === 'approved' || !membership.status);
+          })
+          .map(team => team.name);
+
+        const activeServiceTeamNames = service.teamRequirements
+          .filter(req => req.isActive)
+          .map(req => req.teamName);
+
+        // If member is in any of the required teams, don't add as guest
+        const isTeamMember = activeServiceTeamNames.some(teamName =>
+          memberTeamNames.includes(teamName)
+        );
+
+        if (isTeamMember) {
+          // Member already has access via team membership
+          return true;
+        }
+      }
+
+      // Add member to guest list
+      await serviceService.updateService({
+        ...service,
+        guestMemberIds: [...currentGuests, memberId]
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error adding member as guest:', error);
+      return false;
+    }
   }
 };
