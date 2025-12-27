@@ -28,7 +28,8 @@
           <ion-segment-button value="programme">
             <ion-label>Programme</ion-label>
           </ion-segment-button>
-          <ion-segment-button value="ressources">
+          <!-- Hidden for now, keeping logic for later -->
+          <ion-segment-button v-if="false" value="ressources">
             <ion-label>Ressources</ion-label>
           </ion-segment-button>
           <ion-segment-button value="members">
@@ -728,8 +729,9 @@ onUnmounted(() => {
 
 <style scoped>
 .segment-tabs {
-  margin: 0;
+  margin: 0 16px;
   --background: var(--ion-color-light);
+  border-radius: 8px;
 }
 
 .segment-tabs ion-segment-button {

@@ -53,10 +53,13 @@
           <!-- Tab Selector -->
           <ion-segment :value="activeTab" @ion-change="changeTab">
             <ion-segment-button value="existing">
-              <ion-label>Ressources existantes</ion-label>
+              <ion-label>Existantes</ion-label>
             </ion-segment-button>
             <ion-segment-button value="youtube">
-              <ion-label>Recherche YouTube</ion-label>
+              <ion-label>YouTube</ion-label>
+            </ion-segment-button>
+            <ion-segment-button value="create">
+              <ion-label>Créer</ion-label>
             </ion-segment-button>
           </ion-segment>
 
@@ -133,6 +136,61 @@
               @resource-created="onResourceCreated"
             />
           </div>
+
+          <!-- Quick Create Tab -->
+          <div v-if="activeTab === 'create'" class="tab-content create-tab">
+            <div class="create-form">
+              <ion-item class="form-item">
+                <ion-label position="stacked">Titre *</ion-label>
+                <ion-input
+                  v-model="quickCreateForm.title"
+                  placeholder="Ex: Gloire à Dieu"
+                  :disabled="creatingResource"
+                />
+              </ion-item>
+
+              <div class="collection-section">
+                <label class="section-label">Collection *</label>
+                <ion-segment
+                  :value="quickCreateForm.collectionId"
+                  @ion-change="(e: CustomEvent) => quickCreateForm.collectionId = e.detail.value"
+                  :disabled="creatingResource"
+                  class="collection-segment"
+                >
+                  <ion-segment-button
+                    v-for="collection in collections"
+                    :key="collection.id"
+                    :value="collection.id"
+                  >
+                    <ion-label>{{ collection.symbol }}</ion-label>
+                  </ion-segment-button>
+                </ion-segment>
+                <p v-if="collections.length === 0" class="no-collections">
+                  Aucune collection disponible
+                </p>
+              </div>
+
+              <ion-item class="form-item lyrics-item">
+                <ion-label position="stacked">Paroles (optionnel)</ion-label>
+                <ion-textarea
+                  v-model="quickCreateForm.lyrics"
+                  placeholder="Entrez les paroles ici..."
+                  :rows="6"
+                  :disabled="creatingResource"
+                />
+              </ion-item>
+
+              <ion-button
+                @click="handleQuickCreate"
+                expand="block"
+                :disabled="!quickCreateForm.title.trim() || !quickCreateForm.collectionId || creatingResource"
+                class="create-button"
+              >
+                <ion-spinner v-if="creatingResource" name="crescent" slot="start" />
+                {{ creatingResource ? 'Création...' : 'Créer et lier' }}
+              </ion-button>
+            </div>
+          </div>
         </div>
       </ion-content>
       
@@ -157,14 +215,15 @@ import { ref, computed, onMounted } from 'vue';
 import {
   IonButton, IonIcon, IonModal, IonHeader, IonToolbar, IonTitle, IonButtons,
   IonContent, IonFooter, IonSearchbar, IonSegment, IonSegmentButton, IonLabel,
-  IonLoading
+  IonLoading, IonItem, IonInput, IonTextarea, IonSpinner, toastController
 } from '@ionic/vue';
 import {
   addOutline, closeOutline, checkmarkCircle, ellipseOutline, documentOutline
 } from 'ionicons/icons';
-import type { Resource, ResourceCollection, ResourceType } from '@/types/resource';
-import { getResources, getResourceCollections } from '@/firebase/resources';
+import { ResourceType, type Resource, type ResourceCollection, type ResourceMedia } from '@/types/resource';
+import { getResources, getResourceCollections, createResource } from '@/firebase/resources';
 import NaturalResourceSelector from '@/components/NaturalResourceSelector.vue';
+import { useUser } from '@/composables/useUser';
 
 interface Props {
   modelValue: string | null;
@@ -182,12 +241,22 @@ const props = withDefaults(defineProps<Props>(), {
 });
 const emit = defineEmits<Emits>();
 
+const { user } = useUser();
+
 // Component state
 const isModalOpen = ref(false);
 const loading = ref(false);
 const searchQuery = ref('');
 const selectedCollectionId = ref('');
-const activeTab = ref<'existing' | 'youtube'>('existing');
+const activeTab = ref<'existing' | 'youtube' | 'create'>('existing');
+
+// Quick create form state
+const quickCreateForm = ref({
+  title: '',
+  collectionId: '',
+  lyrics: ''
+});
+const creatingResource = ref(false);
 
 // Data
 const resources = ref<Resource[]>([]);
@@ -235,6 +304,8 @@ const closeResourceModal = () => {
   selectedCollectionId.value = '';
   tempSelectedId.value = null;
   activeTab.value = 'existing';
+  // Reset quick create form
+  quickCreateForm.value = { title: '', collectionId: '', lyrics: '' };
 };
 
 const changeTab = (event: CustomEvent) => {
@@ -327,6 +398,59 @@ const onResourceCreated = async (resource: Resource) => {
   tempSelectedId.value = resource.id;
   // Switch back to existing resources tab to show selection
   activeTab.value = 'existing';
+};
+
+// Quick create helper
+const showToast = async (message: string, color: string = 'primary') => {
+  const toast = await toastController.create({
+    message,
+    duration: 2000,
+    color,
+    position: 'bottom'
+  });
+  await toast.present();
+};
+
+const handleQuickCreate = async () => {
+  if (!quickCreateForm.value.title.trim()) {
+    await showToast('Veuillez entrer un titre', 'warning');
+    return;
+  }
+  if (!quickCreateForm.value.collectionId) {
+    await showToast('Veuillez sélectionner une collection', 'warning');
+    return;
+  }
+
+  creatingResource.value = true;
+  try {
+    const contents: ResourceMedia[] = [];
+    if (quickCreateForm.value.lyrics.trim()) {
+      contents.push({ type: ResourceType.LYRICS, content: quickCreateForm.value.lyrics.trim() });
+    }
+
+    const newResourceId = await createResource({
+      title: quickCreateForm.value.title.trim(),
+      collectionId: quickCreateForm.value.collectionId,
+      contents,
+      createdBy: user.value?.uid || '',
+      updatedBy: user.value?.uid || ''
+    });
+
+    // Reload and auto-select
+    await loadResources();
+    tempSelectedId.value = newResourceId;
+    activeTab.value = 'existing';
+
+    // Reset form
+    quickCreateForm.value = { title: '', collectionId: '', lyrics: '' };
+
+    await showToast('Ressource créée avec succès', 'success');
+  } catch (error) {
+    console.error('Error creating resource:', error);
+    await showToast('Erreur lors de la création', 'danger');
+  } finally {
+    creatingResource.value = false;
+  }
 };
 
 // Load initial data if needed
@@ -478,5 +602,62 @@ onMounted(() => {
 
 .tab-content {
   margin-top: 1rem;
+}
+
+/* Quick Create Tab Styles */
+.create-tab {
+  padding-bottom: 20px;
+}
+
+.create-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-item {
+  --background: var(--ion-color-light);
+  --border-radius: 8px;
+  --padding-start: 12px;
+  --padding-end: 12px;
+}
+
+.collection-section {
+  margin-top: 8px;
+}
+
+.section-label {
+  display: block;
+  font-size: 12px;
+  color: var(--ion-color-medium);
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.collection-segment {
+  --background: var(--ion-color-light);
+}
+
+.collection-segment ion-segment-button {
+  --indicator-color: var(--ion-color-primary);
+  min-width: auto;
+  flex: 1;
+}
+
+.no-collections {
+  font-size: 14px;
+  color: var(--ion-color-medium);
+  text-align: center;
+  padding: 16px;
+}
+
+.lyrics-item ion-textarea {
+  --padding-start: 0;
+  --padding-end: 0;
+  min-height: 120px;
+}
+
+.create-button {
+  margin-top: 8px;
 }
 </style>

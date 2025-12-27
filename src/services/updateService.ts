@@ -241,6 +241,25 @@ class UpdateService {
   async getReleaseNotes(): Promise<ReleaseNote[]> {
     return [
       {
+        version: '1.12.3',
+        date: '2025-12-27',
+        title: 'Création rapide de ressources et améliorations du programme',
+        description: 'Création de ressources directement depuis le programme et améliorations de l\'interface',
+        features: [
+          'Récupération automatique des versets bibliques pour les lectures bibliques',
+          'Nouvel onglet "Créer" dans le sélecteur de ressources pour créer rapidement une ressource',
+          'Création de ressources avec titre, collection et paroles sans quitter le programme'
+        ],
+        fixes: [
+          'Correction de l\'erreur CORS lors de la récupération des versets (utilisation d\'un proxy)'
+        ],
+        improvements: [
+          'Numérotation du programme exclut les sections (titres de sections non numérotés)',
+          'Onglet Ressources masqué temporairement dans la page de détail de service',
+          'Marges du sélecteur d\'onglets alignées avec le contenu de la page'
+        ]
+      },
+      {
         version: '1.12.2',
         date: '2025-12-26',
         title: 'Écran de chargement animé',

@@ -134,9 +134,9 @@
                     </div>
                   </div>
 
-                  <!-- Order Number (hidden for Section items) -->
+                  <!-- Order Number (hidden for Section items, excludes sections from count) -->
                   <div v-if="!isSectionItem(item)" class="item-column item-order-column">
-                    <div class="item-order">{{ index + 1 }}</div>
+                    <div class="item-order">{{ getItemDisplayNumber(index) }}</div>
                   </div>
 
                   <!-- Details -->
@@ -1152,6 +1152,20 @@ const hasSubItems = (item: ProgramItem): boolean => {
 
 const isSectionItem = (item: ProgramItem): boolean => {
   return item.type === ProgramItemType.SECTION;
+};
+
+// Get the display number for an item, excluding sections from the count
+const getItemDisplayNumber = (index: number): number => {
+  if (!program.value) return index + 1;
+
+  // Count how many non-section items come before and including this index
+  let count = 0;
+  for (let i = 0; i <= index; i++) {
+    if (!isSectionItem(program.value.items[i])) {
+      count++;
+    }
+  }
+  return count;
 };
 
 const isItemExpanded = (itemId: string): boolean => {
