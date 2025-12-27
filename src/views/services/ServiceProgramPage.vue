@@ -3,10 +3,13 @@
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-back-button :default-href="`/service-detail/${serviceId}`"></ion-back-button>
+          <ion-back-button :default-href="`/service-detail/${route.params.id}`"></ion-back-button>
         </ion-buttons>
-        <ion-title>{{ isEditMode ? 'Édition du programme' : 'Programme du service' }}</ion-title>
+        <ion-title>{{ isEditMode ? 'Édition du programme' : 'Programme' }}</ion-title>
         <ion-buttons slot="end">
+          <ion-button v-if="!isEditMode && hasYouTubeVideos" @click="showYouTubePlaylist" fill="clear" color="danger">
+            <ion-icon :icon="logoYoutube" />
+          </ion-button>
           <ion-button v-if="isAdmin && !isEditMode" @click="showSMSModal" fill="clear" color="primary">
             <ion-icon :icon="chatboxEllipsesOutline" />
           </ion-button>
@@ -16,10 +19,10 @@
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
-    
+
     <ion-content :fullscreen="true" :class="{ 'edit-mode': isEditMode }">
       <ion-loading :is-open="loading" message="Chargement..."></ion-loading>
-      
+
       <!-- Service Header -->
       <div v-if="service" class="service-header">
         <div class="service-info-card">
@@ -30,7 +33,20 @@
           </p>
         </div>
       </div>
-      
+
+      <!-- YouTube Playlist Feature Notice -->
+      <div v-if="!isEditMode && hasYouTubeVideos" class="youtube-feature-notice">
+        <div class="notice-content">
+          <ion-icon :icon="logoYoutube" class="notice-icon" />
+          <div class="notice-text">
+            <strong>Nouveauté !</strong> Cliquez sur l'icône
+            <ion-icon :icon="logoYoutube" class="inline-icon" />
+            pour accéder à la playlist YouTube des chants du service.<br/>
+            <strong>Idéal pour apprendre les chants et se mettre dans un esprit d'adoration !</strong>
+          </div>
+        </div>
+      </div>
+
       <div class="content-container">
         <!-- Program Summary -->
         <div v-if="program" class="program-summary">
@@ -38,7 +54,7 @@
             <ion-card-content>
               <div class="program-header">
                 <h3>Résumé du programme</h3>
-                <ion-button v-if="isAdmin" @click="showEditModal" fill="clear" size="small" color="primary">
+                <ion-button v-if="isAdmin" @click="showEditProgramModal" fill="clear" size="small" color="primary">
                   <ion-icon :icon="createOutline" slot="icon-only" />
                 </ion-button>
               </div>
@@ -53,19 +69,12 @@
                 <div class="stat-item">
                   <ion-icon :icon="timeOutline" class="stat-icon" />
                   <div class="stat-details">
-                    <span class="stat-value">{{ program.totalDuration || 0 }}</span>
+                    <span class="stat-value">{{ totalDuration }}</span>
                     <span class="stat-label">Minutes</span>
                   </div>
                 </div>
-                <div class="stat-item">
-                  <ion-icon :icon="layersOutline" class="stat-icon" />
-                  <div class="stat-details">
-                    <span class="stat-value">{{ program.sections.length || 1 }}</span>
-                    <span class="stat-label">{{ program.sections.length > 1 ? 'Sections' : 'Section' }}</span>
-                  </div>
-                </div>
               </div>
-              
+
               <!-- Conductor Information -->
               <div v-if="program.conductor" class="conductor-info">
                 <div class="conductor-section">
@@ -80,530 +89,217 @@
             </ion-card-content>
           </ion-card>
         </div>
-        
-        <!-- Add Section Button at Start -->
+
+        <!-- No Program State -->
+        <div v-if="!program && !loading" class="no-program">
+          <ion-card>
+            <ion-card-content class="text-center">
+              <ion-icon :icon="documentTextOutline" class="large-icon" />
+              <h3>Aucun programme</h3>
+              <p>Ce service n'a pas encore de programme.</p>
+              <ion-button v-if="isAdmin" @click="createInitialProgram" expand="block" class="ion-margin-top">
+                <ion-icon :icon="addOutline" slot="start" />
+                Créer un programme
+              </ion-button>
+            </ion-card-content>
+          </ion-card>
+        </div>
+
+        <!-- Add Item Button (Top) -->
         <div v-if="isEditMode && program" class="add-item-container">
-          <ion-button @click="showAddSectionModal" fill="outline" size="default" class="add-item-button">
+          <ion-button @click="showAddItemModal" fill="outline" size="default" class="add-item-button">
             <ion-icon :icon="addOutline" slot="start" />
-            Ajouter une section
+            Ajouter un élément
           </ion-button>
         </div>
 
-        <!-- Program Items -->
-        <div v-if="program && (program.items.length > 0 || program.sections.length > 0)" class="program-content">
-          <!-- Render by sections if they exist -->
-          <div v-if="program.sections.length > 0" class="sections-view">
-            <div v-for="section in sortedSections" :key="section.id" class="program-section" :data-section-id="section.id">
-              <div class="section-header" @click="!isEditMode && showSectionView(section)">
-                <div v-if="isEditMode" class="section-drag-handle" @mousedown="startSectionDrag($event, section)" @touchstart="startSectionDrag($event, section)">
-                  <ion-icon :icon="reorderThreeOutline" />
-                </div>
-                <h3 class="section-title">{{ section.title }}</h3>
-                <div class="section-stats">
-                  {{ getSectionItemsCount(section.id) }} éléments
-                  • {{ getSectionDuration(section.id) }} min
-                </div>
+        <!-- Program Items (Flat List) -->
+        <div v-if="program && program.items.length > 0" class="program-content">
+          <div class="flat-items-view">
+            <div
+              v-for="(item, index) in sortedItems"
+              :key="item.id"
+              class="program-item-wrapper"
+              :class="{ 'has-subitems': hasSubItems(item), 'expanded': isItemExpanded(item.id), 'is-section': isSectionItem(item) }"
+            >
+              <div
+                class="program-item"
+                :class="`item-${item.type.toLowerCase().replace(/\s+/g, '-')}`"
+              >
+                <div class="item-layout">
+                  <!-- Drag Handle (Edit Mode) -->
+                  <div v-if="isEditMode" class="item-column item-handle-column">
+                    <div class="drag-handle">
+                      <ion-icon :icon="reorderThreeOutline" />
+                    </div>
+                  </div>
 
-                <!-- Section Actions (Edit Mode Only) -->
-                <div v-if="isEditMode" class="section-actions">
-                  <ion-button @click.stop="showEditSectionModal(section)" fill="clear" size="small" color="primary">
-                    <ion-icon :icon="createOutline" slot="icon-only" />
-                  </ion-button>
-                  <ion-button
-                    @click.stop="deleteSection(section.id)"
-                    fill="clear"
-                    size="small"
-                    color="danger"
-                    :disabled="!canDeleteSection(section.id)"
-                  >
-                    <ion-icon :icon="trashOutline" slot="icon-only" />
-                  </ion-button>
-                </div>
-              </div>
-              
-              <div class="section-items">
-                <template v-for="(item, index) in getSectionItems(section.id)" :key="item.id">
-                  <!-- Insertion indicator before item -->
-                  <div 
-                    v-if="isDragging && shouldShowInsertionLine(item, index, section.id)"
-                    class="insertion-indicator"
-                  ></div>
-                  
-                  <div 
-                    class="program-item"
-                    :class="[
-                      `item-${item.type.toLowerCase().replace(/\s+/g, '-')}`,
-                      { 'dragging': draggedItemId === item.id }
-                    ]"
-                    :data-item-id="item.id"
-                  >
-                  <div class="item-layout">
-                    <!-- Column 1: Drag Handle (Edit Mode Only) -->
-                    <div v-if="isEditMode" class="item-column item-handle-column">
-                      <div class="drag-handle" @mousedown="startDrag($event, item)" @touchstart="startDrag($event, item)">
-                        <ion-icon :icon="reorderThreeOutline" />
-                      </div>
-                    </div>
-                    
-                    <!-- Column 2: Order Number -->
-                    <div class="item-column item-order-column">
-                      <div class="item-order">{{ item.globalOrder || item.order }}</div>
-                    </div>
-                    
-                    <!-- Column 3: Details -->
-                    <div class="item-column item-details-column">
+                  <!-- Order Number (hidden for Section items) -->
+                  <div v-if="!isSectionItem(item)" class="item-column item-order-column">
+                    <div class="item-order">{{ index + 1 }}</div>
+                  </div>
+
+                  <!-- Details -->
+                  <div class="item-column item-details-column">
+                    <div class="item-header-row">
                       <div class="item-type">
                         <ion-icon :icon="getItemIcon(item.type)" />
                         {{ item.type }}
                       </div>
-                      <h4 class="item-title">{{ item.resourceId && getLinkedResource(item.resourceId) ? getLinkedResource(item.resourceId)?.title : item.title }}</h4>
-                      <p v-if="item.subtitle" class="item-subtitle">{{ item.subtitle }}</p>
 
-                      <div v-if="item.notes" class="item-details">
-                        <div v-if="item.notes" class="item-notes">
-                          <ion-icon :icon="documentTextOutline" />
-                          {{ item.notes }}
-                        </div>
+                      <!-- Expand/Collapse Button for Sub-Items -->
+                      <ion-button
+                        v-if="hasSubItems(item)"
+                        @click="toggleItemExpansion(item.id)"
+                        fill="clear"
+                        size="small"
+                        class="expand-button"
+                      >
+                        <ion-icon
+                          :icon="isItemExpanded(item.id) ? chevronDownOutline : chevronForwardOutline"
+                        />
+                        {{ item.subItems!.length }}
+                      </ion-button>
+                    </div>
+
+                    <h4 class="item-title">
+                      {{ item.resourceId && getLinkedResource(item.resourceId) ? getLinkedResource(item.resourceId)?.title : item.title }}
+                    </h4>
+                    <p v-if="item.subtitle" class="item-subtitle">{{ item.subtitle }}</p>
+                    <p v-if="item.resourceId && getLinkedResource(item.resourceId)?.reference" class="item-reference">{{ getLinkedResource(item.resourceId)?.reference }}</p>
+
+                    <!-- Notes -->
+                    <div v-if="item.notes" class="item-notes">
+                      <ion-icon :icon="documentTextOutline" />
+                      {{ item.notes }}
+                    </div>
+
+                    <!-- Resource Links -->
+                    <div v-if="item.resourceId && getLinkedResource(item.resourceId)" class="item-resources">
+                      <div class="media-buttons">
+                        <button
+                          v-for="content in getLinkedResource(item.resourceId)?.contents"
+                          :key="content.type"
+                          @click="showMediaContent(content, getLinkedResource(item.resourceId)?.title || '')"
+                          class="media-chip-button"
+                        >
+                          <ion-icon :icon="getMediaTypeIcon(content.type)" />
+                          <span>{{ formatMediaType(content.type) }}</span>
+                        </button>
                       </div>
-                  
-                      
-                      <div v-if="item.resourceId && getLinkedResource(item.resourceId)" class="item-resources">
-                        <div class="media-buttons">
+                      <!-- Music Properties -->
+                      <div class="music-props-row">
+                        <div v-if="getResourceMusicProps(item.resourceId)" class="music-props">
+                          <span v-for="prop in getResourceMusicProps(item.resourceId)" :key="prop" class="music-prop">{{ prop }}</span>
+                        </div>
+                        <button
+                          v-if="isAdmin && item.resourceId"
+                          @click.stop="openMusicPropsModal(item.resourceId!)"
+                          class="music-props-edit-btn"
+                        >
+                          <ion-icon :icon="createOutline" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- View All Lyrics Button (for items with sub-items) -->
+                    <div v-if="hasSubItems(item) && hasLyricsInSubItems(item)" class="item-lyrics-button">
+                      <ion-button
+                        @click="showItemLyricsView(item)"
+                        fill="solid"
+                        color="primary"
+                        size="small"
+                        class="view-lyrics-btn"
+                      >
+                        <ion-icon :icon="documentTextOutline" slot="start" />
+                        Voir toutes les paroles
+                      </ion-button>
+                    </div>
+                  </div>
+
+                  <!-- Duration and Participant -->
+                  <div class="item-column item-meta-column">
+                    <div v-if="item.duration" class="item-duration">
+                      <ion-icon :icon="timeOutline" />
+                      {{ item.duration }}min
+                    </div>
+                    <div v-if="item.participant" class="item-participant">
+                      <ion-icon :icon="personOutline" />
+                      {{ item.participant.name }}
+                      <span v-if="item.participant.role" class="participant-role">({{ item.participant.role }})</span>
+                    </div>
+                  </div>
+
+                  <!-- Edit/Delete Actions (Edit Mode) -->
+                  <div v-if="isEditMode" class="item-column item-actions-column">
+                    <div class="item-actions">
+                      <ion-button @click="showAddSubItemModalForItem(item.id)" fill="clear" size="small" color="success">
+                        <ion-icon :icon="addOutline" slot="icon-only" />
+                      </ion-button>
+                      <ion-button @click="showEditItemModalForItem(item)" fill="clear" size="small" color="primary">
+                        <ion-icon :icon="createOutline" slot="icon-only" />
+                      </ion-button>
+                      <ion-button @click="deleteItem(item.id)" fill="clear" size="small" color="danger">
+                        <ion-icon :icon="trashOutline" slot="icon-only" />
+                      </ion-button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Sub-Items (Expanded) -->
+                <div v-if="hasSubItems(item) && isItemExpanded(item.id)" class="sub-items-container">
+                  <div
+                    v-for="subItem in getSortedSubItems(item)"
+                    :key="subItem.id"
+                    class="sub-item"
+                  >
+                    <div class="sub-item-layout">
+                      <div class="sub-item-bullet">•</div>
+                      <div class="sub-item-content">
+                        <span class="sub-item-title">
+                          {{ subItem.resourceId && getLinkedResource(subItem.resourceId) ? getLinkedResource(subItem.resourceId)?.title : subItem.title }}
+                        </span>
+                        <span v-if="subItem.notes" class="sub-item-notes">{{ subItem.notes }}</span>
+
+                        <!-- Resource Links for Sub-Item -->
+                        <div v-if="subItem.resourceId && getLinkedResource(subItem.resourceId)" class="sub-item-resources">
                           <button
-                            v-for="content in getLinkedResource(item.resourceId)?.contents"
+                            v-for="content in getLinkedResource(subItem.resourceId)?.contents"
                             :key="content.type"
-                            @click="showMediaContent(content, getLinkedResource(item.resourceId)?.title)"
-                            class="media-chip-button"
+                            @click="showMediaContent(content, getLinkedResource(subItem.resourceId)?.title || '')"
+                            class="media-chip-button small"
                           >
                             <ion-icon :icon="getMediaTypeIcon(content.type)" />
-                            <span>{{ content.type === 'lyrics' ? 'Paroles' : content.type === 'video' ? 'Vidéo' : content.type === 'audio' ? 'Audio' : content.type === 'music_sheet' ? 'Partition' : content.type }}</span>
+                          </button>
+                          <!-- Music Properties for Sub-Item -->
+                          <span v-for="prop in getResourceMusicProps(subItem.resourceId)" :key="prop" class="music-prop small">{{ prop }}</span>
+                          <button
+                            v-if="isAdmin"
+                            @click.stop="openMusicPropsModal(subItem.resourceId!)"
+                            class="music-props-edit-btn small"
+                          >
+                            <ion-icon :icon="createOutline" />
                           </button>
                         </div>
                       </div>
-                    </div>
-                    
-                    <!-- Column 4: Duration and Participant -->
-                    <div class="item-column item-meta-column">
-                      <div v-if="item.duration" class="item-duration">
-                        <ion-icon :icon="timeOutline" />
-                        {{ item.duration }}min
-                      </div>
-                      <div v-if="item.participant" class="item-participant">
-                        <ion-icon :icon="personOutline" />
-                        {{ item.participant.name }}
-                        <span v-if="item.participant.role" class="participant-role">({{ item.participant.role }})</span>
-                      </div>
-                    </div>
-                    
-                    <!-- Column 5: Edit/Delete Actions (Edit Mode Only) -->
-                    <div v-if="isEditMode" class="item-column item-actions-column">
-                      <div class="item-actions">
-                        <ion-button @click="showEditItemModal(item)" fill="clear" size="small" color="primary">
+
+                      <!-- Sub-Item Actions (Edit Mode) -->
+                      <div v-if="isEditMode" class="sub-item-actions">
+                        <ion-button @click="showEditSubItemModalForItem(item.id, subItem)" fill="clear" size="small" color="primary">
                           <ion-icon :icon="createOutline" slot="icon-only" />
                         </ion-button>
-                        <ion-button @click="deleteItem(item.id)" fill="clear" size="small" color="danger">
+                        <ion-button @click="deleteSubItem(item.id, subItem.id)" fill="clear" size="small" color="danger">
                           <ion-icon :icon="trashOutline" slot="icon-only" />
                         </ion-button>
                       </div>
                     </div>
                   </div>
-                  
-                  </div>
-                  
-                  <!-- Insertion indicator after last item in section -->
-                  <div 
-                    v-if="isDragging && shouldShowInsertionLineAfter(item, index, section.id)"
-                    class="insertion-indicator"
-                  ></div>
-                </template>
-                
-                <!-- Add Item Button at End of Section (Edit Mode Only) -->
-                <div v-if="isEditMode" class="add-item-container">
-                  <ion-button @click="showAddItemModal('section', section.id)" fill="outline" size="small" class="add-item-button">
-                    <ion-icon :icon="addOutline" slot="start" />
-                    Ajouter un élément
-                  </ion-button>
                 </div>
               </div>
             </div>
           </div>
-          
-          <!-- Render without sections -->
-          <div v-else class="items-view">
-            <template v-for="(item, index) in sortedItems" :key="item.id">
-              <!-- Insertion indicator before item -->
-              <div 
-                v-if="isDragging && shouldShowInsertionLine(item, index)"
-                class="insertion-indicator"
-              ></div>
-              
-              <div 
-                class="program-item"
-                :class="[
-                  `item-${item.type.toLowerCase().replace(/\s+/g, '-')}`,
-                  { 'dragging': draggedItemId === item.id }
-                ]"
-                :data-item-id="item.id"
-              >
-              <div class="item-layout">
-                <!-- Column 1: Drag Handle (Edit Mode Only) -->
-                <div v-if="isEditMode" class="item-column item-handle-column">
-                  <div class="drag-handle" @mousedown="startDrag($event, item)" @touchstart="startDrag($event, item)">
-                    <ion-icon :icon="reorderThreeOutline" />
-                  </div>
-                </div>
-                
-                <!-- Column 2: Order Number -->
-                <div class="item-column item-order-column">
-                  <div class="item-order">{{ index + 1 }}</div>
-                </div>
-                
-                <!-- Column 3: Details -->
-                <div class="item-column item-details-column">
-                  <div class="item-type">
-                    <ion-icon :icon="getItemIcon(item.type)" />
-                    {{ item.type }}
-                  </div>
-                  <h4 class="item-title">{{ item.resourceId && getLinkedResource(item.resourceId) ? getLinkedResource(item.resourceId)?.title : item.title }}</h4>
-                  <p v-if="item.subtitle" class="item-subtitle">{{ item.subtitle }}</p>
-                </div>
-                
-                <!-- Column 4: Duration and Participant -->
-                <div class="item-column item-meta-column">
-                  <div v-if="item.duration" class="item-duration">
-                    <ion-icon :icon="timeOutline" />
-                    {{ item.duration }}min
-                  </div>
-                  <div v-if="item.participant" class="item-participant">
-                    <ion-icon :icon="personOutline" />
-                    {{ item.participant.name }}
-                    <span v-if="item.participant.role" class="participant-role">({{ item.participant.role }})</span>
-                  </div>
-                </div>
-                
-                <!-- Column 5: Edit/Delete Actions (Edit Mode Only) -->
-                <div v-if="isEditMode" class="item-column item-actions-column">
-                  <div class="item-actions">
-                    <ion-button @click="showEditItemModal(item)" fill="clear" size="small" color="primary">
-                      <ion-icon :icon="createOutline" slot="icon-only" />
-                    </ion-button>
-                    <ion-button @click="deleteItem(item.id)" fill="clear" size="small" color="danger">
-                      <ion-icon :icon="trashOutline" slot="icon-only" />
-                    </ion-button>
-                  </div>
-                </div>
-              </div>
-              
-              <div v-if="item.notes" class="item-details">
-                <div v-if="item.notes" class="item-notes">
-                  <ion-icon :icon="documentTextOutline" />
-                  {{ item.notes }}
-                </div>
-              </div>
-              
-              
-              <div v-if="item.resourceId && getLinkedResource(item.resourceId)" class="item-resources">
-                <div class="media-buttons">
-                  <button
-                    v-for="content in getLinkedResource(item.resourceId)?.contents"
-                    :key="content.type"
-                    @click="showMediaContent(content, getLinkedResource(item.resourceId)?.title)"
-                    class="media-chip-button"
-                  >
-                    <ion-icon :icon="getMediaTypeIcon(content.type)" />
-                    <span>{{ content.type === 'lyrics' ? 'Paroles' : content.type === 'video' ? 'Vidéo' : content.type === 'audio' ? 'Audio' : content.type === 'music_sheet' ? 'Partition' : content.type }}</span>
-                  </button>
-                </div>
-              </div>
-              </div>
-              
-              <!-- Insertion indicator after last item -->
-              <div 
-                v-if="isDragging && shouldShowInsertionLineAfter(item, index)"
-                class="insertion-indicator"
-              ></div>
-            </template>
-          </div>
-        </div>
-
-        <!-- Add Section Button at End -->
-        <div v-if="isEditMode && program" class="add-item-container">
-          <ion-button @click="showAddSectionModal" fill="outline" size="default" class="add-item-button">
-            <ion-icon :icon="addOutline" slot="start" />
-            Ajouter une section
-          </ion-button>
-        </div>
-        
-        <!-- Empty State -->
-        <div v-else-if="!program" class="empty-state">
-          <ion-icon :icon="documentTextOutline" size="large" color="medium"></ion-icon>
-          <h3>Aucun programme</h3>
-          <p>{{ isAdmin ? "Aucun programme n'a encore été créé pour ce service." : "Le programme n'est pas encore disponible." }}</p>
-          <ion-button v-if="isAdmin" @click="showEditModal" fill="outline" size="small">
-            <ion-icon :icon="createOutline" slot="start" />
-            Créer un programme
-          </ion-button>
         </div>
       </div>
-      
-      <!-- Lyrics Modal -->
-      <ion-modal ref="lyricsModal" :is-open="showLyricsModal" @ionModalDidDismiss="closeLyricsModal">
-        <ion-header>
-          <ion-toolbar>
-            <ion-title>{{ selectedItem?.title }}</ion-title>
-            <ion-buttons slot="end">
-              <ion-button @click="closeLyricsModal">
-                <ion-icon :icon="closeOutline" />
-              </ion-button>
-            </ion-buttons>
-          </ion-toolbar>
-        </ion-header>
-        <ion-content class="ion-padding">
-          {{ selectedItem?.lyrics }}
-          <!-- <div class="lyrics-text">
-            <pre>{{ selectedItem?.lyrics }}</pre>
-          </div> -->
-        </ion-content>
-      </ion-modal>
-      
-      <!-- Resource Detail Modal -->
-      <ion-modal :is-open="showResourceModal" @ionModalDidDismiss="closeResourceModal">
-        <ion-header>
-          <ion-toolbar>
-            <ion-title>{{ selectedResource?.title }}</ion-title>
-            <ion-buttons slot="end">
-              <ion-button @click="closeResourceModal">
-                <ion-icon :icon="closeOutline" />
-              </ion-button>
-            </ion-buttons>
-          </ion-toolbar>
-        </ion-header>
-        <ion-content class="resource-detail-content">
-          <div class="resource-details" v-if="selectedResource">
-            <div class="resource-info">
-              <div class="resource-media-list">
-                <h4>Contenus disponibles</h4>
-                <div 
-                  v-for="(content, index) in selectedResource.contents" 
-                  :key="index"
-                  class="media-item"
-                >
-                  <div class="media-info">
-                    <ion-icon :icon="getMediaTypeIcon(content.type)" class="media-icon" />
-                    <div class="media-details">
-                      <span class="media-type">
-                        {{ content.type === 'lyrics' ? 'Paroles' : content.type === 'video' ? 'Vidéo' : content.type === 'audio' ? 'Audio' : content.type === 'music_sheet' ? 'Partition' : content.type }}
-                      </span>
-                      <span v-if="content.notes" class="media-notes">{{ content.notes }}</span>
-                    </div>
-                  </div>
-                  <div class="media-actions">
-                    <ion-button
-                      v-if="content.url"
-                      @click="showMediaContent(content)"
-                      fill="outline"
-                      size="small"
-                    >
-                      <ion-icon :icon="linkOutline" slot="start" />
-                      Ouvrir
-                    </ion-button>
-                    <ion-button 
-                      v-else-if="content.content && content.type === 'lyrics'"
-                      @click="showLyricsContent(content.content)"
-                      fill="outline"
-                      size="small"
-                    >
-                      <ion-icon :icon="musicalNotesOutline" slot="start" />
-                      Voir
-                    </ion-button>
-                  </div>
-                </div>
-              </div>
-              
-              <div class="resource-actions">
-                <ion-button 
-                  @click="navigateToResource(selectedResource.id)"
-                  fill="solid"
-                  color="primary"
-                >
-                  <ion-icon :icon="libraryOutline" slot="start" />
-                  Voir la ressource complète
-                </ion-button>
-              </div>
-            </div>
-          </div>
-        </ion-content>
-      </ion-modal>
-
-      <!-- Add Item Type Selection Modal -->
-      <ion-modal :is-open="showAddItemModalState" @ionModalDidDismiss="closeAddItemModal">
-        <ion-header>
-          <ion-toolbar>
-            <ion-title>{{ addItemModalTitle }}</ion-title>
-            <ion-buttons slot="end">
-              <ion-button @click="closeAddItemModal">
-                <ion-icon :icon="closeOutline" />
-              </ion-button>
-            </ion-buttons>
-          </ion-toolbar>
-        </ion-header>
-        <ion-content class="add-item-modal-content">
-          <div class="item-type-grid">
-            <ion-button 
-              v-for="itemType in programItemTypes" 
-              :key="itemType"
-              @click="selectItemType(itemType)"
-              fill="outline" 
-              size="large"
-              class="item-type-button"
-            >
-              <div class="item-type-content">
-                <ion-icon :icon="getItemIcon(itemType)" size="large" />
-                <span class="item-type-label">{{ itemType }}</span>
-              </div>
-            </ion-button>
-          </div>
-          
-          <div class="modal-footer">
-            <p class="position-info">
-              {{ addItemPosition === 'start' ? 'Ajouter au début du programme' : 'Ajouter à la fin du programme' }}
-            </p>
-          </div>
-        </ion-content>
-      </ion-modal>
-
-      <!-- Add Section Modal -->
-      <ion-modal :is-open="showAddSectionModalState" @ionModalDidDismiss="closeAddSectionModal">
-        <ion-header>
-          <ion-toolbar>
-            <ion-title>Ajouter une section</ion-title>
-            <ion-buttons slot="end">
-              <ion-button @click="closeAddSectionModal">
-                <ion-icon :icon="closeOutline" />
-              </ion-button>
-            </ion-buttons>
-          </ion-toolbar>
-        </ion-header>
-        <ion-content class="add-section-modal-content">
-          <div class="section-form">
-            <ion-item>
-              <ion-label position="stacked">Nom de la section</ion-label>
-              <ion-input 
-                v-model="newSectionName" 
-                placeholder="Ex: Louange, Prière, Prédication..."
-                @keyup.enter="createSection"
-              ></ion-input>
-            </ion-item>
-            
-            <ion-item>
-              <ion-label position="stacked">Insérer après</ion-label>
-              <ion-select 
-                v-model="insertAfterSectionId" 
-                placeholder="Choisir une section (optionnel)"
-                interface="popover"
-              >
-                <ion-select-option :value="null">Au début du programme</ion-select-option>
-                <ion-select-option 
-                  v-for="section in sortedSections" 
-                  :key="section.id" 
-                  :value="section.id"
-                >
-                  Après "{{ section.title }}"
-                </ion-select-option>
-              </ion-select>
-            </ion-item>
-            
-            <div class="modal-actions">
-              <ion-button @click="closeAddSectionModal" fill="clear" color="medium">
-                Annuler
-              </ion-button>
-              <ion-button 
-                @click="createSection" 
-                :disabled="!newSectionName.trim()"
-                color="primary"
-              >
-                <ion-icon :icon="addOutline" slot="start" />
-                Créer la section
-              </ion-button>
-            </div>
-          </div>
-        </ion-content>
-      </ion-modal>
-
-      <!-- Edit Section Modal -->
-      <ion-modal :is-open="showEditSectionModalState" @ionModalDidDismiss="closeEditSectionModal">
-        <ion-header>
-          <ion-toolbar>
-            <ion-title>Modifier la section</ion-title>
-            <ion-buttons slot="end">
-              <ion-button @click="closeEditSectionModal">
-                <ion-icon :icon="closeOutline" />
-              </ion-button>
-            </ion-buttons>
-          </ion-toolbar>
-        </ion-header>
-        <ion-content class="edit-section-modal-content">
-          <div class="section-form">
-            <ion-item>
-              <ion-label position="stacked">Nom de la section</ion-label>
-              <ion-input 
-                v-model="editSectionForm.title" 
-                placeholder="Ex: Louange, Prière, Prédication..."
-                @keyup.enter="saveEditSection"
-              ></ion-input>
-            </ion-item>
-            
-            <div class="modal-actions">
-              <ion-button @click="closeEditSectionModal" fill="clear" color="medium">
-                Annuler
-              </ion-button>
-              <ion-button 
-                @click="saveEditSection" 
-                :disabled="!editSectionForm.title.trim()"
-                color="primary"
-              >
-                <ion-icon :icon="checkmarkOutline" slot="start" />
-                Enregistrer
-              </ion-button>
-            </div>
-          </div>
-        </ion-content>
-      </ion-modal>
-
-      <!-- Section View Modal -->
-      <ion-modal :is-open="showSectionViewModal" @ionModalDidDismiss="closeSectionView">
-        <ion-header>
-          <ion-toolbar>
-            <ion-title>{{ selectedSection?.title }}</ion-title>
-            <ion-buttons slot="end">
-              <ion-button @click="closeSectionView">
-                <ion-icon :icon="closeOutline" />
-              </ion-button>
-            </ion-buttons>
-          </ion-toolbar>
-        </ion-header>
-        <ion-content class="section-view-modal-content">
-          <div v-if="selectedSection" class="section-view-container">
-            <!-- Section Items with Titles and Lyrics -->
-            <div
-              v-for="(item, index) in getSectionItems(selectedSection.id)"
-              :key="item.id"
-              class="section-item-card"
-            >
-              <!-- Item Header -->
-              <div class="item-header">
-                <div class="item-number">{{ index + 1 }}</div>
-                <h3 class="item-title">{{ item.resourceId && getLinkedResource(item.resourceId) ? getLinkedResource(item.resourceId)?.title : item.title }}</h3>
-              </div>
-
-              <!-- Lyrics -->
-              <div v-if="item.lyrics || (item.resourceId && getLinkedResource(item.resourceId)?.contents?.find(c => c.type === 'lyrics'))" class="lyrics-content">
-                {{ item.lyrics || getLinkedResource(item.resourceId)?.contents?.find(c => c.type === 'lyrics')?.content }}
-              </div>
-            </div>
-          </div>
-        </ion-content>
-      </ion-modal>
 
       <!-- Edit Program Modal -->
       <ion-modal :is-open="showEditProgramModalState" @ionModalDidDismiss="closeEditProgramModal">
@@ -617,225 +313,175 @@
             </ion-buttons>
           </ion-toolbar>
         </ion-header>
-        <ion-content class="edit-program-modal-content">
-          <div class="modal-form">
-            
-            <ion-item>
-              <ion-label position="stacked">Dirigeant du service</ion-label>
-              <ion-input 
-                v-model="editProgramForm.conductorName" 
-                placeholder="Nom du dirigeant/pasteur"
-              ></ion-input>
-            </ion-item>
-            
-            <ion-item>
-              <ion-label position="stacked">Rôle du dirigeant</ion-label>
-              <ion-input 
-                v-model="editProgramForm.conductorRole" 
-                placeholder="Ex: Pasteur, Dirigeant, etc."
-              ></ion-input>
-            </ion-item>
-            
-            <!-- Duration is calculated automatically from items, so we just display it -->
-            <ion-item>
-              <ion-label position="stacked">Durée totale (minutes)</ion-label>
-              <ion-input 
-                :value="program?.totalDuration || 0" 
-                readonly
-                placeholder="Calculée automatiquement"
-                type="number"
-              ></ion-input>
-            </ion-item>
-            
-            <div class="modal-actions">
-              <ion-button @click="closeEditProgramModal" fill="clear" color="medium">
-                Annuler
-              </ion-button>
-              <ion-button 
-                @click="saveEditProgram" 
-                color="primary"
-              >
-                <ion-icon :icon="checkmarkOutline" slot="start" />
-                Enregistrer
-              </ion-button>
-            </div>
-          </div>
+        <ion-content class="ion-padding">
+          <ion-item>
+            <ion-label position="stacked">Nom du dirigeant</ion-label>
+            <ion-input v-model="editProgramForm.conductorName" placeholder="Ex: Sr. Nadège"></ion-input>
+          </ion-item>
+
+          <ion-item>
+            <ion-label position="stacked">Rôle (optionnel)</ion-label>
+            <ion-input v-model="editProgramForm.conductorRole" placeholder="Ex: Dirigeante"></ion-input>
+          </ion-item>
+
+          <ion-button @click="updateProgramInfo" expand="block" class="ion-margin-top">
+            Mettre à jour
+          </ion-button>
         </ion-content>
       </ion-modal>
-      
-      <!-- Add Item Form Modal -->
-      <ion-modal :is-open="showAddItemFormModal" @ionModalDidDismiss="closeAddItemForm">
+
+      <!-- Add/Edit Item Modal -->
+      <ion-modal :is-open="showItemFormModal" @ionModalDidDismiss="closeItemFormModal">
         <ion-header>
           <ion-toolbar>
-            <ion-title>Ajouter {{ addItemForm.type }}</ion-title>
+            <ion-buttons slot="start">
+              <ion-button @click="closeItemFormModal">
+                <ion-icon :icon="arrowBackOutline" />
+              </ion-button>
+            </ion-buttons>
+            <ion-title>{{ editingItemId ? 'Modifier l\'élément' : 'Ajouter un élément' }}</ion-title>
             <ion-buttons slot="end">
-              <ion-button @click="closeAddItemForm">
+              <ion-button
+                @click="editingItemId ? updateItem() : addItem()"
+                :disabled="!itemForm.type || !itemForm.title"
+                :strong="true"
+              >
+                {{ editingItemId ? 'Modifier' : 'Ajouter' }}
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="ion-padding">
+          <!-- Type Selection with Icon Buttons -->
+          <div class="type-selection-section">
+            <ion-label class="type-label">Type *</ion-label>
+            <div class="type-buttons-grid">
+              <button
+                v-for="type in programItemTypes"
+                :key="type"
+                @click="itemForm.type = type"
+                :class="['type-button', { 'selected': itemForm.type === type }]"
+                type="button"
+              >
+                <ion-icon :icon="getItemIcon(type)" class="type-icon" />
+                <span class="type-text">{{ type }}</span>
+              </button>
+            </div>
+          </div>
+
+          <ion-item class="title-field-with-button">
+            <ion-label position="stacked">Titre *</ion-label>
+            <ion-input v-model="itemForm.title" placeholder="Ex: Moment d'adoration"></ion-input>
+            <div slot="end" class="resource-selector-inline">
+              <ResourceSelector v-model="itemForm.resourceId" button-fill="solid" button-size="small" />
+            </div>
+          </ion-item>
+
+          <ion-item>
+            <ion-label position="stacked">Sous-titre (optionnel)</ion-label>
+            <ion-input v-model="itemForm.subtitle"></ion-input>
+          </ion-item>
+
+          <ion-item>
+            <ion-label position="stacked">Participant (optionnel)</ion-label>
+            <ion-input v-model="itemForm.participantName" placeholder="Ex: Pasteur Hugues-Dieu"></ion-input>
+          </ion-item>
+
+          <ion-item>
+            <ion-label position="stacked">Durée (minutes)</ion-label>
+            <ion-input v-model.number="itemForm.duration" type="number" min="0"></ion-input>
+          </ion-item>
+
+          <ion-item>
+            <ion-label position="stacked">Notes (optionnel)</ion-label>
+            <ion-textarea v-model="itemForm.notes" :rows="3"></ion-textarea>
+          </ion-item>
+        </ion-content>
+      </ion-modal>
+
+      <!-- Add Sub-Item Modal -->
+      <ion-modal :is-open="showAddSubItemModalState" @ionModalDidDismiss="closeAddSubItemModal">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>Ajouter un sous-élément</ion-title>
+            <ion-buttons slot="end">
+              <ion-button @click="closeAddSubItemModal">
                 <ion-icon :icon="closeOutline" />
               </ion-button>
             </ion-buttons>
           </ion-toolbar>
         </ion-header>
-        <ion-content class="add-item-form-modal-content">
-          <div class="modal-form">
-            
-            <ion-item>
-              <ion-label position="stacked">Titre *</ion-label>
-              <ion-input 
-                v-model="addItemForm.title" 
-                placeholder="Titre de l'élément"
-                required
-              ></ion-input>
-            </ion-item>
-            
-            <ion-item>
-              <ion-label position="stacked">Sous-titre</ion-label>
-              <ion-input 
-                v-model="addItemForm.subtitle" 
-                placeholder="Sous-titre optionnel"
-              ></ion-input>
-            </ion-item>
-            
-            <ion-item>
-              <ion-label position="stacked">Participant</ion-label>
-              <ion-input 
-                v-model="addItemForm.participantName" 
-                placeholder="Nom du participant"
-              ></ion-input>
-            </ion-item>
-            
-            
-            <ion-item>
-              <ion-label position="stacked">Durée (minutes) *</ion-label>
-              <ion-input 
-                v-model="addItemForm.duration" 
-                type="number"
-                placeholder="5"
-                required
-              ></ion-input>
-            </ion-item>
-            
-            
-            <ion-item>
-              <ion-label position="stacked">Notes</ion-label>
-              <ion-textarea 
-                v-model="addItemForm.notes" 
-                placeholder="Notes ou instructions spéciales"
-                :rows="3"
-              ></ion-textarea>
-            </ion-item>
-            
-            
-            <!-- Resource Selector -->
-            <div class="resource-selector-container">
-              <ResourceSelector v-model="addItemForm.resourceId" />
-            </div>
-            
-            <div class="modal-actions">
-              <ion-button @click="closeAddItemForm" fill="clear" color="medium">
-                Annuler
-              </ion-button>
-              <ion-button 
-                @click="saveNewItem" 
-                color="primary"
-                :disabled="!addItemForm.title || !Number(addItemForm.duration)"
-              >
-                <ion-icon :icon="checkmarkOutline" slot="start" />
-                Ajouter
-              </ion-button>
-            </div>
-          </div>
+        <ion-content class="ion-padding">
+          <ion-item>
+            <ion-label position="stacked">Titre *</ion-label>
+            <ion-input v-model="addSubItemForm.title" placeholder="Ex: Kache mwen anba zel ou"></ion-input>
+          </ion-item>
+
+          <ion-item>
+            <ion-label position="stacked">Lier à une ressource (optionnel)</ion-label>
+            <ResourceSelector v-model="addSubItemForm.resourceId" resource-type="song" />
+          </ion-item>
+
+          <ion-item>
+            <ion-label position="stacked">Notes (optionnel)</ion-label>
+            <ion-textarea v-model="addSubItemForm.notes" :rows="3"></ion-textarea>
+          </ion-item>
+
+          <ion-button
+            @click="addSubItem"
+            expand="block"
+            class="ion-margin-top"
+            :disabled="!addSubItemForm.title"
+          >
+            Ajouter
+          </ion-button>
         </ion-content>
       </ion-modal>
 
-      <!-- Edit Item Form Modal -->
-      <ion-modal :is-open="showEditItemFormModal" @ionModalDidDismiss="closeEditItemForm">
+      <!-- Edit Sub-Item Modal -->
+      <ion-modal :is-open="showEditSubItemModalState" @ionModalDidDismiss="closeEditSubItemModal">
         <ion-header>
           <ion-toolbar>
-            <ion-title>Modifier {{ editItemForm.type }}</ion-title>
+            <ion-title>Modifier le sous-élément</ion-title>
             <ion-buttons slot="end">
-              <ion-button @click="closeEditItemForm">
+              <ion-button @click="closeEditSubItemModal">
                 <ion-icon :icon="closeOutline" />
               </ion-button>
             </ion-buttons>
           </ion-toolbar>
         </ion-header>
-        <ion-content class="edit-item-form-modal-content">
-          <div class="modal-form">
-            
-            <ion-item>
-              <ion-label position="stacked">Titre *</ion-label>
-              <ion-input 
-                v-model="editItemForm.title" 
-                placeholder="Titre de l'élément"
-                required
-              ></ion-input>
-            </ion-item>
-            
-            <ion-item>
-              <ion-label position="stacked">Sous-titre</ion-label>
-              <ion-input 
-                v-model="editItemForm.subtitle" 
-                placeholder="Sous-titre optionnel"
-              ></ion-input>
-            </ion-item>
-            
-            <ion-item>
-              <ion-label position="stacked">Participant</ion-label>
-              <ion-input 
-                v-model="editItemForm.participantName" 
-                placeholder="Nom du participant"
-              ></ion-input>
-            </ion-item>
-            
-            
-            <ion-item>
-              <ion-label position="stacked">Durée (minutes) *</ion-label>
-              <ion-input 
-                v-model="editItemForm.duration" 
-                type="number"
-                placeholder="5"
-                required
-              ></ion-input>
-            </ion-item>
-            
-            
-            <ion-item>
-              <ion-label position="stacked">Notes</ion-label>
-              <ion-textarea 
-                v-model="editItemForm.notes" 
-                placeholder="Notes ou instructions spéciales"
-                :rows="3"
-              ></ion-textarea>
-            </ion-item>
-            
-            
-            <!-- Resource Selector -->
-            <div class="resource-selector-container">
-              <ResourceSelector v-model="editItemForm.resourceId" />
-            </div>
-            
-            <div class="modal-actions">
-              <ion-button @click="closeEditItemForm" fill="clear" color="medium">
-                Annuler
-              </ion-button>
-              <ion-button 
-                @click="saveEditItem" 
-                color="primary"
-                :disabled="!editItemForm.title || !Number(editItemForm.duration)"
-              >
-                <ion-icon :icon="checkmarkOutline" slot="start" />
-                Enregistrer
-              </ion-button>
-            </div>
-          </div>
+        <ion-content class="ion-padding">
+          <ion-item>
+            <ion-label position="stacked">Titre *</ion-label>
+            <ion-input v-model="editSubItemForm.title"></ion-input>
+          </ion-item>
+
+          <ion-item>
+            <ion-label position="stacked">Lier à une ressource (optionnel)</ion-label>
+            <ResourceSelector v-model="editSubItemForm.resourceId" resource-type="song" />
+          </ion-item>
+
+          <ion-item>
+            <ion-label position="stacked">Notes (optionnel)</ion-label>
+            <ion-textarea v-model="editSubItemForm.notes" :rows="3"></ion-textarea>
+          </ion-item>
+
+          <ion-button
+            @click="updateSubItem"
+            expand="block"
+            class="ion-margin-top"
+            :disabled="!editSubItemForm.title"
+          >
+            Mettre à jour
+          </ion-button>
         </ion-content>
       </ion-modal>
 
-      <!-- Media Viewer Modal -->
-      <ion-modal :is-open="showMediaModal" @ionModalDidDismiss="closeMediaModal">
+      <!-- Media Modal (for displaying lyrics, videos, etc.) -->
+      <ion-modal :is-open="showMediaModalState" @ionModalDidDismiss="closeMediaModal" class="media-modal fullscreen-modal">
         <ion-header>
           <ion-toolbar>
-            <ion-title>{{ selectedMediaContent?.title || 'Média' }}</ion-title>
+            <ion-title>{{ selectedMediaTitle }}</ion-title>
             <ion-buttons slot="end">
               <ion-button @click="closeMediaModal">
                 <ion-icon :icon="closeOutline" />
@@ -843,84 +489,239 @@
             </ion-buttons>
           </ion-toolbar>
         </ion-header>
-        <ion-content class="media-viewer-content">
-          <div v-if="selectedMediaContent" class="media-container">
-            <!-- Video Content -->
-            <div v-if="selectedMediaContent.type === 'video'" class="video-container">
-              <!-- YouTube Video -->
-              <iframe
-                v-if="isYouTubeUrl(selectedMediaContent.url)"
-                :src="getYouTubeEmbedUrl(selectedMediaContent.url) || ''"
-                frameborder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowfullscreen
-                class="media-iframe"
-              ></iframe>
-              <!-- Regular Video -->
-              <video
-                v-else
-                :src="selectedMediaContent.url"
-                controls
-                class="media-video"
-                :poster="selectedMediaContent.thumbnailUrl"
-              ></video>
-            </div>
+        <ion-content v-if="selectedMediaContent">
+          <!-- YouTube Video -->
+          <div v-if="(selectedMediaContent.type === 'video' || selectedMediaContent.type === 'youtube') && selectedMediaContent.url && isYouTubeUrl(selectedMediaContent.url)" class="video-container">
+            <iframe
+              :src="getYouTubeEmbedUrl(selectedMediaContent.url) || ''"
+              frameborder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowfullscreen
+              class="youtube-iframe"
+            ></iframe>
+          </div>
 
-            <!-- Audio Content -->
-            <div v-if="selectedMediaContent.type === 'audio'" class="audio-container">
-              <audio :src="selectedMediaContent.url" controls class="media-audio"></audio>
-              <div class="audio-info">
-                <h3>{{ selectedMediaContent.title }}</h3>
-                <p v-if="selectedMediaContent.notes">{{ selectedMediaContent.notes }}</p>
-              </div>
-            </div>
+          <!-- Regular Video Content -->
+          <div v-else-if="selectedMediaContent.type === 'video' && selectedMediaContent.url" class="video-container">
+            <video controls :src="selectedMediaContent.url" class="full-width-video"></video>
+          </div>
 
-            <!-- Music Sheet Content -->
-            <div v-if="selectedMediaContent.type === 'music_sheet'" class="music-sheet-container">
-              <div class="file-info">
-                <ion-icon :icon="musicalNotesOutline" />
-                <div>
-                  <h3>{{ selectedMediaContent.title }}</h3>
-                  <p>Partition musicale</p>
-                  <p v-if="selectedMediaContent.notes">{{ selectedMediaContent.notes }}</p>
+          <!-- Spotify Content -->
+          <div v-if="selectedMediaContent.type === 'spotify' && selectedMediaContent.url" class="spotify-container">
+            <iframe
+              :src="getSpotifyEmbedUrl(selectedMediaContent.url) || ''"
+              width="100%"
+              height="352"
+              frameborder="0"
+              allowtransparency="true"
+              allow="encrypted-media"
+              class="spotify-iframe"
+            ></iframe>
+            <ion-button
+              :href="selectedMediaContent.url"
+              target="_blank"
+              expand="block"
+              fill="outline"
+              style="margin-top: 1rem;"
+            >
+              <ion-icon :icon="musicalNoteOutline" slot="start" />
+              Ouvrir dans Spotify
+            </ion-button>
+          </div>
+
+          <!-- Audio Content -->
+          <div v-if="selectedMediaContent.type === 'audio' && selectedMediaContent.url" class="audio-container">
+            <audio controls :src="selectedMediaContent.url" class="full-width-audio"></audio>
+          </div>
+
+          <!-- Lyrics Content -->
+          <div v-if="selectedMediaContent.type === 'lyrics'" class="lyrics-container">
+            <div class="lyrics-content">
+              <pre>{{ selectedMediaContent.content }}</pre>
+            </div>
+          </div>
+
+          <!-- PDF/Document Content -->
+          <div v-if="selectedMediaContent.type === 'music_sheet' && selectedMediaContent.url" class="document-container">
+            <ion-button @click="openInNewTab(selectedMediaContent.url)" expand="block" fill="outline">
+              <ion-icon :icon="documentOutline" slot="start" />
+              Ouvrir la partition
+            </ion-button>
+          </div>
+
+          <!-- Debug/Fallback - Show if no content matched -->
+          <div v-if="!['video', 'youtube', 'spotify', 'audio', 'lyrics', 'music_sheet'].includes(selectedMediaContent.type)" class="debug-container" style="padding: 1rem;">
+            <p><strong>Type:</strong> {{ selectedMediaContent.type }}</p>
+            <p><strong>URL:</strong> {{ selectedMediaContent.url }}</p>
+            <p><strong>Content:</strong> {{ selectedMediaContent.content }}</p>
+          </div>
+        </ion-content>
+      </ion-modal>
+
+      <!-- Item Lyrics View Modal -->
+      <ion-modal :is-open="showItemLyricsModalState" @ionModalDidDismiss="closeItemLyricsView" class="lyrics-view-modal fullscreen-modal">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>{{ selectedItemForLyrics?.title }}</ion-title>
+            <ion-buttons slot="end">
+              <ion-button @click="closeItemLyricsView">
+                <ion-icon :icon="closeOutline" />
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="lyrics-view-modal-content fullscreen-content">
+          <div v-if="selectedItemForLyrics" class="lyrics-view-container">
+            <!-- Sub-Items with Titles and Lyrics -->
+            <div
+              v-for="(subItem, index) in getSortedSubItems(selectedItemForLyrics)"
+              :key="subItem.id"
+              class="lyrics-item-card"
+            >
+              <!-- Item Header -->
+              <div class="lyrics-item-header">
+                <div class="lyrics-item-number">{{ index + 1 }}</div>
+                <div class="lyrics-item-header-text">
+                  <h3 class="lyrics-item-title">
+                    {{ subItem.resourceId && getLinkedResource(subItem.resourceId) ? getLinkedResource(subItem.resourceId)?.title : subItem.title }}
+                  </h3>
+                  <p v-if="subItem.resourceId && getLinkedResource(subItem.resourceId)?.reference" class="lyrics-item-subtitle">
+                    {{ getLinkedResource(subItem.resourceId)?.reference }}
+                  </p>
+                  <p v-if="subItem.notes" class="lyrics-item-notes">
+                    {{ subItem.notes }}
+                  </p>
                 </div>
               </div>
-              <ion-button
-                @click="downloadFile(selectedMediaContent.url, selectedMediaContent.title)"
-                expand="block"
-                fill="outline"
-              >
-                <ion-icon :icon="downloadOutline" slot="start" />
-                Télécharger
-              </ion-button>
-            </div>
 
-            <!-- Lyrics Content -->
-            <div v-if="selectedMediaContent.type === 'lyrics'" class="lyrics-container">
-              <div class="lyrics-content">
-                <pre>{{ selectedMediaContent.content }}</pre>
+              <!-- Lyrics -->
+              <div v-if="getSubItemLyrics(subItem)" class="lyrics-content-display">
+                <pre>{{ getSubItemLyrics(subItem) }}</pre>
+              </div>
+              <div v-else class="no-lyrics">
+                Aucune parole disponible
               </div>
             </div>
+          </div>
+        </ion-content>
+      </ion-modal>
 
-            <!-- Fallback for other content types -->
-            <div v-if="!['video', 'audio', 'music_sheet', 'lyrics'].includes(selectedMediaContent.type)" class="fallback-container">
-              <div class="file-info">
-                <ion-icon :icon="documentOutline" />
-                <div>
-                  <h3>{{ selectedMediaContent.title }}</h3>
-                  <p>{{ selectedMediaContent.type }}</p>
-                  <p v-if="selectedMediaContent.notes">{{ selectedMediaContent.notes }}</p>
+      <!-- YouTube Playlist Modal -->
+      <ion-modal :is-open="showYouTubePlaylistModalState" @ionModalDidDismiss="closeYouTubePlaylist" class="youtube-playlist-modal fullscreen-modal">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>
+              <ion-icon :icon="logoYoutube" style="vertical-align: middle; margin-right: 0.5rem;" />
+              Playlist YouTube
+            </ion-title>
+            <ion-buttons slot="end">
+              <ion-button @click="closeYouTubePlaylist">
+                <ion-icon :icon="closeOutline" />
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="fullscreen-content">
+          <div class="youtube-player-container">
+            <!-- Main Video Player -->
+            <div v-if="youtubeVideos.length > 0" class="main-player-section">
+              <div class="current-video-info">
+                <div class="video-counter">
+                  Vidéo {{ currentVideoIndex + 1 }} / {{ youtubeVideos.length }}
+                </div>
+                <h2 class="current-video-title">{{ youtubeVideos[currentVideoIndex].title }}</h2>
+                <p v-if="youtubeVideos[currentVideoIndex].subtitle" class="current-video-subtitle">
+                  {{ youtubeVideos[currentVideoIndex].subtitle }}
+                </p>
+              </div>
+
+              <div
+                class="main-video-wrapper"
+                @touchstart="handleTouchStart"
+                @touchmove="handleTouchMove"
+                @touchend="handleTouchEnd"
+              >
+                <iframe
+                  :id="`youtube-player-${currentVideoIndex}`"
+                  :key="currentVideoIndex"
+                  :src="getAutoplayEmbedUrl(youtubeVideos[currentVideoIndex].embedUrl)"
+                  frameborder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                  allowfullscreen
+                  class="main-video-iframe"
+                ></iframe>
+                <div v-if="showPlayPrompt" class="play-prompt-overlay" @click="dismissPlayPrompt">
+                  <div class="play-prompt-content">
+                    <ion-icon :icon="playCircleOutline" class="play-prompt-icon" />
+                    <p class="play-prompt-text">Appuyez sur la vidéo pour démarrer la lecture</p>
+                  </div>
                 </div>
               </div>
-              <ion-button
-                v-if="selectedMediaContent.url"
-                @click="downloadFile(selectedMediaContent.url, selectedMediaContent.title)"
-                expand="block"
-                fill="outline"
-              >
-                <ion-icon :icon="downloadOutline" slot="start" />
-                Télécharger
-              </ion-button>
+
+              <!-- Player Controls -->
+              <div class="player-controls">
+                <ion-button
+                  @click="previousVideo"
+                  :disabled="currentVideoIndex === 0"
+                  fill="solid"
+                  color="danger"
+                  class="nav-button"
+                >
+                  <ion-icon :icon="playBackOutline" slot="start" class="hide-mobile" />
+                  <ion-icon :icon="playBackOutline" slot="icon-only" class="show-mobile" />
+                  <span class="hide-mobile">Précédent</span>
+                </ion-button>
+
+                <div class="progress-indicator">
+                  <div
+                    v-for="(video, index) in youtubeVideos"
+                    :key="index"
+                    :class="['progress-dot', { 'active': index === currentVideoIndex, 'played': index < currentVideoIndex }]"
+                    @click="goToVideo(index)"
+                  ></div>
+                </div>
+
+                <ion-button
+                  @click="nextVideo"
+                  :disabled="currentVideoIndex === youtubeVideos.length - 1"
+                  fill="solid"
+                  color="danger"
+                  class="nav-button"
+                >
+                  <span class="hide-mobile">Suivant</span>
+                  <ion-icon :icon="playForwardOutline" slot="icon-only" class="show-mobile" />
+                  <ion-icon :icon="playForwardOutline" slot="end" class="hide-mobile" />
+                </ion-button>
+              </div>
+            </div>
+
+            <!-- Playlist Queue -->
+            <div class="playlist-queue">
+              <h3 class="queue-title">File d'attente ({{ youtubeVideos.length }})</h3>
+              <div class="queue-list">
+                <div
+                  v-for="(video, index) in youtubeVideos"
+                  :key="index"
+                  :class="['queue-item', { 'active': index === currentVideoIndex, 'played': index < currentVideoIndex }]"
+                  @click="goToVideo(index)"
+                >
+                  <div class="queue-item-number">{{ index + 1 }}</div>
+                  <div class="queue-item-info">
+                    <div class="queue-item-title">{{ video.title }}</div>
+                    <div class="queue-item-subtitle-group">
+                      <div v-if="video.subtitle" class="queue-item-subtitle">{{ video.subtitle }}</div>
+                      <div v-if="video.programItemNumber && video.programItemTitle" class="queue-item-context">
+                        #{{ video.programItemNumber }} - {{ video.programItemTitle }}
+                      </div>
+                    </div>
+                  </div>
+                  <ion-icon
+                    v-if="index === currentVideoIndex"
+                    :icon="playCircleOutline"
+                    class="queue-item-playing"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </ion-content>
@@ -935,26 +736,110 @@
         @close="closeSMSModal"
         @sent="onSMSSent"
       />
+
+      <!-- Music Properties Edit Modal -->
+      <ion-modal :is-open="showMusicPropsModalState" @ionModalDidDismiss="closeMusicPropsModal" :initial-breakpoint="0.6" :breakpoints="[0, 0.6, 0.9]">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>Propriétés musicales</ion-title>
+            <ion-buttons slot="end">
+              <ion-button @click="closeMusicPropsModal">
+                <ion-icon :icon="closeOutline" />
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="ion-padding">
+          <div class="music-props-form">
+            <ion-item>
+              <ion-select
+                v-model="musicPropsForm.musicKey"
+                label="Tonalité"
+                label-placement="stacked"
+                interface="action-sheet"
+                placeholder="Sélectionner..."
+              >
+                <ion-select-option value="">Aucune</ion-select-option>
+                <ion-select-option v-for="option in musicKeys" :key="option.id" :value="option.id">
+                  {{ option.name }}
+                </ion-select-option>
+              </ion-select>
+            </ion-item>
+
+            <ion-item>
+              <ion-select
+                v-model="musicPropsForm.musicBeat"
+                label="Signature"
+                label-placement="stacked"
+                interface="action-sheet"
+                placeholder="Sélectionner..."
+              >
+                <ion-select-option value="">Aucune</ion-select-option>
+                <ion-select-option v-for="option in musicBeats" :key="option.id" :value="option.id">
+                  {{ option.name }}
+                </ion-select-option>
+              </ion-select>
+            </ion-item>
+
+            <ion-item>
+              <ion-select
+                v-model="musicPropsForm.musicTempo"
+                label="Tempo"
+                label-placement="stacked"
+                interface="action-sheet"
+                placeholder="Sélectionner..."
+              >
+                <ion-select-option value="">Aucun</ion-select-option>
+                <ion-select-option v-for="option in musicTempos" :key="option.id" :value="option.id">
+                  {{ option.name }} <span v-if="option.label">({{ option.label }})</span>
+                </ion-select-option>
+              </ion-select>
+            </ion-item>
+
+            <ion-item>
+              <ion-select
+                v-model="musicPropsForm.musicStyle"
+                label="Style"
+                label-placement="stacked"
+                interface="action-sheet"
+                placeholder="Sélectionner..."
+              >
+                <ion-select-option value="">Aucun</ion-select-option>
+                <ion-select-option v-for="option in musicStyles" :key="option.id" :value="option.id">
+                  {{ option.name }}
+                </ion-select-option>
+              </ion-select>
+            </ion-item>
+
+            <ion-button @click="saveMusicProps" expand="block" class="ion-margin-top">
+              Enregistrer
+            </ion-button>
+          </div>
+        </ion-content>
+      </ion-modal>
     </ion-content>
   </ion-page>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonBackButton,
-  IonButton, IonIcon, IonCard, IonCardContent, IonLoading, IonModal, IonSelect, IonSelectOption,
-  IonItem, IonLabel, IonInput, IonTextarea
+  IonButton, IonIcon, IonCard, IonCardContent, IonLoading, IonModal,
+  IonItem, IonLabel, IonInput, IonTextarea, IonSelect, IonSelectOption,
+  toastController, alertController
 } from '@ionic/vue';
 import {
-  calendarOutline, createOutline, listOutline, timeOutline, layersOutline,
-  personOutline, bookOutline, documentTextOutline, musicalNotesOutline,
+  calendarOutline, createOutline, listOutline, timeOutline,
+  personOutline, documentTextOutline, musicalNotesOutline,
   closeOutline, musicalNoteOutline, libraryOutline, micOutline,
   megaphoneOutline, giftOutline, handLeftOutline, personCircleOutline,
   checkmarkOutline, reorderThreeOutline, addOutline, trashOutline,
-  playCircleOutline, volumeHighOutline, documentOutline, linkOutline,
-  downloadOutline, chatboxEllipsesOutline, removeOutline
+  playCircleOutline, volumeHighOutline, documentOutline,
+  chatboxEllipsesOutline, chevronDownOutline, chevronForwardOutline,
+  arrowBackOutline, logoYoutube, playBackOutline, playForwardOutline,
+  removeOutline
 } from 'ionicons/icons';
 import ResourceSelector from '@/components/ResourceSelector.vue';
 import SendProgramSMSModal from '@/components/SendProgramSMSModal.vue';
@@ -963,70 +848,51 @@ import { timezoneUtils } from '@/utils/timezone';
 import { useUser } from '@/composables/useUser';
 import {
   getProgramByServiceId,
+  subscribeToProgramByServiceId,
   createProgram,
   updateProgram,
-  addSectionToProgram,
-  updateSectionInProgram,
-  deleteSectionFromProgram,
   addItemToProgram,
   updateItemInProgram,
   deleteItemFromProgram,
-  updateProgramOrder
+  addSubItemToItem,
+  updateSubItemInItem,
+  deleteSubItemFromItem
 } from '@/firebase/programs';
 import type { Service } from '@/types/service';
-import type { ServiceProgram, ProgramItem, ProgramSection, ProgramParticipant } from '@/types/program';
+import type { ServiceProgram, ProgramItem, ProgramParticipant, ProgramSubItem } from '@/types/program';
 import { ProgramItemType } from '@/types/program';
-import type { Resource } from '@/types/resource';
-import { getResourceById } from '@/firebase/resources';
+import type { Resource, ResourceOption } from '@/types/resource';
+import { getResourceById, getAllResourceOptions, updateResource, subscribeToResource } from '@/firebase/resources';
+import type { Unsubscribe } from 'firebase/firestore';
+import { isYouTubeUrl, getYouTubeEmbedUrl, getSpotifyEmbedUrl } from '@/utils/resource-utils';
 
 const route = useRoute();
-const router = useRouter();
 const { user, isAdmin } = useUser();
 
+// Reactive State
 const loading = ref(true);
 const service = ref<Service | null>(null);
 const program = ref<ServiceProgram | null>(null);
 const linkedResources = ref<Map<string, Resource>>(new Map());
-const showLyricsModal = ref(false);
-const selectedItem = ref<ProgramItem | null>(null);
-const showResourceModal = ref(false);
-const selectedResource = ref<Resource | null>(null);
-const showMediaModal = ref(false);
-const selectedMediaContent = ref<any>(null);
 const isEditMode = ref(false);
-const isDragging = ref(false);
-const draggedItemId = ref<string | null>(null);
-const insertionIndex = ref<number>(-1);
-const insertionSectionId = ref<string | null>(null);
-const showAddItemModalState = ref(false);
-const addItemPosition = ref<'start' | 'end' | 'section' | null>(null);
-const addItemSectionId = ref<string | null>(null);
-const showAddItemFormModal = ref(false);
-const addItemForm = ref({
-  type: '' as ProgramItemType,
-  title: '',
-  subtitle: '',
-  participantName: '',
-  duration: 5,
-  notes: '',
-  resourceId: null as string | null
-});
-const showAddSectionModalState = ref(false);
-const newSectionName = ref('');
-const insertAfterSectionId = ref<string | null>(null);
-const showEditSectionModalState = ref(false);
-const editSectionForm = ref({
-  id: '',
-  title: ''
-});
+
+// Music options
+const musicKeys = ref<ResourceOption[]>([]);
+const musicBeats = ref<ResourceOption[]>([]);
+const musicTempos = ref<ResourceOption[]>([]);
+const musicStyles = ref<ResourceOption[]>([]);
+
+// Edit Program Modal
 const showEditProgramModalState = ref(false);
 const editProgramForm = ref({
   conductorName: '',
   conductorRole: ''
 });
-const showEditItemFormModal = ref(false);
-const editItemForm = ref({
-  id: '',
+
+// Item Form Modal
+const showItemFormModal = ref(false);
+const editingItemId = ref<string | null>(null);
+const itemForm = ref({
   type: '' as ProgramItemType,
   title: '',
   subtitle: '',
@@ -1035,504 +901,418 @@ const editItemForm = ref({
   notes: '',
   resourceId: null as string | null
 });
-const showSectionViewModal = ref(false);
-const selectedSection = ref<ProgramSection | null>(null);
+
+// Sub-item state
+const showAddSubItemModalState = ref(false);
+const parentItemIdForSubItem = ref<string | null>(null);
+const addSubItemForm = ref({
+  title: '',
+  resourceId: null as string | null,
+  notes: ''
+});
+
+const showEditSubItemModalState = ref(false);
+const editSubItemForm = ref({
+  id: '',
+  parentItemId: '',
+  title: '',
+  resourceId: null as string | null,
+  notes: ''
+});
+
+const expandedItems = ref<Set<string>>(new Set());
+
+// Media Modal
+const showMediaModalState = ref(false);
+const selectedMediaContent = ref<any>(null);
+const selectedMediaTitle = ref('');
+
+// SMS Modal
 const showSMSModalState = ref(false);
 
+// Item Lyrics View Modal
+const showItemLyricsModalState = ref(false);
+const selectedItemForLyrics = ref<ProgramItem | null>(null);
+
+// YouTube Playlist Modal
+const showYouTubePlaylistModalState = ref(false);
+const youtubeVideos = ref<Array<{
+  title: string;
+  subtitle?: string;
+  embedUrl: string;
+  programItemNumber?: number;
+  programItemTitle?: string;
+}>>([]);
+const currentVideoIndex = ref(0);
+
+// Touch/Swipe handling
+const touchStartX = ref(0);
+const touchEndX = ref(0);
+const touchStartY = ref(0);
+const touchEndY = ref(0);
+
+// Play prompt for mobile
+const showPlayPrompt = ref(false);
+
+// Music Properties Edit Modal
+const showMusicPropsModalState = ref(false);
+const editingResourceId = ref<string | null>(null);
+const musicPropsForm = ref({
+  musicKey: '' as string,
+  musicBeat: '' as string,
+  musicTempo: '' as string,
+  musicStyle: '' as string
+});
+
+// Real-time subscriptions for resources
+const resourceSubscriptions = ref<Map<string, Unsubscribe>>(new Map());
+
+// Real-time subscription for program
+const programSubscription = ref<Unsubscribe | null>(null);
+
+// Computed Properties
 const serviceId = computed(() => route.params.id as string);
 
 const programItemTypes = computed(() => Object.values(ProgramItemType));
-
-const addItemModalTitle = computed(() => {
-  if (addItemPosition.value === 'section' && addItemSectionId.value) {
-    const section = program.value?.sections.find(s => s.id === addItemSectionId.value);
-    return section ? `Ajouter un élément à "${section.title}"` : 'Sélectionner un type d\'élément';
-  }
-  return 'Sélectionner un type d\'élément';
-});
-
-const formatDateTime = (dateStr: string | undefined, timeStr: string | undefined): string => {
-  if (!dateStr || !timeStr) return '';
-  return timezoneUtils.formatDateTimeForDisplay(dateStr, timeStr);
-};
-
-const formatDuration = (minutes: number): string => {
-  if (minutes < 60) {
-    return `${minutes}min`;
-  }
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-  if (remainingMinutes === 0) {
-    return `${hours}h`;
-  }
-  return `${hours}h${remainingMinutes}min`;
-};
-
-const getItemIcon = (type: ProgramItemType) => {
-  const iconMap: Record<ProgramItemType, string> = {
-    'Chant': musicalNoteOutline,
-    'Prière': handLeftOutline,
-    'Lecture biblique': libraryOutline,
-    'Prédication': micOutline,
-    'Titre': documentTextOutline,
-    'Section': removeOutline
-  };
-  return iconMap[type] || documentTextOutline;
-};
 
 const sortedItems = computed(() => {
   if (!program.value) return [];
   return [...program.value.items].sort((a, b) => a.order - b.order);
 });
 
-const sortedSections = computed(() => {
-  if (!program.value) return [];
-  return [...program.value.sections].sort((a, b) => a.order - b.order);
-});
-
-// Create a computed property that returns all items with their global order
-const allItemsWithGlobalOrder = computed(() => {
-  if (!program.value) return [];
-
-  const items: Array<any> = [];
-  let globalOrder = 1;
-
-  if (program.value.sections.length > 0) {
-    // If we have sections, iterate through them in order
-    sortedSections.value.forEach(section => {
-      const sectionItems = program.value!.items
-        .filter(item => item.sectionId === section.id)
-        .sort((a, b) => a.order - b.order);
-
-      sectionItems.forEach(item => {
-        items.push({ ...item, globalOrder: globalOrder++ });
-      });
-    });
-
-    // Add any items without sections at the end
-    const itemsWithoutSection = program.value.items
-      .filter(item => !item.sectionId)
-      .sort((a, b) => a.order - b.order);
-
-    itemsWithoutSection.forEach(item => {
-      items.push({ ...item, globalOrder: globalOrder++ });
-    });
-  } else {
-    // No sections, just number items sequentially
-    program.value.items
-      .sort((a, b) => a.order - b.order)
-      .forEach(item => {
-        items.push({ ...item, globalOrder: globalOrder++ });
-      });
-  }
-
-  return items;
-});
-
-const getSectionItems = (sectionId: string) => {
-  if (!program.value) return [];
-
-  // Return items with their global order
-  return allItemsWithGlobalOrder.value
-    .filter(item => item.sectionId === sectionId);
-};
-
-const getSectionItemsCount = (sectionId: string) => {
-  return getSectionItems(sectionId).length;
-};
-
-const getSectionDuration = (sectionId: string) => {
-  return getSectionItems(sectionId)
-    .reduce((total, item) => total + (item.duration || 0), 0);
-};
-
-const calculateTotalDuration = () => {
+const totalDuration = computed(() => {
   if (!program.value) return 0;
-  return program.value.items.reduce((total, item) => total + (item.duration || 0), 0);
-};
+  return program.value.items.reduce((sum, item) => sum + (item.duration || 0), 0);
+});
 
-const updateProgramDuration = async () => {
-  if (!program.value || !user.value?.uid) return;
-  
-  const newTotalDuration = calculateTotalDuration();
-  
-  // Only update if duration has changed
-  if (newTotalDuration !== program.value.totalDuration) {
-    try {
-      await updateProgram(program.value.id, { totalDuration: newTotalDuration }, user.value.uid);
-      program.value.totalDuration = newTotalDuration;
-      console.log('Program duration updated:', newTotalDuration);
-    } catch (error) {
-      console.error('Error updating program duration:', error);
+const hasYouTubeVideos = computed(() => {
+  if (!program.value) return false;
+
+  // Check all items and sub-items for YouTube videos
+  for (const item of program.value.items) {
+    // Check item resource
+    if (item.resourceId) {
+      const resource = getLinkedResource(item.resourceId);
+      if (resource?.contents?.some(c => (c.type === 'video' || c.type === 'youtube') && c.url && isYouTubeUrl(c.url))) {
+        return true;
+      }
+    }
+
+    // Check sub-items
+    if (item.subItems) {
+      for (const subItem of item.subItems) {
+        if (subItem.resourceId) {
+          const resource = getLinkedResource(subItem.resourceId);
+          if (resource?.contents?.some(c => (c.type === 'video' || c.type === 'youtube') && c.url && isYouTubeUrl(c.url))) {
+            return true;
+          }
+        }
+      }
     }
   }
+
+  return false;
+});
+
+// Helper Functions
+const formatDateTime = (dateStr: string | undefined, timeStr: string | undefined): string => {
+  if (!dateStr || !timeStr) return '';
+  return timezoneUtils.formatDateTimeForDisplay(dateStr, timeStr);
 };
 
-const showLyrics = (item: ProgramItem) => {
-  selectedItem.value = item;
-  showLyricsModal.value = true;
-};
-
-const getLinkedResource = (resourceId: string | undefined): Resource | null => {
-  if (!resourceId) return null;
-  return linkedResources.value.get(resourceId) || null;
-};
-
-const showResourceDetails = (item: ProgramItem) => {
-  if (!item.resourceId) return;
-  const resource = getLinkedResource(item.resourceId);
-  if (resource) {
-    selectedResource.value = resource;
-    showResourceModal.value = true;
-  }
-};
-
-const navigateToResource = (resourceId: string) => {
-  router.push(`/resources/${resourceId}`);
-};
-
-const showMediaContent = (content: any, resourceTitle?: string) => {
-  selectedMediaContent.value = {
-    ...content,
-    title: resourceTitle || content.title || 'Contenu média'
+const getItemIcon = (type: ProgramItemType) => {
+  const iconMap: Record<string, string> = {
+    'Chant': musicalNoteOutline,
+    'Prière': handLeftOutline,
+    'Lecture biblique': libraryOutline,
+    'Prédication': micOutline,
+    'Titre': documentTextOutline,
+    'Section': removeOutline,
+    'Annonce': megaphoneOutline,
+    'Offrande': giftOutline,
+    'Bénédiction': handLeftOutline,
+    'Mot de bienvenue': personCircleOutline,
+    'Salutations': personOutline,
+    'Numéro spécial': musicalNotesOutline,
+    'Collecte': giftOutline,
+    'Adoration': musicalNotesOutline,
+    'Louange': musicalNotesOutline,
+    'Chant final': musicalNoteOutline,
+    'Chant de clôture': musicalNoteOutline,
+    'Autre': documentTextOutline
   };
-  showMediaModal.value = true;
-};
-
-const closeMediaModal = () => {
-  showMediaModal.value = false;
-  selectedMediaContent.value = null;
-};
-
-const downloadFile = (url: string, filename: string) => {
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename || 'download';
-  link.target = '_blank';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-};
-
-const isYouTubeUrl = (url: string): boolean => {
-  if (!url) return false;
-  const patterns = [
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)/,
-    /^[a-zA-Z0-9_-]{11}$/ // Just a YouTube video ID
-  ];
-  return patterns.some(pattern => pattern.test(url));
-};
-
-const getYouTubeEmbedUrl = (url: string): string | null => {
-  if (!url) return null;
-
-  // Extract video ID from various YouTube URL formats
-  const patterns = [
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
-  ];
-
-  for (const pattern of patterns) {
-    const match = url.match(pattern);
-    if (match && match[1]) {
-      return `https://www.youtube.com/embed/${match[1]}`;
-    }
-  }
-
-  // Check if it's already just a video ID
-  if (/^[a-zA-Z0-9_-]{11}$/.test(url)) {
-    return `https://www.youtube.com/embed/${url}`;
-  }
-
-  return null;
+  return iconMap[type as string] || documentTextOutline;
 };
 
 const getMediaTypeIcon = (type: string) => {
-  switch(type) {
-    case 'lyrics': return musicalNotesOutline;
-    case 'video': return playCircleOutline;
-    case 'youtube': return playCircleOutline;
-    case 'audio': return volumeHighOutline;
-    case 'music_sheet': return musicalNoteOutline;
-    default: return documentOutline;
+  const iconMap: Record<string, string> = {
+    'video': playCircleOutline,
+    'audio': volumeHighOutline,
+    'lyrics': documentTextOutline,
+    'music_sheet': documentOutline,
+    'spotify': musicalNoteOutline
+  };
+  return iconMap[type] || documentOutline;
+};
+
+const formatMediaType = (type: string): string => {
+  const typeMap: Record<string, string> = {
+    'lyrics': 'Paroles',
+    'video': 'Vidéo',
+    'audio': 'Audio',
+    'music_sheet': 'Partition',
+    'spotify': 'Spotify'
+  };
+  return typeMap[type] || type;
+};
+
+const getLinkedResource = (resourceId: string): Resource | undefined => {
+  return linkedResources.value.get(resourceId);
+};
+
+const hasSubItems = (item: ProgramItem): boolean => {
+  return !!(item.subItems && item.subItems.length > 0);
+};
+
+const isSectionItem = (item: ProgramItem): boolean => {
+  return item.type === ProgramItemType.SECTION;
+};
+
+const isItemExpanded = (itemId: string): boolean => {
+  return expandedItems.value.has(itemId);
+};
+
+const toggleItemExpansion = (itemId: string) => {
+  if (expandedItems.value.has(itemId)) {
+    expandedItems.value.delete(itemId);
+  } else {
+    expandedItems.value.add(itemId);
   }
 };
 
-const closeLyricsModal = () => {
-  showLyricsModal.value = false;
-  selectedItem.value = null;
+const getSortedSubItems = (item: ProgramItem): ProgramSubItem[] => {
+  if (!item.subItems) return [];
+  return [...item.subItems].sort((a, b) => a.order - b.order);
 };
 
-const closeResourceModal = () => {
-  showResourceModal.value = false;
-  selectedResource.value = null;
+// Check if item has lyrics in any sub-items
+const hasLyricsInSubItems = (item: ProgramItem): boolean => {
+  if (!item.subItems || item.subItems.length === 0) return false;
+
+  return item.subItems.some(subItem => {
+    if (subItem.resourceId) {
+      const resource = getLinkedResource(subItem.resourceId);
+      return resource?.contents?.some(c => c.type === 'lyrics' && c.content);
+    }
+    return false;
+  });
 };
 
-const showLyricsContent = (lyricsContent: string) => {
-  // Create a temporary item to show lyrics in the existing lyrics modal
-  selectedItem.value = {
-    id: 'temp',
-    title: 'Paroles',
-    lyrics: lyricsContent,
-    order: 0,
-    type: ProgramItemType.SONG
-  } as ProgramItem;
-  closeResourceModal();
-  showLyricsModal.value = true;
+// Get lyrics from a sub-item
+const getSubItemLyrics = (subItem: ProgramSubItem): string | null => {
+  if (subItem.resourceId) {
+    const resource = getLinkedResource(subItem.resourceId);
+    const lyricsContent = resource?.contents?.find(c => c.type === 'lyrics');
+    return lyricsContent?.content || null;
+  }
+  return null;
 };
 
-const showEditModal = () => {
+// Show item lyrics view
+const showItemLyricsView = (item: ProgramItem) => {
+  selectedItemForLyrics.value = item;
+  showItemLyricsModalState.value = true;
+};
+
+// Close item lyrics view
+const closeItemLyricsView = () => {
+  showItemLyricsModalState.value = false;
+  selectedItemForLyrics.value = null;
+};
+
+// Toast Helper
+const showToast = async (message: string, color: 'success' | 'danger' | 'warning' = 'success') => {
+  const toast = await toastController.create({
+    message,
+    duration: 3000,
+    color,
+    position: 'bottom'
+  });
+  await toast.present();
+};
+
+// Confirm Helper
+const confirmAction = async (message: string): Promise<boolean> => {
+  const alert = await alertController.create({
+    header: 'Confirmation',
+    message,
+    buttons: [
+      {
+        text: 'Annuler',
+        role: 'cancel',
+        handler: () => {
+          alert.dismiss(false);
+        }
+      },
+      {
+        text: 'Confirmer',
+        handler: () => {
+          alert.dismiss(true);
+        }
+      }
+    ]
+  });
+  await alert.present();
+  const { data } = await alert.onDidDismiss();
+  return data === true;
+};
+
+// Load Data
+const loadService = async () => {
+  try {
+    service.value = await serviceService.getServiceById(serviceId.value);
+  } catch (error) {
+    console.error('Error loading service:', error);
+    await showToast('Erreur lors du chargement du service', 'danger');
+  }
+};
+
+const subscribeToResourcesInProgram = (programData: ServiceProgram) => {
+  // Subscribe to linked resources for real-time updates
+  const resourceIds = new Set<string>();
+  programData.items.forEach(item => {
+    if (item.resourceId) resourceIds.add(item.resourceId);
+    item.subItems?.forEach(subItem => {
+      if (subItem.resourceId) resourceIds.add(subItem.resourceId);
+    });
+  });
+
+  for (const resourceId of resourceIds) {
+    // Subscribe to real-time updates for each resource
+    subscribeToLinkedResource(resourceId);
+  }
+};
+
+const setupProgramSubscription = () => {
+  // Unsubscribe from previous subscription if exists
+  if (programSubscription.value) {
+    programSubscription.value();
+    programSubscription.value = null;
+  }
+
+  // Subscribe to program for real-time updates
+  programSubscription.value = subscribeToProgramByServiceId(
+    serviceId.value,
+    (programData) => {
+      program.value = programData;
+      if (programData) {
+        subscribeToResourcesInProgram(programData);
+      }
+      loading.value = false;
+    },
+    (error) => {
+      console.error('Error in program subscription:', error);
+      loading.value = false;
+    }
+  );
+};
+
+const loadProgram = async () => {
+  try {
+    setupProgramSubscription();
+  } catch (error) {
+    console.error('Error loading program:', error);
+  }
+};
+
+// Create Initial Program
+const createInitialProgram = async () => {
+  if (!user.value) return;
+
+  try {
+    loading.value = true;
+
+    await createProgram(
+      {
+        serviceId: serviceId.value,
+        items: [],
+        sections: [], // Empty for flat structure
+        totalDuration: 0
+      },
+      user.value.uid
+    );
+
+    await loadProgram();
+    await showToast('Programme créé avec succès', 'success');
+  } catch (error) {
+    console.error('Error creating program:', error);
+    await showToast('Erreur lors de la création du programme', 'danger');
+  } finally {
+    loading.value = false;
+  }
+};
+
+// Edit Mode
+const toggleEditMode = () => {
+  isEditMode.value = !isEditMode.value;
+};
+
+// Edit Program Modal
+const showEditProgramModal = () => {
   if (program.value) {
-    // Pre-populate form with current program data
-    editProgramForm.value.conductorName = program.value.conductor?.name || '';
-    editProgramForm.value.conductorRole = program.value.conductor?.role || '';
-    
-    showEditProgramModalState.value = true;
+    editProgramForm.value = {
+      conductorName: program.value.conductor?.name || '',
+      conductorRole: program.value.conductor?.role || ''
+    };
   }
+  showEditProgramModalState.value = true;
 };
 
 const closeEditProgramModal = () => {
   showEditProgramModalState.value = false;
-  editProgramForm.value = {
-    conductorName: '',
-    conductorRole: ''
-  };
 };
 
-const saveEditProgram = async () => {
-  if (!program.value || !user.value?.uid) return;
-  
+const updateProgramInfo = async () => {
+  if (!program.value || !user.value) return;
+
   try {
-    // Create or update conductor
-    const conductor: ProgramParticipant | undefined = editProgramForm.value.conductorName.trim() ? {
-      id: `conductor_${Date.now()}`,
-      name: editProgramForm.value.conductorName.trim(),
-      role: editProgramForm.value.conductorRole.trim() || 'Dirigeant',
-      isCustom: true
-    } : undefined;
-    
-    // Update program with new metadata
-    const updates: any = {};
-    
-    // Only add conductor if it has changed
-    if (conductor) {
-      updates.conductor = conductor;
-    } else if (!editProgramForm.value.conductorName && program.value.conductor) {
-      updates.conductor = null;
+    loading.value = true;
+
+    // Build conductor object, excluding undefined values
+    let conductor: ProgramParticipant | undefined = undefined;
+    if (editProgramForm.value.conductorName) {
+      conductor = {
+        id: `custom_${Date.now()}`,
+        name: editProgramForm.value.conductorName,
+        isCustom: true
+      } as ProgramParticipant;
+
+      // Only add role if it has a value
+      if (editProgramForm.value.conductorRole) {
+        conductor.role = editProgramForm.value.conductorRole;
+      }
     }
-    
-    await updateProgram(program.value.id, updates, user.value.uid);
-    
-    // Update local state
-    if (conductor) {
-      program.value.conductor = conductor;
-    } else if (!editProgramForm.value.conductorName) {
-      program.value.conductor = undefined;
-    }
-    
-    // Recalculate total duration after saving program summary
-    await updateProgramDuration();
-    
+
+    await updateProgram(
+      program.value.id,
+      { conductor },
+      user.value.uid
+    );
+
     closeEditProgramModal();
-    console.log('Program updated successfully');
+    await showToast('Programme mis à jour', 'success');
   } catch (error) {
     console.error('Error updating program:', error);
-    // TODO: Show error message to user
+    await showToast('Erreur lors de la mise à jour', 'danger');
+  } finally {
+    loading.value = false;
   }
 };
 
-const toggleEditMode = () => {
-  if (!isAdmin.value) {
-    console.warn('Only admins can edit programs');
-    return;
-  }
-  isEditMode.value = !isEditMode.value;
-};
-
-const showAddItemModal = (position: 'start' | 'end' | 'section', sectionId?: string) => {
-  addItemPosition.value = position;
-  addItemSectionId.value = sectionId || null;
-  showAddItemModalState.value = true;
-};
-
-const closeAddItemModal = () => {
-  showAddItemModalState.value = false;
-  addItemPosition.value = null;
-  addItemSectionId.value = null;
-};
-
-const showAddSectionModal = () => {
-  showAddSectionModalState.value = true;
-  newSectionName.value = '';
-  insertAfterSectionId.value = null;
-};
-
-const closeAddSectionModal = () => {
-  showAddSectionModalState.value = false;
-  newSectionName.value = '';
-  insertAfterSectionId.value = null;
-};
-
-const createSection = async () => {
-  if (!newSectionName.value.trim() || !program.value || !user.value?.uid) return;
-  
-  // Find insert position
-  let insertOrder = program.value.sections.length + 1;
-  if (insertAfterSectionId.value) {
-    const afterSection = program.value.sections.find(s => s.id === insertAfterSectionId.value);
-    if (afterSection) {
-      insertOrder = afterSection.order + 1;
-      // Update order of sections that come after
-      program.value.sections.forEach(section => {
-        if (section.order >= insertOrder) {
-          section.order += 1;
-        }
-      });
-    }
-  }
-  
-  try {
-    const newSection = await addSectionToProgram(
-      program.value.id,
-      {
-        title: newSectionName.value.trim(),
-        order: insertOrder
-      },
-      user.value.uid
-    );
-    
-    // Update local state
-    program.value.sections.push(newSection);
-    closeAddSectionModal();
-  } catch (error) {
-    console.error('Error creating section:', error);
-    // TODO: Show error message to user
-  }
-};
-
-// Edit Section functionality
-const showEditSectionModal = (section: ProgramSection) => {
-  editSectionForm.value = {
-    id: section.id,
-    title: section.title
-  };
-  
-  showEditSectionModalState.value = true;
-};
-
-const closeEditSectionModal = () => {
-  showEditSectionModalState.value = false;
-  editSectionForm.value = {
-    id: '',
-    title: ''
-  };
-};
-
-const showSectionView = (section: ProgramSection) => {
-  selectedSection.value = section;
-  showSectionViewModal.value = true;
-};
-
-const closeSectionView = () => {
-  showSectionViewModal.value = false;
-  selectedSection.value = null;
-};
-
-const showSMSModal = () => {
-  showSMSModalState.value = true;
-};
-
-const closeSMSModal = () => {
-  showSMSModalState.value = false;
-};
-
-const onSMSSent = (data: any) => {
-  console.log('SMS sent successfully:', data);
-  // You can add a toast notification here if desired
-};
-
-const saveEditSection = async () => {
-  if (!program.value || !user.value?.uid || !editSectionForm.value.title.trim() || !editSectionForm.value.id) return;
-  
-  try {
-    await updateSectionInProgram(
-      program.value.id,
-      editSectionForm.value.id,
-      {
-        title: editSectionForm.value.title.trim()
-      },
-      user.value.uid
-    );
-    
-    // Update local state
-    const sectionIndex = program.value.sections.findIndex(section => section.id === editSectionForm.value.id);
-    if (sectionIndex !== -1) {
-      program.value.sections[sectionIndex].title = editSectionForm.value.title.trim();
-    }
-    
-    console.log('Section updated:', editSectionForm.value.id);
-    closeEditSectionModal();
-  } catch (error) {
-    console.error('Error updating section:', error);
-    // TODO: Show error message to user
-  }
-};
-
-// Delete Section functionality (only when empty)
-const canDeleteSection = (sectionId: string) => {
-  if (!program.value) return false;
-  const sectionItems = program.value.items.filter(item => item.sectionId === sectionId);
-  return sectionItems.length === 0;
-};
-
-const deleteSection = async (sectionId: string) => {
-  if (!program.value || !user.value?.uid || !canDeleteSection(sectionId)) return;
-  
-  try {
-    await deleteSectionFromProgram(program.value.id, sectionId, user.value.uid);
-    
-    // Update local state
-    const sectionIndex = program.value.sections.findIndex(section => section.id === sectionId);
-    if (sectionIndex !== -1) {
-      program.value.sections.splice(sectionIndex, 1);
-    }
-    
-    console.log('Section deleted:', sectionId);
-  } catch (error) {
-    console.error('Error deleting section:', error);
-    // TODO: Show error message to user
-  }
-};
-
-const selectItemType = (itemType: ProgramItemType) => {
-  // Store the position and sectionId before closing the modal
-  const position = addItemPosition.value;
-  const sectionId = addItemSectionId.value;
-  
-  closeAddItemModal();
-  
-  // Restore the position and sectionId after closing
-  addItemPosition.value = position;
-  addItemSectionId.value = sectionId;
-  
-  // Reset form
-  addItemForm.value = {
-    type: itemType,
-    title: '',
-    subtitle: '',
-    participantName: '',
-    duration: 5,
-    notes: '',
-    resourceId: null
-  };
-  
-  // Show the form modal
-  showAddItemFormModal.value = true;
-};
-
-const closeAddItemForm = () => {
-  showAddItemFormModal.value = false;
-  // Reset form
-  addItemForm.value = {
+// Item Management
+const showAddItemModal = () => {
+  editingItemId.value = null;
+  itemForm.value = {
     type: '' as ProgramItemType,
     title: '',
     subtitle: '',
@@ -1541,84 +1321,12 @@ const closeAddItemForm = () => {
     notes: '',
     resourceId: null
   };
-  // Reset position values
-  addItemPosition.value = null;
-  addItemSectionId.value = null;
+  showItemFormModal.value = true;
 };
 
-const saveNewItem = async () => {
-  if (!program.value || !user.value?.uid || !addItemForm.value.title || !Number(addItemForm.value.duration)) return;
-  
-  const position = addItemPosition.value;
-  const sectionId = addItemSectionId.value;
-  
-  // Calculate order based on position (global numbering)
-  let order = 1;
-  if (position === 'end') {
-    order = program.value.items.length + 1;
-  } else if (position === 'section' && sectionId) {
-    // For global numbering, always use the total count of items + 1
-    order = program.value.items.length + 1;
-  }
-  
-  try {
-    // Create the item with form data
-    const itemData: any = {
-      order,
-      type: addItemForm.value.type,
-      title: addItemForm.value.title,
-      duration: Number(addItemForm.value.duration) || 0
-    };
-    
-    // Add sectionId only if it exists
-    if (sectionId) {
-      itemData.sectionId = sectionId;
-    }
-    
-    // Add optional fields if provided
-    if (addItemForm.value.subtitle) itemData.subtitle = addItemForm.value.subtitle;
-    if (addItemForm.value.notes) itemData.notes = addItemForm.value.notes;
-    
-    // Add participant if provided
-    if (addItemForm.value.participantName) {
-      itemData.participant = {
-        name: addItemForm.value.participantName,
-        role: ''
-      };
-    }
-    
-    // Add resource link if provided
-    if (addItemForm.value.resourceId) {
-      itemData.resourceId = addItemForm.value.resourceId;
-    }
-    
-    const newItem = await addItemToProgram(
-      program.value.id,
-      itemData,
-      user.value.uid
-    );
-    
-    // Update local state
-    program.value.items.push(newItem);
-    
-    console.log('New item created:', newItem);
-    
-    // Update total duration in Firestore
-    await updateProgramDuration();
-    
-    // Close the form
-    closeAddItemForm();
-  } catch (error) {
-    console.error('Error creating item:', error);
-    // TODO: Show error message to user
-  }
-};
-
-// Edit Item functionality
-const showEditItemModal = (item: ProgramItem) => {
-  // Pre-populate form with current item data
-  editItemForm.value = {
-    id: item.id,
+const showEditItemModalForItem = (item: ProgramItem) => {
+  editingItemId.value = item.id;
+  itemForm.value = {
     type: item.type,
     title: item.title,
     subtitle: item.subtitle || '',
@@ -1627,666 +1335,659 @@ const showEditItemModal = (item: ProgramItem) => {
     notes: item.notes || '',
     resourceId: item.resourceId || null
   };
-  
-  showEditItemFormModal.value = true;
+  showItemFormModal.value = true;
 };
 
-const closeEditItemForm = () => {
-  showEditItemFormModal.value = false;
-  editItemForm.value = {
-    id: '',
-    type: '' as ProgramItemType,
-    title: '',
-    subtitle: '',
-    participantName: '',
-    duration: 5,
-    notes: '',
-    resourceId: null
-  };
+const closeItemFormModal = () => {
+  showItemFormModal.value = false;
+  editingItemId.value = null;
 };
 
-const saveEditItem = async () => {
-  if (!program.value || !user.value?.uid || !editItemForm.value.title || !Number(editItemForm.value.duration) || !editItemForm.value.id) return;
-  
+const addItem = async () => {
+  if (!program.value || !user.value) return;
+
   try {
-    // Create the updated item data
-    const itemData: any = {
-      type: editItemForm.value.type,
-      title: editItemForm.value.title,
-      duration: Number(editItemForm.value.duration) || 0
+    loading.value = true;
+
+    const participant: ProgramParticipant | undefined = itemForm.value.participantName
+      ? {
+          id: `custom_${Date.now()}`,
+          name: itemForm.value.participantName,
+          isCustom: true
+        }
+      : undefined;
+
+    // Build item object, excluding undefined values
+    const newItem: any = {
+      order: program.value.items.length,
+      type: itemForm.value.type,
+      title: itemForm.value.title
     };
-    
-    // Add optional fields if provided
-    if (editItemForm.value.subtitle) itemData.subtitle = editItemForm.value.subtitle;
-    if (editItemForm.value.notes) itemData.notes = editItemForm.value.notes;
-    
-    // Add participant if provided
-    if (editItemForm.value.participantName) {
-      itemData.participant = {
-        name: editItemForm.value.participantName,
-        role: ''
-      };
-    }
-    
-    // Add resource link if provided
-    if (editItemForm.value.resourceId) {
-      itemData.resourceId = editItemForm.value.resourceId;
-    }
-    
-    await updateItemInProgram(
+
+    // Only add optional fields if they have values
+    if (itemForm.value.subtitle) newItem.subtitle = itemForm.value.subtitle;
+    if (participant) newItem.participant = participant;
+    if (itemForm.value.duration) newItem.duration = itemForm.value.duration;
+    if (itemForm.value.notes) newItem.notes = itemForm.value.notes;
+    if (itemForm.value.resourceId) newItem.resourceId = itemForm.value.resourceId;
+
+    await addItemToProgram(
       program.value.id,
-      editItemForm.value.id,
-      itemData,
+      newItem,
       user.value.uid
     );
-    
-    // Update local state
-    const itemIndex = program.value.items.findIndex(item => item.id === editItemForm.value.id);
-    if (itemIndex !== -1) {
-      program.value.items[itemIndex] = { ...program.value.items[itemIndex], ...itemData };
-    }
-    
-    console.log('Item updated:', editItemForm.value.id);
-    
-    // Update total duration in Firestore
-    await updateProgramDuration();
-    
-    // Close the form
-    closeEditItemForm();
+
+    closeItemFormModal();
+    await showToast('Élément ajouté avec succès', 'success');
   } catch (error) {
-    console.error('Error updating item:', error);
-    // TODO: Show error message to user
-  }
-};
-
-// Delete Item functionality
-const deleteItem = async (itemId: string) => {
-  if (!program.value || !user.value?.uid) return;
-  
-  try {
-    await deleteItemFromProgram(program.value.id, itemId, user.value.uid);
-    
-    // Update local state
-    const itemIndex = program.value.items.findIndex(item => item.id === itemId);
-    if (itemIndex !== -1) {
-      program.value.items.splice(itemIndex, 1);
-    }
-    
-    console.log('Item deleted:', itemId);
-    
-    // Update total duration in Firestore
-    await updateProgramDuration();
-  } catch (error) {
-    console.error('Error deleting item:', error);
-    // TODO: Show error message to user
-  }
-};
-
-// Drag and Drop functionality
-let draggedItem: ProgramItem | null = null;
-let draggedSection: ProgramSection | null = null;
-
-const startDrag = (event: MouseEvent | TouchEvent, item: ProgramItem) => {
-  if (!isEditMode.value) return;
-  draggedItem = item;
-  isDragging.value = true;
-  draggedItemId.value = item.id;
-  event.preventDefault();
-  
-  // Add global events for both mouse and touch
-  document.addEventListener('mousemove', handleMouseMove);
-  document.addEventListener('mouseup', handleMouseUp);
-  document.addEventListener('touchmove', handleTouchMove, { passive: false });
-  document.addEventListener('touchend', handleTouchEnd);
-};
-
-const startSectionDrag = (event: MouseEvent | TouchEvent, section: ProgramSection) => {
-  if (!isEditMode.value) return;
-  draggedSection = section;
-  event.preventDefault();
-  
-  // Add global events for both mouse and touch
-  document.addEventListener('mousemove', handleMouseMove);
-  document.addEventListener('mouseup', handleMouseUp);
-  document.addEventListener('touchmove', handleTouchMove, { passive: false });
-  document.addEventListener('touchend', handleTouchEnd);
-};
-
-const getEventCoordinates = (event: MouseEvent | TouchEvent) => {
-  if ('touches' in event && event.touches.length > 0) {
-    return { clientX: event.touches[0].clientX, clientY: event.touches[0].clientY };
-  } else if ('clientX' in event) {
-    return { clientX: event.clientX, clientY: event.clientY };
-  }
-  return { clientX: 0, clientY: 0 };
-};
-
-const handleMouseMove = (event: MouseEvent) => {
-  handleDragMove(event);
-};
-
-const handleTouchMove = (event: TouchEvent) => {
-  event.preventDefault(); // Prevent scrolling
-  handleDragMove(event);
-};
-
-const handleDragMove = (event: MouseEvent | TouchEvent) => {
-  if (!isDragging.value || !draggedItem) return;
-  
-  const { clientX, clientY } = getEventCoordinates(event);
-  
-  // Find the element under the pointer
-  const elementUnderPointer = document.elementFromPoint(clientX, clientY);
-  
-  // Find the closest program item or section
-  const closestItem = elementUnderPointer?.closest('.program-item');
-  const closestSection = elementUnderPointer?.closest('.program-section');
-  
-  if (closestItem) {
-    const itemId = closestItem.getAttribute('data-item-id');
-    if (itemId && itemId !== draggedItem.id) {
-      calculateInsertionPosition({ clientX, clientY }, closestItem, itemId);
-    }
-  } else if (closestSection) {
-    const sectionId = closestSection.getAttribute('data-section-id');
-    if (sectionId) {
-      calculateInsertionInSection({ clientX, clientY }, closestSection, sectionId);
-    }
-  } else {
-    // Clear insertion indicators
-    insertionIndex.value = -1;
-    insertionSectionId.value = null;
-  }
-};
-
-const calculateInsertionPosition = (coordinates: { clientX: number; clientY: number }, itemElement: Element, targetItemId: string) => {
-  if (!program.value || !draggedItem) return;
-  
-  const rect = itemElement.getBoundingClientRect();
-  const pointerY = coordinates.clientY;
-  const itemCenterY = rect.top + rect.height / 2;
-  
-  // Find the target item in the program
-  const targetItem = program.value.items.find(item => item.id === targetItemId);
-  if (!targetItem) return;
-  
-  // Determine if we should insert before or after
-  const insertBefore = pointerY < itemCenterY;
-  const targetIndex = program.value.items.findIndex(item => item.id === targetItemId);
-  
-  insertionIndex.value = insertBefore ? targetIndex : targetIndex + 1;
-  insertionSectionId.value = targetItem.sectionId || null;
-};
-
-const calculateInsertionInSection = (coordinates: { clientX: number; clientY: number }, sectionElement: Element, sectionId: string) => {
-  if (!program.value) return;
-  
-  // Find items in this section
-  const sectionItems = program.value.items.filter(item => item.sectionId === sectionId);
-  
-  if (sectionItems.length === 0) {
-    // Empty section - insert at beginning
-    insertionIndex.value = 0;
-    insertionSectionId.value = sectionId;
-    return;
-  }
-  
-  // Find the last item in this section to insert after
-  const lastItem = sectionItems[sectionItems.length - 1];
-  const lastItemIndex = program.value.items.findIndex(item => item.id === lastItem.id);
-  
-  insertionIndex.value = lastItemIndex + 1;
-  insertionSectionId.value = sectionId;
-};
-
-const handleMouseUp = (event: MouseEvent) => {
-  handleDragEnd(event);
-};
-
-const handleTouchEnd = (event: TouchEvent) => {
-  handleDragEnd(event);
-};
-
-const handleDragEnd = (event: MouseEvent | TouchEvent) => {
-  // Clean up event listeners for both mouse and touch
-  document.removeEventListener('mousemove', handleMouseMove);
-  document.removeEventListener('mouseup', handleMouseUp);
-  document.removeEventListener('touchmove', handleTouchMove);
-  document.removeEventListener('touchend', handleTouchEnd);
-  
-  if (draggedItem && insertionIndex.value >= 0) {
-    // Handle item drop at insertion point
-    performItemInsertion(draggedItem, insertionIndex.value, insertionSectionId.value);
-  }
-  
-  if (draggedSection) {
-    // Handle section drop
-    const { clientX, clientY } = getEventCoordinates(event);
-    handleSectionDrop({ clientX, clientY });
-    draggedSection = null;
-  }
-  
-  // Clean up drag state
-  isDragging.value = false;
-  draggedItemId.value = null;
-  draggedItem = null;
-  insertionIndex.value = -1;
-  insertionSectionId.value = null;
-};
-
-
-const handleSectionDrop = (coordinates: { clientX: number; clientY: number }) => {
-  if (!draggedSection || !program.value) return;
-  
-  const target = document.elementFromPoint(coordinates.clientX, coordinates.clientY);
-  const targetSection = target?.closest('.program-section');
-  
-  if (targetSection) {
-    const targetId = targetSection.getAttribute('data-section-id');
-    const targetProgramSection = program.value.sections.find(section => section.id === targetId);
-    
-    if (targetProgramSection && targetProgramSection.id !== draggedSection.id) {
-      reorderSections(draggedSection, targetProgramSection);
-    }
-  }
-};
-
-const performItemInsertion = (draggedItem: ProgramItem, insertIndex: number, targetSectionId: string | null) => {
-  if (!program.value) return;
-  
-  const items = [...program.value.items];
-  const draggedIndex = items.findIndex(item => item.id === draggedItem.id);
-  
-  // Remove the dragged item from its current position
-  const [movedItem] = items.splice(draggedIndex, 1);
-  
-  // Update the section if moving to a different section
-  if (targetSectionId !== null) {
-    movedItem.sectionId = targetSectionId;
-  }
-  
-  // Adjust insertion index if we removed an item before the insertion point
-  const adjustedInsertIndex = draggedIndex < insertIndex ? insertIndex - 1 : insertIndex;
-  
-  // Insert the item at the new position
-  items.splice(adjustedInsertIndex, 0, movedItem);
-  
-  // Renumber all items sequentially
-  items.forEach((item, index) => {
-    item.order = index + 1;
-  });
-  
-  program.value.items = items;
-  
-  // Save to Firestore
-  saveProgramOrder();
-};
-
-const reorderSections = (draggedSection: ProgramSection, targetSection: ProgramSection) => {
-  if (!program.value) return;
-  
-  const sections = [...program.value.sections];
-  const draggedIndex = sections.findIndex(section => section.id === draggedSection.id);
-  const targetIndex = sections.findIndex(section => section.id === targetSection.id);
-  
-  // Remove dragged section and insert at target position
-  sections.splice(draggedIndex, 1);
-  sections.splice(targetIndex, 0, draggedSection);
-  
-  // Update order numbers
-  sections.forEach((section, index) => {
-    section.order = index + 1;
-  });
-  
-  program.value.sections = sections;
-  
-  // Save to Firestore
-  saveProgramOrder();
-};
-
-const saveProgramOrder = async () => {
-  if (!program.value || !user.value?.uid) return;
-  
-  try {
-    await updateProgramOrder(
-      program.value.id,
-      program.value.sections,
-      program.value.items,
-      user.value.uid
-    );
-    
-    // Update total duration after reordering
-    await updateProgramDuration();
-  } catch (error) {
-    console.error('Error saving program order:', error);
-    // TODO: Show error message to user
-  }
-};
-
-// Insertion line display logic
-const shouldShowInsertionLine = (item: ProgramItem, index: number, sectionId?: string) => {
-  if (!program.value) return false;
-  
-  const allItems = sectionId 
-    ? program.value.items.filter(i => i.sectionId === sectionId)
-    : program.value.items;
-  
-  const itemGlobalIndex = program.value.items.findIndex(i => i.id === item.id);
-  
-  // Show insertion line before this item if the insertion index matches
-  return insertionIndex.value === itemGlobalIndex && 
-         (sectionId === undefined || insertionSectionId.value === sectionId);
-};
-
-const shouldShowInsertionLineAfter = (item: ProgramItem, index: number, sectionId?: string) => {
-  if (!program.value) return false;
-  
-  const allItems = sectionId 
-    ? program.value.items.filter(i => i.sectionId === sectionId)
-    : program.value.items;
-  
-  const itemGlobalIndex = program.value.items.findIndex(i => i.id === item.id);
-  const isLastInSection = index === allItems.length - 1;
-  
-  // Show insertion line after this item if:
-  // 1. The insertion index is right after this item, or
-  // 2. This is the last item in the section and we're inserting at the end
-  return (insertionIndex.value === itemGlobalIndex + 1 && 
-          (sectionId === undefined || insertionSectionId.value === sectionId)) ||
-         (isLastInSection && insertionSectionId.value === sectionId && 
-          insertionIndex.value > itemGlobalIndex);
-};
-
-const loadService = async () => {
-  try {
-    service.value = await serviceService.getServiceById(serviceId.value);
-  } catch (error) {
-    console.error('Error loading service:', error);
-  }
-};
-
-const loadLinkedResources = async () => {
-  if (!program.value) return;
-  
-  const newResourcesMap = new Map<string, Resource>();
-  
-  // Get all unique resource IDs from program items
-  const resourceIds = new Set<string>();
-  for (const item of program.value.items) {
-    if (item.resourceId) {
-      resourceIds.add(item.resourceId);
-    }
-  }
-  
-  // Fetch all resources in parallel
-  const promises = Array.from(resourceIds).map(async (resourceId) => {
-    try {
-      const resource = await getResourceById(resourceId);
-      if (resource) {
-        newResourcesMap.set(resourceId, resource);
-      }
-    } catch (error) {
-      console.error(`Error fetching resource ${resourceId}:`, error);
-    }
-  });
-  
-  await Promise.all(promises);
-  linkedResources.value = newResourcesMap;
-};
-
-const loadProgram = async () => {
-  console.log('loadProgram called');
-  
-  // Wait for user to be loaded if not available yet
-  let attempts = 0;
-  while (!user.value && attempts < 10) {
-    console.log('Waiting for user to load...', attempts);
-    await new Promise(resolve => setTimeout(resolve, 100));
-    attempts++;
-  }
-  
-  if (!user.value) {
-    console.error('User not loaded after waiting');
-    return;
-  }
-  
-  try {
-    console.log('Trying to load existing program for service:', serviceId.value);
-    // Try to load existing program from Firestore
-    const existingProgram = await getProgramByServiceId(serviceId.value);
-    
-    if (existingProgram) {
-      console.log('Existing program found:', existingProgram);
-      program.value = existingProgram;
-      
-      // Load linked resources
-      await loadLinkedResources();
-      
-      // Recalculate and update duration if needed
-      await updateProgramDuration();
-    } else {
-      console.log('No existing program found, creating default');
-      // Create default program if none exists
-      await createDefaultProgram();
-    }
-  } catch (error) {
-    console.error('Error loading program:', error);
-    // Fallback to creating default program
-    await createDefaultProgram();
-  }
-};
-
-const createDefaultProgram = async () => {
-  console.log('createDefaultProgram called');
-  console.log('User:', user.value);
-  console.log('Service ID:', serviceId.value);
-  
-  if (!user.value?.uid) {
-    console.error('No authenticated user');
-    return;
-  }
-
-  const defaultSections: ProgramSection[] = [
-    { id: `section_${Date.now()}_1`, title: 'Ouverture', order: 1, color: '#4CAF50' },
-    { id: `section_${Date.now()}_2`, title: 'Louange et Adoration', order: 2, color: '#2196F3' },
-    { id: `section_${Date.now()}_3`, title: 'Parole de Dieu', order: 3, color: '#FF9800' },
-    { id: `section_${Date.now()}_4`, title: 'Clôture', order: 4, color: '#9C27B0' }
-  ];
-
-  console.log('Default sections:', defaultSections);
-
-  try {
-    console.log('Calling createProgram with:', {
-      serviceId: serviceId.value,
-      items: [],
-      sections: defaultSections,
-      totalDuration: 0
-    });
-    
-    const newProgram = await createProgram({
-      serviceId: serviceId.value,
-      items: [],
-      sections: defaultSections,
-      totalDuration: 0
-    }, user.value.uid);
-    
-    console.log('Program created successfully:', newProgram);
-    program.value = newProgram;
-    
-    // Load linked resources
-    await loadLinkedResources();
-  } catch (error) {
-    console.error('Error creating default program:', error);
-    console.error('Error details:', error);
-  }
-};
-
-const loadMockProgram = async () => {
-  // Mock program data for now
-  const mockParticipants: ProgramParticipant[] = [
-    { id: '1', name: 'Jean Dupont', role: 'Pasteur', isCustom: false },
-    { id: '2', name: 'Marie Martin', role: 'Responsable louange', isCustom: false },
-    { id: '3', name: 'Paul Durand', role: 'Diacre', isCustom: false },
-    { id: '4', name: 'Sophie Bernard', role: 'Chantre', isCustom: false },
-    { id: '5', name: 'Équipe de louange', role: '', isCustom: true }
-  ];
-
-  const mockSections: ProgramSection[] = [
-    { id: 'opening', title: 'Ouverture', order: 1, color: '#4CAF50' },
-    { id: 'worship', title: 'Louange et Adoration', order: 2, color: '#2196F3' },
-    { id: 'word', title: 'Parole de Dieu', order: 3, color: '#FF9800' },
-    { id: 'closing', title: 'Clôture', order: 4, color: '#9C27B0' }
-  ];
-
-  const mockItems: ProgramItem[] = [
-    {
-      id: '1',
-      order: 1,
-      type: 'Titre' as ProgramItemType,
-      title: 'Bienvenue',
-      subtitle: 'Salutations et annonces',
-      participant: mockParticipants[0],
-      duration: 5,
-      sectionId: 'opening',
-      notes: 'Accueillir chaleureusement les visiteurs'
-    },
-    {
-      id: '2',
-      order: 2,
-      type: 'Prière' as ProgramItemType,
-      title: 'Prière d\'ouverture',
-      participant: mockParticipants[2],
-      duration: 3,
-      sectionId: 'opening',
-      notes: 'Prière pour l\'ouverture du cœur à la Parole'
-    },
-    {
-      id: '3',
-      order: 3,
-      type: 'Chant' as ProgramItemType,
-      title: 'Jésus, que ton nom soit élevé',
-      subtitle: 'Chant d\'ouverture',
-      participant: mockParticipants[4],
-      duration: 4,
-      sectionId: 'worship',
-      lyrics: `Jésus, que ton nom soit élevé
-Jésus, que ton nom soit élevé
-Dans nos cœurs et dans cette ville
-Jésus, que ton nom soit élevé
-
-Nous proclamons le nom de Jésus
-Nous proclamons le nom de Jésus
-Dans nos cœurs et dans cette ville
-Nous proclamons le nom de Jésus`
-    },
-    {
-      id: '4',
-      order: 4,
-      type: 'Chant' as ProgramItemType,
-      title: 'Mon Rédempteur est vivant',
-      participant: mockParticipants[3],
-      duration: 5,
-      sectionId: 'worship',
-      lyrics: `Mon Rédempteur est vivant
-Mon Sauveur tout-puissant
-Quelle joie dans mon cœur
-De connaître le Seigneur
-
-Il est ressuscité
-Pour l'éternité
-Jésus-Christ est vivant
-Mon Rédempteur est vivant`
-    },
-    {
-      id: '5',
-      order: 5,
-      type: 'Prière' as ProgramItemType,
-      title: 'Prière de louange',
-      participant: mockParticipants[1],
-      duration: 3,
-      sectionId: 'worship'
-    },
-    {
-      id: '6',
-      order: 6,
-      type: 'Offrande' as ProgramItemType,
-      title: 'Offrande',
-      subtitle: 'Temps de générosité',
-      participant: mockParticipants[2],
-      duration: 5,
-      sectionId: 'worship',
-      notes: 'Rappeler les projets soutenus par l\'église'
-    },
-    {
-      id: '7',
-      order: 7,
-      type: 'Lecture biblique' as ProgramItemType,
-      title: 'Lecture de la Parole',
-      participant: mockParticipants[1],
-      duration: 3,
-      sectionId: 'word',
-      notes: 'Les Béatitudes'
-    },
-    {
-      id: '8',
-      order: 8,
-      type: 'Prédication' as ProgramItemType,
-      title: 'Les Béatitudes : Le bonheur selon Dieu',
-      subtitle: 'Série : Vivre selon le Royaume',
-      participant: mockParticipants[0],
-      duration: 25,
-      sectionId: 'word',
-      notes: 'Points clés : Pauvreté en esprit, Consolation, Héritage, Justice'
-    },
-    {
-      id: '9',
-      order: 9,
-      type: 'Chant' as ProgramItemType,
-      title: 'Béni soit ton nom',
-      subtitle: 'Chant de réponse',
-      participant: mockParticipants[4],
-      duration: 4,
-      sectionId: 'closing'
-    },
-    {
-      id: '10',
-      order: 10,
-      type: 'Annonce' as ProgramItemType,
-      title: 'Annonces de la semaine',
-      participant: mockParticipants[0],
-      duration: 3,
-      sectionId: 'closing',
-      notes: 'Rappeler la soirée de prière mercredi et le repas communautaire samedi'
-    },
-    {
-      id: '11',
-      order: 11,
-      type: 'Bénédiction' as ProgramItemType,
-      title: 'Bénédiction finale',
-      participant: mockParticipants[0],
-      duration: 2,
-      sectionId: 'closing'
-    }
-  ];
-
-  // This function is no longer used but kept for reference
-};
-
-onMounted(async () => {
-  loading.value = true;
-  try {
-    await Promise.all([loadService(), loadProgram()]);
+    console.error('Error adding item:', error);
+    await showToast('Erreur lors de l\'ajout de l\'élément', 'danger');
   } finally {
     loading.value = false;
   }
+};
+
+const updateItem = async () => {
+  if (!program.value || !user.value || !editingItemId.value) return;
+
+  try {
+    loading.value = true;
+
+    const participant: ProgramParticipant | undefined = itemForm.value.participantName
+      ? {
+          id: `custom_${Date.now()}`,
+          name: itemForm.value.participantName,
+          isCustom: true
+        }
+      : undefined;
+
+    // Build update object, excluding undefined values
+    const updates: any = {
+      type: itemForm.value.type,
+      title: itemForm.value.title
+    };
+
+    // Only add optional fields if they have values
+    if (itemForm.value.subtitle) updates.subtitle = itemForm.value.subtitle;
+    if (participant) updates.participant = participant;
+    if (itemForm.value.duration) updates.duration = itemForm.value.duration;
+    if (itemForm.value.notes) updates.notes = itemForm.value.notes;
+    if (itemForm.value.resourceId) updates.resourceId = itemForm.value.resourceId;
+
+    await updateItemInProgram(
+      program.value.id,
+      editingItemId.value,
+      updates,
+      user.value.uid
+    );
+
+    closeItemFormModal();
+    await showToast('Élément mis à jour', 'success');
+  } catch (error) {
+    console.error('Error updating item:', error);
+    await showToast('Erreur lors de la mise à jour', 'danger');
+  } finally {
+    loading.value = false;
+  }
+};
+
+const deleteItem = async (itemId: string) => {
+  if (!program.value || !user.value) return;
+
+  const confirmed = await confirmAction('Supprimer cet élément du programme ?');
+  if (!confirmed) return;
+
+  try {
+    loading.value = true;
+
+    await deleteItemFromProgram(program.value.id, itemId, user.value.uid);
+
+    await showToast('Élément supprimé', 'success');
+  } catch (error) {
+    console.error('Error deleting item:', error);
+    await showToast('Erreur lors de la suppression', 'danger');
+  } finally {
+    loading.value = false;
+  }
+};
+
+// Sub-Item Management
+const showAddSubItemModalForItem = (itemId: string) => {
+  parentItemIdForSubItem.value = itemId;
+  addSubItemForm.value = {
+    title: '',
+    resourceId: null,
+    notes: ''
+  };
+  showAddSubItemModalState.value = true;
+};
+
+const closeAddSubItemModal = () => {
+  showAddSubItemModalState.value = false;
+  parentItemIdForSubItem.value = null;
+};
+
+const addSubItem = async () => {
+  if (!program.value || !parentItemIdForSubItem.value || !user.value) return;
+
+  try {
+    loading.value = true;
+
+    const parentItem = program.value.items.find(i => i.id === parentItemIdForSubItem.value);
+    const currentSubItems = parentItem?.subItems || [];
+
+    // Build sub-item object, excluding undefined values
+    const newSubItem: any = {
+      title: addSubItemForm.value.title,
+      order: currentSubItems.length
+    };
+
+    // Only add optional fields if they have values
+    if (addSubItemForm.value.resourceId) newSubItem.resourceId = addSubItemForm.value.resourceId;
+    if (addSubItemForm.value.notes) newSubItem.notes = addSubItemForm.value.notes;
+
+    await addSubItemToItem(
+      program.value.id,
+      parentItemIdForSubItem.value,
+      newSubItem,
+      user.value.uid
+    );
+
+    // Auto-expand the parent item
+    expandedItems.value.add(parentItemIdForSubItem.value);
+
+    closeAddSubItemModal();
+    await showToast('Sous-élément ajouté', 'success');
+  } catch (error) {
+    console.error('Error adding sub-item:', error);
+    await showToast('Erreur lors de l\'ajout', 'danger');
+  } finally {
+    loading.value = false;
+  }
+};
+
+const showEditSubItemModalForItem = (itemId: string, subItem: ProgramSubItem) => {
+  parentItemIdForSubItem.value = itemId;
+  editSubItemForm.value = {
+    id: subItem.id,
+    parentItemId: itemId,
+    title: subItem.title,
+    resourceId: subItem.resourceId || null,
+    notes: subItem.notes || ''
+  };
+  showEditSubItemModalState.value = true;
+};
+
+const closeEditSubItemModal = () => {
+  showEditSubItemModalState.value = false;
+  parentItemIdForSubItem.value = null;
+};
+
+const updateSubItem = async () => {
+  if (!program.value || !editSubItemForm.value.parentItemId || !user.value) return;
+
+  try {
+    loading.value = true;
+
+    // Build update object, excluding undefined values
+    const updates: any = {
+      title: editSubItemForm.value.title
+    };
+
+    // Only add optional fields if they have values
+    if (editSubItemForm.value.resourceId) updates.resourceId = editSubItemForm.value.resourceId;
+    if (editSubItemForm.value.notes) updates.notes = editSubItemForm.value.notes;
+
+    await updateSubItemInItem(
+      program.value.id,
+      editSubItemForm.value.parentItemId,
+      editSubItemForm.value.id,
+      updates,
+      user.value.uid
+    );
+
+    closeEditSubItemModal();
+    await showToast('Sous-élément mis à jour', 'success');
+  } catch (error) {
+    console.error('Error updating sub-item:', error);
+    await showToast('Erreur', 'danger');
+  } finally {
+    loading.value = false;
+  }
+};
+
+const deleteSubItem = async (itemId: string, subItemId: string) => {
+  if (!program.value || !user.value) return;
+
+  const confirmed = await confirmAction('Supprimer ce sous-élément ?');
+  if (!confirmed) return;
+
+  try {
+    loading.value = true;
+
+    await deleteSubItemFromItem(
+      program.value.id,
+      itemId,
+      subItemId,
+      user.value.uid
+    );
+
+    await showToast('Sous-élément supprimé', 'success');
+  } catch (error) {
+    console.error('Error deleting sub-item:', error);
+    await showToast('Erreur', 'danger');
+  } finally {
+    loading.value = false;
+  }
+};
+
+// Media Functions
+const showMediaContent = (content: any, title: string) => {
+  selectedMediaContent.value = content;
+  selectedMediaTitle.value = title;
+  showMediaModalState.value = true;
+};
+
+const closeMediaModal = () => {
+  showMediaModalState.value = false;
+  selectedMediaContent.value = null;
+  selectedMediaTitle.value = '';
+};
+
+const openInNewTab = (url: string) => {
+  window.open(url, '_blank');
+};
+
+// SMS Functions
+const showSMSModal = () => {
+  showSMSModalState.value = true;
+};
+
+const closeSMSModal = () => {
+  showSMSModalState.value = false;
+};
+
+const onSMSSent = () => {
+  showToast('SMS envoyé avec succès', 'success');
+};
+
+// YouTube Playlist Functions
+const collectYouTubeVideos = () => {
+  const videos: Array<{
+    title: string;
+    subtitle?: string;
+    embedUrl: string;
+    programItemNumber?: number;
+    programItemTitle?: string;
+  }> = [];
+
+  if (!program.value) return videos;
+
+  // Collect from all items in order
+  for (let i = 0; i < sortedItems.value.length; i++) {
+    const item = sortedItems.value[i];
+    const itemNumber = i + 1;
+
+    // Check item resource
+    if (item.resourceId) {
+      const resource = getLinkedResource(item.resourceId);
+      if (resource?.contents) {
+        for (const content of resource.contents) {
+          // Check for both 'video' and 'youtube' types
+          if ((content.type === 'video' || content.type === 'youtube') && content.url && isYouTubeUrl(content.url)) {
+            const embedUrl = getYouTubeEmbedUrl(content.url);
+            if (embedUrl) {
+              videos.push({
+                title: resource.title,
+                subtitle: resource.reference,
+                embedUrl,
+                programItemNumber: itemNumber,
+                programItemTitle: item.title
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // Check sub-items
+    if (item.subItems && item.subItems.length > 0) {
+      const sortedSubItems = getSortedSubItems(item);
+      for (const subItem of sortedSubItems) {
+        if (subItem.resourceId) {
+          const resource = getLinkedResource(subItem.resourceId);
+          if (resource?.contents) {
+            for (const content of resource.contents) {
+              // Check for both 'video' and 'youtube' types
+              if ((content.type === 'video' || content.type === 'youtube') && content.url && isYouTubeUrl(content.url)) {
+                const embedUrl = getYouTubeEmbedUrl(content.url);
+                if (embedUrl) {
+                  videos.push({
+                    title: resource.title,
+                    subtitle: resource.reference,
+                    embedUrl,
+                    programItemNumber: itemNumber,
+                    programItemTitle: item.title
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return videos;
+};
+
+const showYouTubePlaylist = () => {
+  youtubeVideos.value = collectYouTubeVideos();
+  currentVideoIndex.value = 0;
+  showYouTubePlaylistModalState.value = true;
+
+  // Show play prompt on mobile after a short delay
+  setTimeout(() => {
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (isMobile) {
+      showPlayPrompt.value = true;
+    }
+  }, 500);
+};
+
+const closeYouTubePlaylist = () => {
+  showYouTubePlaylistModalState.value = false;
+  currentVideoIndex.value = 0;
+  showPlayPrompt.value = false;
+};
+
+const nextVideo = () => {
+  if (currentVideoIndex.value < youtubeVideos.value.length - 1) {
+    currentVideoIndex.value++;
+    showPlayPrompt.value = false;
+  }
+};
+
+const previousVideo = () => {
+  if (currentVideoIndex.value > 0) {
+    currentVideoIndex.value--;
+    showPlayPrompt.value = false;
+  }
+};
+
+const goToVideo = (index: number) => {
+  currentVideoIndex.value = index;
+  showPlayPrompt.value = false;
+};
+
+const dismissPlayPrompt = () => {
+  showPlayPrompt.value = false;
+};
+
+const getAutoplayEmbedUrl = (embedUrl: string): string => {
+  // Add autoplay parameter and enable JS API to YouTube embed URL
+  const separator = embedUrl.includes('?') ? '&' : '?';
+  return `${embedUrl}${separator}autoplay=1&rel=0&enablejsapi=1`;
+};
+
+// Touch/Swipe handlers
+const handleTouchStart = (e: TouchEvent) => {
+  touchStartX.value = e.touches[0].clientX;
+  touchStartY.value = e.touches[0].clientY;
+};
+
+const handleTouchMove = (e: TouchEvent) => {
+  touchEndX.value = e.touches[0].clientX;
+  touchEndY.value = e.touches[0].clientY;
+};
+
+const handleTouchEnd = () => {
+  const deltaX = touchStartX.value - touchEndX.value;
+  const deltaY = Math.abs(touchStartY.value - touchEndY.value);
+
+  // Minimum swipe distance (in pixels)
+  const minSwipeDistance = 50;
+
+  // Check if horizontal swipe is dominant (not vertical scroll)
+  if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaX) > deltaY * 2) {
+    if (deltaX > 0) {
+      // Swiped left - next video
+      if (currentVideoIndex.value < youtubeVideos.value.length - 1) {
+        nextVideo();
+      }
+    } else {
+      // Swiped right - previous video
+      if (currentVideoIndex.value > 0) {
+        previousVideo();
+      }
+    }
+  }
+
+  // Reset values
+  touchStartX.value = 0;
+  touchEndX.value = 0;
+  touchStartY.value = 0;
+  touchEndY.value = 0;
+};
+
+// YouTube Player API integration for auto-advance
+const setupYouTubeAPIListener = () => {
+  // Load YouTube IFrame API if not already loaded
+  if (!(window as any).YT) {
+    const tag = document.createElement('script');
+    tag.src = 'https://www.youtube.com/iframe_api';
+    const firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+
+    // Setup callback for when API is ready
+    (window as any).onYouTubeIframeAPIReady = () => {
+      initYouTubePlayer();
+    };
+  } else {
+    initYouTubePlayer();
+  }
+};
+
+const initYouTubePlayer = () => {
+  // Wait for iframe to be available
+  setTimeout(() => {
+    const iframe = document.querySelector('.main-video-iframe') as HTMLIFrameElement;
+    if (!iframe || !iframe.contentWindow) return;
+
+    // Initialize YouTube player with event listeners
+    new (window as any).YT.Player(iframe, {
+      events: {
+        onStateChange: (event: any) => {
+          // YT.PlayerState.ENDED = 0
+          if (event.data === 0) {
+            // Video ended, play next
+            if (currentVideoIndex.value < youtubeVideos.value.length - 1) {
+              nextVideo();
+            }
+          }
+        }
+      }
+    });
+  }, 1000);
+};
+
+// Watch for video changes to reinitialize player
+watch(currentVideoIndex, () => {
+  if (showYouTubePlaylistModalState.value) {
+    initYouTubePlayer();
+  }
+});
+
+// Setup API when modal opens
+watch(showYouTubePlaylistModalState, (isOpen) => {
+  if (isOpen && youtubeVideos.value.length > 0) {
+    setupYouTubeAPIListener();
+  }
+});
+
+// Watch for resource selection to auto-populate title
+watch(() => itemForm.value.resourceId, async (newResourceId) => {
+  if (newResourceId && !itemForm.value.title) {
+    const resource = getLinkedResource(newResourceId);
+    if (resource) {
+      itemForm.value.title = resource.title;
+    } else {
+      // If resource not yet loaded, load it
+      try {
+        const resource = await getResourceById(newResourceId);
+        if (resource && !itemForm.value.title) {
+          itemForm.value.title = resource.title;
+          linkedResources.value.set(newResourceId, resource);
+        }
+      } catch (error) {
+        console.error('Error loading resource:', error);
+      }
+    }
+  }
+});
+
+// Load music options
+const loadMusicOptions = async () => {
+  try {
+    const options = await getAllResourceOptions();
+    musicKeys.value = options.musicKeys;
+    musicBeats.value = options.musicBeats;
+    musicTempos.value = options.musicTempos;
+    musicStyles.value = options.musicStyles;
+  } catch (error) {
+    console.error('Error loading music options:', error);
+  }
+};
+
+// Get music option name
+const getMusicOptionName = (optionId: string | undefined, options: ResourceOption[]): string => {
+  if (!optionId) return '';
+  const option = options.find(o => o.id === optionId);
+  return option?.name || '';
+};
+
+// Get music properties for a resource
+const getResourceMusicProps = (resourceId: string | undefined) => {
+  if (!resourceId) return null;
+  const resource = linkedResources.value.get(resourceId);
+  if (!resource) return null;
+
+  const props = [];
+  if (resource.musicKey) props.push(getMusicOptionName(resource.musicKey, musicKeys.value));
+  if (resource.musicBeat) props.push(getMusicOptionName(resource.musicBeat, musicBeats.value));
+  if (resource.musicTempo) props.push(getMusicOptionName(resource.musicTempo, musicTempos.value));
+  if (resource.musicStyle) props.push(getMusicOptionName(resource.musicStyle, musicStyles.value));
+
+  return props.length > 0 ? props : null;
+};
+
+// Subscribe to a resource for real-time updates
+const subscribeToLinkedResource = (resourceId: string) => {
+  // Don't subscribe twice
+  if (resourceSubscriptions.value.has(resourceId)) return;
+
+  const unsubscribe = subscribeToResource(
+    resourceId,
+    (resource) => {
+      if (resource) {
+        linkedResources.value.set(resourceId, resource);
+      }
+    },
+    (error) => {
+      console.error('Error in resource subscription:', error);
+    }
+  );
+
+  resourceSubscriptions.value.set(resourceId, unsubscribe);
+};
+
+// Unsubscribe from all resources
+const unsubscribeFromAllResources = () => {
+  resourceSubscriptions.value.forEach((unsubscribe) => {
+    unsubscribe();
+  });
+  resourceSubscriptions.value.clear();
+};
+
+// Open music properties edit modal
+const openMusicPropsModal = (resourceId: string) => {
+  const resource = linkedResources.value.get(resourceId);
+  if (!resource) return;
+
+  editingResourceId.value = resourceId;
+  musicPropsForm.value = {
+    musicKey: resource.musicKey || '',
+    musicBeat: resource.musicBeat || '',
+    musicTempo: resource.musicTempo || '',
+    musicStyle: resource.musicStyle || ''
+  };
+  showMusicPropsModalState.value = true;
+};
+
+// Close music properties modal
+const closeMusicPropsModal = () => {
+  showMusicPropsModalState.value = false;
+  editingResourceId.value = null;
+};
+
+// Save music properties
+const saveMusicProps = async () => {
+  if (!editingResourceId.value) return;
+
+  try {
+    await updateResource(editingResourceId.value, {
+      musicKey: musicPropsForm.value.musicKey || undefined,
+      musicBeat: musicPropsForm.value.musicBeat || undefined,
+      musicTempo: musicPropsForm.value.musicTempo || undefined,
+      musicStyle: musicPropsForm.value.musicStyle || undefined
+    });
+
+    const toast = await toastController.create({
+      message: 'Propriétés musicales mises à jour',
+      duration: 1500,
+      position: 'bottom',
+      color: 'success'
+    });
+    await toast.present();
+
+    closeMusicPropsModal();
+  } catch (error) {
+    console.error('Error saving music properties:', error);
+    const toast = await toastController.create({
+      message: 'Erreur lors de la mise à jour',
+      duration: 2000,
+      position: 'bottom',
+      color: 'danger'
+    });
+    await toast.present();
+  }
+};
+
+// Lifecycle
+onMounted(async () => {
+  loading.value = true;
+  await Promise.all([loadService(), loadMusicOptions()]);
+  await loadProgram();
+  loading.value = false;
+});
+
+onUnmounted(() => {
+  // Clean up program subscription
+  if (programSubscription.value) {
+    programSubscription.value();
+    programSubscription.value = null;
+  }
+  // Clean up all resource subscriptions
+  unsubscribeFromAllResources();
 });
 </script>
 
 <style scoped>
+/* Service Header */
 .service-header {
-  padding: 16px;
-  background: var(--ion-color-light);
-  border-bottom: 1px solid var(--ion-color-light-shade);
+  background: linear-gradient(135deg, var(--ion-color-primary) 0%, var(--ion-color-primary-shade) 100%);
+  padding: 1.5rem;
+  color: white;
 }
 
 .service-info-card {
@@ -2294,59 +1995,130 @@ onMounted(async () => {
 }
 
 .service-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--ion-color-dark);
-  margin: 0 0 8px;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem 0;
 }
 
 .service-datetime {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  color: var(--ion-color-medium);
-  font-size: 0.95rem;
+  gap: 0.5rem;
+  font-size: 1rem;
+  opacity: 0.9;
   margin: 0;
 }
 
+/* YouTube Feature Notice */
+.youtube-feature-notice {
+  background: linear-gradient(135deg, #F3F4F6 0%, #E5E7EB 100%);
+  padding: 1rem 1.5rem;
+  margin: 0;
+  border-bottom: 1px solid #D1D5DB;
+  border-left: 4px solid #EF4444;
+}
+
+.notice-content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.notice-icon {
+  font-size: 2.5rem;
+  color: #EF4444;
+  flex-shrink: 0;
+}
+
+.notice-text {
+  flex: 1;
+  color: #374151;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.notice-text strong {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: #EF4444;
+}
+
+.inline-icon {
+  font-size: 1.2rem;
+  vertical-align: middle;
+  margin: 0 0.25rem;
+  color: #EF4444;
+}
+
+@media (max-width: 768px) {
+  .youtube-feature-notice {
+    padding: 0.75rem 1rem;
+  }
+
+  .notice-content {
+    gap: 0.75rem;
+  }
+
+  .notice-icon {
+    font-size: 2rem;
+  }
+
+  .notice-text {
+    font-size: 0.85rem;
+  }
+
+  .notice-text strong {
+    font-size: 0.95rem;
+  }
+
+  .inline-icon {
+    font-size: 1rem;
+  }
+}
+
+/* Content Container */
 .content-container {
-  padding: 16px;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 1rem;
 }
 
 /* Program Summary */
 .program-summary {
-  margin-bottom: 24px;
+  margin-bottom: 1.5rem;
 }
 
 .program-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 1rem;
 }
 
 .program-header h3 {
   margin: 0;
   font-size: 1.1rem;
   font-weight: 600;
-  color: var(--ion-color-dark);
 }
 
 .summary-stats {
   display: flex;
   justify-content: space-around;
-  gap: 16px;
+  gap: 1rem;
+  margin-bottom: 1rem;
 }
 
 .stat-item {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 0.75rem;
 }
 
 .stat-icon {
-  font-size: 2rem;
+  font-size: 1.5rem;
   color: var(--ion-color-primary);
 }
 
@@ -2356,8 +2128,8 @@ onMounted(async () => {
 }
 
 .stat-value {
-  font-size: 1.5rem;
-  font-weight: 700;
+  font-size: 1.25rem;
+  font-weight: 600;
   color: var(--ion-color-dark);
 }
 
@@ -2366,38 +2138,36 @@ onMounted(async () => {
   color: var(--ion-color-medium);
 }
 
-/* Conductor Information */
+/* Conductor Info */
 .conductor-info {
-  margin-top: 20px;
-  padding-top: 16px;
   border-top: 1px solid var(--ion-color-light);
+  padding-top: 1rem;
+  margin-top: 1rem;
 }
 
 .conductor-section {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 0.75rem;
 }
 
 .conductor-icon {
-  font-size: 2.5rem;
-  color: var(--ion-color-secondary);
+  font-size: 2rem;
+  color: var(--ion-color-primary);
 }
 
 .conductor-details {
   display: flex;
   flex-direction: column;
-  gap: 2px;
 }
 
 .conductor-label {
   font-size: 0.85rem;
   color: var(--ion-color-medium);
-  font-weight: 500;
 }
 
 .conductor-name {
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--ion-color-dark);
 }
@@ -2408,1098 +2178,1093 @@ onMounted(async () => {
   font-style: italic;
 }
 
-/* Program Content */
-.program-content {
-  margin-bottom: 24px;
+/* No Program State */
+.no-program {
+  margin-top: 2rem;
 }
 
-/* Sections */
-.program-section {
-  margin-bottom: 32px;
+.text-center {
+  text-align: center;
 }
 
-.section-header {
-  margin-bottom: 16px;
-  padding: 16px;
-  background: var(--ion-color-light-tint);
-  border-radius: 12px;
-  border-left: 4px solid var(--ion-color-primary);
-}
-
-.section-title {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--ion-color-dark);
-  margin: 0 0 4px;
-}
-
-.section-stats {
-  font-size: 0.9rem;
+.large-icon {
+  font-size: 4rem;
   color: var(--ion-color-medium);
+  margin-bottom: 1rem;
+}
+
+/* Add Item Button */
+.add-item-container {
+  margin: 1rem 0;
+  display: flex;
+  justify-content: center;
+}
+
+.add-item-button {
+  min-width: 200px;
 }
 
 /* Program Items */
-.section-items, .items-view {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.program-content {
+  margin: 1rem 0;
 }
 
-.program-item {
+.flat-items-view {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.program-item-wrapper {
   background: white;
-  border-radius: 12px;
-  border: 1px solid var(--ion-color-light-shade);
-  padding: 16px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: all 0.2s ease;
 }
 
-.program-item:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+.program-item-wrapper.has-subitems {
+  border-left: 3px solid var(--ion-color-primary);
 }
 
-/* New Column Layout */
+.program-item-wrapper.expanded {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.program-item {
+  padding: 1rem;
+}
+
 .item-layout {
-  display: grid;
-  grid-template-columns: 30px 1fr 140px;
-  gap: 12px;
-  align-items: start;
-  margin-bottom: 12px;
-  width: 100%;
-  min-width: 0; /* Prevent grid blowout */
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
 }
 
-/* Edit Mode: Show drag handle column and actions column */
-.edit-mode .item-layout {
-  grid-template-columns: 40px 30px 1fr 140px 100px;
-  min-width: 0; /* Prevent grid blowout */
-  align-items: start;
-}
-
+/* Item Columns */
 .item-column {
   display: flex;
   flex-direction: column;
-  gap: 4px;
 }
 
 .item-handle-column {
-  justify-content: flex-start;
+  flex-shrink: 0;
+  width: 30px;
+}
+
+.drag-handle {
+  cursor: grab;
+  color: var(--ion-color-medium);
+  font-size: 1.5rem;
+  display: flex;
   align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
 }
 
 .item-order-column {
-  justify-content: flex-start;
-  align-items: center;
-}
-
-.item-details-column {
-  flex: 1;
-  min-width: 0; /* Allow text truncation */
-  overflow: hidden; /* Prevent content from breaking grid */
-}
-
-.item-meta-column {
-  justify-content: flex-start;
-  align-items: flex-end;
-  text-align: right;
-  font-size: 0.85rem;
-}
-
-.item-actions-column {
-  justify-content: flex-start;
-  align-items: center;
-}
-
-.item-actions {
-  display: flex;
-  gap: 4px;
-  flex-direction: column;
-}
-
-.item-actions ion-button {
-  --padding-start: 8px;
-  --padding-end: 8px;
-  --min-height: 32px;
+  flex-shrink: 0;
   width: 40px;
 }
 
 .item-order {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: var(--ion-color-primary);
-  color: white;
+  background: var(--ion-color-light);
+  color: var(--ion-color-dark);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 600;
-  font-size: 0.85rem;
-  flex-shrink: 0;
+  font-size: 0.9rem;
 }
 
-.item-info {
+.item-details-column {
   flex: 1;
   min-width: 0;
+}
+
+.item-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
 }
 
 .item-type {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 0.8rem;
-  color: var(--ion-color-medium);
-  text-transform: uppercase;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--ion-color-primary);
   font-weight: 500;
-  margin-bottom: 4px;
 }
 
-.item-type ion-icon {
-  font-size: 1rem;
+.expand-button {
+  --padding-start: 0.5rem;
+  --padding-end: 0.5rem;
+  height: 28px;
+  font-size: 0.85rem;
 }
 
 .item-title {
   font-size: 1.1rem;
   font-weight: 600;
+  margin: 0 0 0.25rem 0;
   color: var(--ion-color-dark);
-  margin: 0 0 4px;
 }
 
 .item-subtitle {
+  font-size: 0.95rem;
+  color: var(--ion-color-medium);
+  margin: 0 0 0.25rem 0;
+}
+
+.item-reference {
   font-size: 0.9rem;
   color: var(--ion-color-medium);
-  margin: 0;
   font-style: italic;
-}
-
-.item-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  align-items: flex-end;
-  flex-shrink: 0;
-  font-size: 0.85rem;
-}
-
-.item-duration, .item-participant {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--ion-color-medium);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.participant-role {
-  font-style: italic;
-  opacity: 0.8;
-}
-
-.item-details {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-top: 8px;
-  padding-top: 12px;
-  border-top: 1px solid var(--ion-color-light);
+  margin: 0 0 0.25rem 0;
 }
 
 .item-notes {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  align-items: flex-start;
+  gap: 0.5rem;
   font-size: 0.9rem;
-  color: var(--ion-color-medium);
+  color: var(--ion-color-medium-shade);
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: var(--ion-color-light);
+  border-radius: 4px;
 }
 
 .item-notes ion-icon {
-  font-size: 1rem;
-}
-
-/* Item Type Styling */
-.item-chant {
-  border-left: 4px solid #2196F3;
-}
-
-.item-prière {
-  border-left: 4px solid #4CAF50;
-}
-
-.item-lecture-biblique {
-  border-left: 4px solid #FF9800;
-}
-
-.item-prédication {
-  border-left: 4px solid #9C27B0;
-}
-
-.item-titre {
-  border-left: 4px solid #607D8B;
-}
-
-.item-annonce {
-  border-left: 4px solid #FF5722;
-}
-
-.item-offrande {
-  border-left: 4px solid #795548;
-}
-
-.item-bénédiction {
-  border-left: 4px solid #E91E63;
-}
-
-/* Empty State */
-.empty-state {
-  text-align: center;
-  padding: 48px 16px;
-}
-
-.empty-state ion-icon {
-  font-size: 64px;
-  margin-bottom: 16px;
-}
-
-.empty-state h3 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--ion-color-dark);
-  margin: 0 0 8px;
-}
-
-.empty-state p {
-  color: var(--ion-color-medium);
-  margin: 0 0 24px;
-}
-
-/* Lyrics Modal */
-.lyrics-content {
-  padding: 16px;
-}
-
-.lyrics-text pre {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  font-size: 1.1rem;
-  line-height: 1.8;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  color: var(--ion-color-dark);
-  margin: 0;
-}
-
-/* Drag and Drop Styles */
-.drag-handle, .section-drag-handle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  cursor: grab;
-  color: var(--ion-color-medium);
-  border: 1px dashed var(--ion-color-light);
-  border-radius: 6px;
-  margin-right: 8px;
-  transition: all 0.2s ease;
   flex-shrink: 0;
-  /* Touch-friendly settings */
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
-  -webkit-touch-callout: none;
+  margin-top: 0.2rem;
 }
 
-.drag-handle:hover, .section-drag-handle:hover {
-  color: var(--ion-color-primary);
-  border-color: var(--ion-color-primary);
-  background: var(--ion-color-primary-tint);
-}
-
-.drag-handle:active, .section-drag-handle:active {
-  cursor: grabbing;
-  transform: scale(0.95);
-}
-
-.section-drag-handle {
-  margin-right: 12px;
-}
-
-/* Edit Mode Visual Indicators */
-.program-item {
-  transition: all 0.2s ease;
-}
-
-.program-item:hover {
-  background: var(--ion-color-light);
-  transform: translateX(2px);
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.section-header:not(.edit-mode .section-header) {
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
-
-.section-header:not(.edit-mode .section-header):hover {
-  background: var(--ion-color-light);
-}
-
-.section-title {
-  flex: 1;
-}
-
-.section-actions {
-  display: flex;
-  gap: 4px;
-}
-
-.section-actions ion-button {
-  --padding-start: 8px;
-  --padding-end: 8px;
-  --min-height: 32px;
-  width: 40px;
-}
-
-/* Edit Mode Content Styling */
-.edit-mode {
-  background: linear-gradient(135deg, var(--ion-background-color) 0%, var(--ion-color-light) 100%);
-}
-
-.edit-mode .program-section {
-  position: relative;
-}
-
-.edit-mode .program-section::before {
-  content: '';
-  position: absolute;
-  left: -8px;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: var(--ion-color-primary);
-  opacity: 0.3;
-  border-radius: 2px;
-}
-
-.edit-mode .program-item {
-  cursor: move;
-  border-left: 2px solid transparent;
-  padding-left: 6px;
-}
-
-.edit-mode .program-item:hover {
-  border-left-color: var(--ion-color-primary);
-}
-
-/* Drag and Drop Visual Feedback */
-.insertion-indicator {
-  height: 3px;
-  background: var(--ion-color-primary);
-  margin: 4px 0;
-  border-radius: 2px;
-  position: relative;
-  animation: insertionPulse 1s ease-in-out infinite;
-}
-
-.insertion-indicator::before {
-  content: '';
-  position: absolute;
-  left: -6px;
-  top: -3px;
-  width: 9px;
-  height: 9px;
-  background: var(--ion-color-primary);
-  border-radius: 50%;
-}
-
-.insertion-indicator::after {
-  content: '';
-  position: absolute;
-  right: -6px;
-  top: -3px;
-  width: 9px;
-  height: 9px;
-  background: var(--ion-color-primary);
-  border-radius: 50%;
-}
-
-@keyframes insertionPulse {
-  0%, 100% { opacity: 0.6; transform: scaleY(1); }
-  50% { opacity: 1; transform: scaleY(1.2); }
-}
-
-.program-item.dragging {
-  opacity: 0.5;
-  transform: rotate(2deg) scale(0.98);
-  box-shadow: 0 8px 24px rgba(var(--ion-color-primary-rgb), 0.3);
-  z-index: 1000;
-  pointer-events: none;
-}
-
-/* Add Item Buttons and Modal */
-.add-item-container {
-  display: flex;
-  justify-content: center;
-  margin: 20px 0;
-}
-
-.add-item-button {
-  --border-style: dashed;
-  --border-width: 2px;
-  --border-color: var(--ion-color-primary);
-  --color: var(--ion-color-primary);
-  min-height: 50px;
-  transition: all 0.3s ease;
-}
-
-.add-item-button:hover {
-  --background: var(--ion-color-primary-tint);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(var(--ion-color-primary-rgb), 0.3);
-}
-
-.add-item-modal-content {
-  padding: 20px;
-}
-
-.item-type-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
-  margin-bottom: 30px;
-}
-
-.item-type-button {
-  height: 100px;
-  --border-radius: 12px;
-  --border-width: 2px;
-}
-
-.item-type-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
-.item-type-label {
-  font-size: 0.9rem;
-  font-weight: 600;
-  text-align: center;
-}
-
-.modal-footer {
-  text-align: center;
-  padding-top: 20px;
-  border-top: 1px solid var(--ion-color-light);
-}
-
-.position-info {
-  color: var(--ion-color-medium);
-  font-style: italic;
-  margin: 0;
-}
-
-/* Add Section Modal */
-.add-section-modal-content {
-  padding: 20px;
-}
-
-.section-form {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  padding-top: 20px;
-  margin-top: 20px;
-  border-top: 1px solid var(--ion-color-light);
-}
-
-/* Mobile Responsive */
-@media (max-width: 768px) {
-  .summary-stats {
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: 8px;
-  }
-  
-  .stat-item {
-    flex-direction: column;
-    text-align: center;
-    min-width: 0;
-    flex: 1;
-  }
-  
-  .stat-item .stat-icon {
-    margin-bottom: 4px;
-  }
-  
-  /* Mobile: Stacked layout */
-  .item-layout {
-    grid-template-columns: 1fr;
-    gap: 8px;
-  }
-  
-  /* Mobile Edit Mode: Show handle + stacked content */
-  .edit-mode .item-layout {
-    grid-template-columns: 50px 1fr;
-    gap: 12px;
-  }
-  
-  .edit-mode .item-handle-column {
-    grid-row: 1 / 4; /* Span all rows */
-    align-self: start;
-  }
-  
-  .edit-mode .item-order-column,
-  .edit-mode .item-details-column,
-  .edit-mode .item-meta-column {
-    grid-column: 2;
-  }
-  
-  .item-order-column {
-    justify-self: start;
-    margin-bottom: 8px;
-  }
-  
-  .item-details-column {
-    margin-bottom: 8px;
-  }
-  
-  .item-meta-column {
-    justify-self: start;
-    text-align: left;
-    align-items: flex-start;
-  }
-  
-  .item-details {
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .item-type-grid {
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 12px;
-  }
-
-  .item-type-button {
-    height: 80px;
-  }
-
-  .item-type-label {
-    font-size: 0.8rem;
-  }
-}
-
-/* Edit Program Modal */
-.edit-program-modal-content {
-  --ion-background-color: var(--ion-color-light);
-}
-
-.edit-program-modal-content .modal-form {
-  padding: 16px;
-}
-
-.edit-program-modal-content .modal-form ion-item {
-  margin-bottom: 16px;
-  --background: white;
-  --border-radius: 8px;
-  --border-color: var(--ion-color-light-shade);
-  --min-height: 56px;
-}
-
-.edit-program-modal-content .modal-form ion-label {
-  font-weight: 600;
-  color: var(--ion-color-dark);
-  margin-bottom: 8px;
-}
-
-.edit-program-modal-content .modal-form ion-input {
-  --padding-start: 12px;
-  --color: var(--ion-color-dark);
-}
-
-.edit-program-modal-content .modal-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 0;
-  margin-top: 20px;
-  border-top: 1px solid var(--ion-color-light-shade);
-}
-
-.edit-program-modal-content .modal-actions ion-button {
-  --border-radius: 8px;
-  font-weight: 600;
-}
-
-/* Add Item Form Modal */
-.add-item-form-modal-content {
-  --ion-background-color: var(--ion-color-light);
-}
-
-.add-item-form-modal-content .modal-form {
-  padding: 16px;
-}
-
-.add-item-form-modal-content .modal-form ion-item {
-  margin-bottom: 16px;
-  --background: white;
-  --border-radius: 8px;
-  --border-color: var(--ion-color-light-shade);
-  --min-height: 56px;
-}
-
-.add-item-form-modal-content .modal-form ion-label {
-  font-weight: 600;
-  color: var(--ion-color-dark);
-  margin-bottom: 8px;
-}
-
-.add-item-form-modal-content .modal-form ion-input,
-.add-item-form-modal-content .modal-form ion-textarea {
-  --padding-start: 12px;
-  --color: var(--ion-color-dark);
-}
-
-.add-item-form-modal-content .modal-form ion-textarea {
-  --padding-top: 12px;
-}
-
-.add-item-form-modal-content .modal-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 0;
-  margin-top: 20px;
-  border-top: 1px solid var(--ion-color-light-shade);
-}
-
-.add-item-form-modal-content .modal-actions ion-button {
-  --border-radius: 8px;
-  font-weight: 600;
-}
-
-/* Edit Item Form Modal */
-.edit-item-form-modal-content {
-  --ion-background-color: var(--ion-color-light);
-}
-
-.edit-item-form-modal-content .modal-form {
-  padding: 16px;
-}
-
-.edit-item-form-modal-content .modal-form ion-item {
-  margin-bottom: 16px;
-  --background: white;
-  --border-radius: 8px;
-  --border-color: var(--ion-color-light-shade);
-  --min-height: 56px;
-}
-
-.edit-item-form-modal-content .modal-form ion-label {
-  font-weight: 600;
-  color: var(--ion-color-dark);
-  margin-bottom: 8px;
-}
-
-.edit-item-form-modal-content .modal-form ion-input,
-.edit-item-form-modal-content .modal-form ion-textarea {
-  --padding-start: 12px;
-  --color: var(--ion-color-dark);
-}
-
-.edit-item-form-modal-content .modal-form ion-textarea {
-  --padding-top: 12px;
-}
-
-.edit-item-form-modal-content .modal-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 0;
-  margin-top: 20px;
-  border-top: 1px solid var(--ion-color-light-shade);
-}
-
-.edit-item-form-modal-content .modal-actions ion-button {
-  --border-radius: 8px;
-  font-weight: 600;
-}
-
-/* Edit Section Modal */
-.edit-section-modal-content {
-  --ion-background-color: var(--ion-color-light);
-}
-
-.edit-section-modal-content .section-form {
-  padding: 20px;
-}
-
-.edit-section-modal-content .section-form ion-item {
-  margin-bottom: 20px;
-  --background: white;
-  --border-radius: 8px;
-  --border-color: var(--ion-color-light-shade);
-  --min-height: 56px;
-}
-
-.edit-section-modal-content .section-form ion-label {
-  font-weight: 600;
-  color: var(--ion-color-dark);
-  margin-bottom: 8px;
-}
-
-.edit-section-modal-content .section-form ion-input {
-  --padding-start: 12px;
-  --color: var(--ion-color-dark);
-}
-
-.edit-section-modal-content .modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  padding-top: 20px;
-  margin-top: 20px;
-  border-top: 1px solid var(--ion-color-light-shade);
-}
-
-.edit-section-modal-content .modal-actions ion-button {
-  --border-radius: 8px;
-  font-weight: 600;
-}
-
-/* Resource Selector */
-.resource-selector-container {
-  margin: 16px 0;
-  padding: 0 4px;
-}
-
-/* Resource Display in Items */
 .item-resources {
-  margin-top: 4px;
-}
-
-.resource-count {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--ion-color-primary);
-  font-weight: 500;
-}
-
-.resource-count ion-icon {
-  font-size: 14px;
-}
-
-/* Resource Media Links */
-.item-resources {
-  margin-top: 6px;
+  margin-top: 0.75rem;
 }
 
 .media-buttons {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
+  gap: 0.5rem;
 }
 
 .media-chip-button {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 10px;
-  background: transparent;
-  border: 1px solid var(--ion-color-medium-tint);
-  border-radius: 12px;
-  font-size: 12px;
-  color: var(--ion-color-medium-shade);
+  gap: 0.25rem;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--ion-color-primary);
+  border-radius: 16px;
+  background: white;
+  color: var(--ion-color-primary);
+  font-size: 0.85rem;
   cursor: pointer;
   transition: all 0.2s ease;
-  font-family: inherit;
-  font-weight: 500;
-  white-space: nowrap;
-  height: 24px;
 }
 
 .media-chip-button:hover {
+  background: var(--ion-color-primary);
+  color: white;
+}
+
+.media-chip-button.small {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8rem;
+}
+
+/* Music Properties */
+.music-props-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.music-props {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.music-prop {
+  font-size: 0.75rem;
+  color: var(--ion-color-medium);
   background: var(--ion-color-light);
-  border-color: var(--ion-color-primary);
-  color: var(--ion-color-primary);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
 }
 
-.media-chip-button:active {
-  transform: translateY(0);
-  box-shadow: none;
+.music-prop.small {
+  font-size: 0.7rem;
+  padding: 1px 6px;
+  margin-left: 0.25rem;
 }
 
-.media-chip-button ion-icon {
+.music-props-edit-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: var(--ion-color-light);
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--ion-color-medium);
+  transition: all 0.2s ease;
+}
+
+.music-props-edit-btn:hover {
+  background: var(--ion-color-primary);
+  color: white;
+}
+
+.music-props-edit-btn.small {
+  width: 20px;
+  height: 20px;
+}
+
+.music-props-edit-btn ion-icon {
   font-size: 14px;
+}
+
+.music-props-edit-btn.small ion-icon {
+  font-size: 12px;
+}
+
+.music-props-form ion-item {
+  margin-bottom: 0.5rem;
+}
+
+.sub-item-resources {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+.item-meta-column {
+  flex-shrink: 0;
+  min-width: 120px;
+  gap: 0.5rem;
+  align-items: flex-end;
+  text-align: right;
+}
+
+.item-duration,
+.item-participant {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--ion-color-medium-shade);
+}
+
+.participant-role {
+  font-size: 0.85rem;
+  color: var(--ion-color-medium);
+}
+
+.item-actions-column {
+  flex-shrink: 0;
+  min-width: 120px;
+}
+
+.item-actions {
+  display: flex;
+  gap: 0.25rem;
+  justify-content: flex-end;
+}
+
+/* Sub-Items */
+.sub-items-container {
+  margin: 1rem 0 0 3rem;
+  padding: 0.75rem 0 0 1rem;
+  border-left: 2px solid var(--ion-color-light-shade);
+}
+
+.sub-item {
+  margin-bottom: 0.75rem;
+}
+
+.sub-item:last-child {
+  margin-bottom: 0;
+}
+
+.sub-item-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.sub-item-bullet {
+  flex-shrink: 0;
+  font-size: 1.2rem;
+  color: var(--ion-color-primary);
+  margin-top: 0.1rem;
+}
+
+.sub-item-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.sub-item-title {
+  font-size: 0.95rem;
+  color: var(--ion-color-dark);
+  font-weight: 500;
+}
+
+.sub-item-notes {
+  font-size: 0.85rem;
+  color: var(--ion-color-medium);
+  font-style: italic;
+}
+
+.sub-item-resources {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  align-items: center;
+}
+
+.sub-item-actions {
+  display: flex;
+  gap: 0.25rem;
   flex-shrink: 0;
 }
 
-.media-chip-button span {
-  font-size: 11px;
+/* Media Modal */
+.media-modal {
+  --width: 90%;
+  --height: 80%;
+  --border-radius: 12px;
 }
 
-/* Media Viewer Modal */
-.media-viewer-content {
-  --background: var(--ion-color-light);
+.video-container,
+.audio-container,
+.spotify-container,
+.lyrics-container,
+.document-container {
+  padding: 1rem;
 }
 
-.media-container {
-  padding: 0px;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.video-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
+.full-width-video,
+.full-width-audio {
   width: 100%;
-  height: 100%;
 }
 
-.media-iframe {
+.youtube-iframe {
   width: 100%;
-  height: 60vh;
-  max-height: 400px;
+  aspect-ratio: 16/9;
+  min-height: 315px;
   border-radius: 8px;
 }
 
-.media-video {
+.spotify-iframe {
   width: 100%;
-  max-width: 800px;
-  height: auto;
-  border-radius: 8px;
-}
-
-.audio-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  padding: 32px;
-}
-
-.media-audio {
-  width: 100%;
-  max-width: 400px;
-}
-
-.audio-info {
-  text-align: center;
-}
-
-.audio-info h3 {
-  margin: 0 0 8px 0;
-  font-size: 1.2rem;
-  color: var(--ion-color-dark);
-}
-
-.audio-info p {
-  margin: 0;
-  color: var(--ion-color-medium);
-  font-size: 0.9rem;
-}
-
-.music-sheet-container,
-.fallback-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 24px;
-  padding: 32px;
-  text-align: center;
-}
-
-.file-info {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px;
-  background: white;
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.file-info ion-icon {
-  font-size: 2rem;
-  color: var(--ion-color-primary);
-}
-
-.file-info h3 {
-  margin: 0 0 4px 0;
-  font-size: 1.1rem;
-  color: var(--ion-color-dark);
-}
-
-.file-info p {
-  margin: 0;
-  color: var(--ion-color-medium);
-  font-size: 0.9rem;
-}
-
-.lyrics-container {
-  padding: 16px;
-  height: 100%;
 }
 
 .lyrics-content {
-  background: white;
+  background: var(--ion-color-light);
+  padding: 1.5rem;
   border-radius: 8px;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  height: 100%;
-  overflow-y: auto;
 }
 
 .lyrics-content pre {
-  font-family: inherit;
   white-space: pre-wrap;
-  margin: 0;
+  font-family: var(--ion-font-family);
   font-size: 1rem;
   line-height: 1.6;
-  color: var(--ion-color-dark);
+  margin: 0;
 }
 
-/* Resource Detail Modal */
-.resource-detail-content {
-  --background: var(--ion-color-light);
+/* Lyrics View Button */
+.item-lyrics-button {
+  margin-top: 0.75rem;
 }
 
-.resource-details {
-  padding: 16px;
-}
-
-.resource-media-list h4 {
-  margin: 20px 0 12px 0;
-  font-size: 16px;
+.view-lyrics-btn {
+  --padding-top: 8px;
+  --padding-bottom: 8px;
+  --padding-start: 16px;
+  --padding-end: 16px;
   font-weight: 600;
-  color: var(--ion-color-dark);
 }
 
-.media-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px;
-  background: white;
-  border-radius: 8px;
-  margin-bottom: 8px;
-  border: 1px solid var(--ion-color-light-shade);
+/* Lyrics View Modal */
+.lyrics-view-modal {
+  --width: 90%;
+  --height: 80%;
+  --border-radius: 12px;
 }
 
-.media-info {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1;
+/* Fullscreen Modal */
+.fullscreen-modal {
+  --width: 100%;
+  --height: 100%;
+  --border-radius: 0;
 }
 
-.media-icon {
-  font-size: 20px;
-  color: var(--ion-color-primary);
-}
-
-.media-details {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.media-type {
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--ion-color-dark);
-}
-
-.media-notes {
-  font-size: 12px;
-  color: var(--ion-color-medium);
-}
-
-.media-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.resource-actions {
-  margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px solid var(--ion-color-light-shade);
-}
-
-/* Section View Modal Styles */
-.section-view-modal-content {
+.fullscreen-content {
   --padding-top: 0;
   --padding-bottom: 0;
   --padding-start: 0;
   --padding-end: 0;
 }
 
-.section-view-container {
-  padding: 0;
+.lyrics-view-modal-content {
+  --padding-top: 1rem;
 }
 
-.section-item-card {
-  padding: 16px 12px;
-  border-bottom: 1px solid var(--ion-color-light-shade);
+.lyrics-view-container {
+  padding: 0.5rem;
 }
 
-.section-item-card:last-child {
-  border-bottom: none;
+.lyrics-item-card {
+  background: white;
+  border-radius: 0;
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+  box-shadow: none;
+  border-bottom: 1px solid var(--ion-color-light);
 }
 
-.section-item-card .item-header {
+.lyrics-item-header {
   display: flex;
-  gap: 10px;
   align-items: center;
-  margin-bottom: 12px;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--ion-color-primary);
 }
 
-.section-item-card .item-number {
+.lyrics-item-header-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.lyrics-item-number {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 28px;
-  height: 28px;
-  border-radius: 50%;
+  width: 40px;
+  height: 40px;
   background: var(--ion-color-primary);
   color: white;
+  border-radius: 50%;
   font-weight: 700;
-  font-size: 0.85rem;
+  font-size: 1.25rem;
   flex-shrink: 0;
 }
 
-.section-item-card .item-title {
-  font-size: 1.05rem;
+.lyrics-item-title {
+  margin: 0;
+  font-size: 1.2rem;
   font-weight: 700;
   color: var(--ion-color-dark);
-  margin: 0;
-  flex: 1;
+  line-height: 1.2;
 }
 
-.section-item-card .lyrics-content {
-  font-size: 0.95rem;
-  line-height: 1.6;
-  color: var(--ion-color-dark);
-  white-space: pre-wrap;
-  word-wrap: break-word;
+.lyrics-item-subtitle {
   margin: 0;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--ion-color-medium-shade);
+  line-height: 1.2;
+}
+
+.lyrics-item-notes {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: var(--ion-color-medium);
+  font-style: italic;
+  line-height: 1.2;
+}
+
+.lyrics-content-display {
+  background: transparent;
+  padding: 0.5rem 0;
+  border-radius: 0;
+  margin-top: 0.5rem;
+}
+
+.lyrics-content-display pre {
+  white-space: pre-wrap;
+  font-family: var(--ion-font-family);
+  font-size: 1.1rem;
+  line-height: 1.7;
+  margin: 0;
+  color: var(--ion-color-dark);
+  font-weight: 400;
+}
+
+.no-lyrics {
+  text-align: center;
+  padding: 2rem;
+  color: var(--ion-color-medium);
+  font-style: italic;
+}
+
+/* YouTube Playlist Modal */
+.youtube-playlist-modal {
+  --width: 100%;
+  --height: 100%;
+  --border-radius: 0;
+}
+
+.youtube-player-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #000;
+}
+
+/* Main Player Section */
+.main-player-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #000;
+}
+
+.current-video-info {
+  padding: 1rem;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.7));
+  color: white;
+}
+
+.video-counter {
+  font-size: 0.85rem;
+  color: var(--ion-color-danger);
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.current-video-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: white;
+  line-height: 1.3;
+}
+
+.current-video-subtitle {
+  margin: 0.25rem 0 0 0;
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.main-video-wrapper {
+  flex: 1;
+  position: relative;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.main-video-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.play-prompt-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  cursor: pointer;
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.play-prompt-content {
+  text-align: center;
+  color: white;
+  padding: 2rem;
+}
+
+.play-prompt-icon {
+  font-size: 4rem;
+  color: #EF4444;
+  margin-bottom: 1rem;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+.play-prompt-text {
+  font-size: 1.1rem;
+  font-weight: 500;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Player Controls */
+.player-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.7));
+  gap: 1rem;
+}
+
+.progress-indicator {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding: 0.5rem 0;
+}
+
+.progress-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.progress-dot:hover {
+  background: rgba(255, 255, 255, 0.5);
+  transform: scale(1.2);
+}
+
+.progress-dot.active {
+  background: var(--ion-color-danger);
+  width: 16px;
+  height: 16px;
+}
+
+.progress-dot.played {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+/* Playlist Queue */
+.playlist-queue {
+  background: var(--ion-color-light);
+  border-top: 2px solid var(--ion-color-medium);
+  max-height: 40%;
+  overflow-y: auto;
+}
+
+.queue-title {
+  margin: 0;
+  padding: 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ion-color-dark);
+  background: white;
+  border-bottom: 1px solid var(--ion-color-light-shade);
+  sticky: top;
+  top: 0;
+  z-index: 1;
+}
+
+.queue-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.queue-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: white;
+  border-bottom: 1px solid var(--ion-color-light);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.queue-item:hover {
+  background: var(--ion-color-light-tint);
+}
+
+.queue-item.active {
+  background: var(--ion-color-danger);
+  border-left: 4px solid var(--ion-color-danger-shade);
+}
+
+.queue-item.played {
+  opacity: 0.6;
+}
+
+.queue-item-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--ion-color-light);
+  color: var(--ion-color-dark);
+  font-weight: 600;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.queue-item.active .queue-item-number {
+  background: rgba(255, 255, 255, 0.3);
+  color: white;
+}
+
+.queue-item-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.queue-item-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ion-color-dark);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.queue-item.active .queue-item-title {
+  color: white;
+}
+
+.queue-item-subtitle-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.queue-item-subtitle {
+  font-size: 0.8rem;
+  color: var(--ion-color-medium-shade);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.queue-item.active .queue-item-subtitle {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.queue-item-context {
+  font-size: 0.75rem;
+  color: var(--ion-color-medium);
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.queue-item.active .queue-item-context {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.queue-item-playing {
+  font-size: 1.5rem;
+  color: white;
+  flex-shrink: 0;
+}
+
+/* Utility classes for responsive display */
+.hide-mobile {
+  display: inline;
+}
+
+.show-mobile {
+  display: none;
+}
+
+/* Navigation buttons */
+.nav-button {
+  --padding-start: 1rem;
+  --padding-end: 1rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .current-video-title {
+    font-size: 1.2rem;
+  }
+
+  .player-controls {
+    flex-direction: row;
+    gap: 0.5rem;
+    padding: 0.75rem;
+  }
+
+  .nav-button {
+    --padding-start: 0.5rem;
+    --padding-end: 0.5rem;
+    min-width: 44px;
+    flex-shrink: 0;
+  }
+
+  .hide-mobile {
+    display: none;
+  }
+
+  .show-mobile {
+    display: inline;
+  }
+
+  .progress-indicator {
+    flex: 1;
+    gap: 0.35rem;
+    padding: 0;
+  }
+
+  .progress-dot {
+    width: 10px;
+    height: 10px;
+  }
+
+  .progress-dot.active {
+    width: 14px;
+    height: 14px;
+  }
+
+  .playlist-queue {
+    max-height: 50%;
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .item-layout {
+    flex-wrap: wrap;
+  }
+
+  .item-meta-column {
+    width: 100%;
+    align-items: flex-start;
+    text-align: left;
+    margin-top: 0.5rem;
+  }
+
+  .item-duration,
+  .item-participant {
+    justify-content: flex-start;
+  }
+
+  .item-actions-column {
+    width: 100%;
+    margin-top: 0.5rem;
+  }
+
+  .item-actions {
+    justify-content: flex-start;
+  }
+
+  .sub-items-container {
+    margin-left: 1.5rem;
+  }
+
+  .summary-stats {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+}
+
+/* Edit Mode */
+.edit-mode .program-item {
+  border: 1px dashed var(--ion-color-light-shade);
+}
+
+.edit-mode .program-item-wrapper:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Title Field with Resource Button */
+.title-field-with-button {
+  --padding-end: 0;
+}
+
+.resource-selector-inline {
+  display: flex;
+  align-items: center;
+  margin-left: 0.5rem;
+}
+
+/* Type Selection Section */
+.type-selection-section {
+  margin-bottom: 1.5rem;
+}
+
+.type-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--ion-color-medium);
+  margin-bottom: 0.75rem;
+}
+
+.type-buttons-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.type-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem 0.75rem;
+  min-width: 90px;
+  border: 2px solid var(--ion-color-light);
+  border-radius: 8px;
+  background: var(--ion-color-light-tint);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--ion-color-danger);
+}
+
+.type-button:hover {
+  border-color: var(--ion-color-primary-tint);
+  background: var(--ion-color-primary-tint);
+  color: white;
+}
+
+.type-button.selected {
+  border-color: var(--ion-color-primary);
+  background: var(--ion-color-primary);
+  color: white;
+}
+
+.type-icon {
+  font-size: 1.75rem;
+}
+
+.type-button:hover .type-icon {
+  color: white;
+}
+
+.type-button.selected .type-icon {
+  color: white;
+}
+
+.type-text {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.2;
+}
+
+/* Section Divider Styles */
+.program-item-wrapper.is-section {
+  margin: 1.5rem 0;
+}
+
+.program-item-wrapper.is-section .program-item {
+  background: linear-gradient(135deg, var(--ion-color-primary) 0%, var(--ion-color-primary-shade) 100%);
+  border-radius: 0;
+  padding: 0.75rem 1rem;
+}
+
+.program-item-wrapper.is-section .item-layout {
+  justify-content: center;
+}
+
+.program-item-wrapper.is-section .item-details-column {
+  text-align: center;
+}
+
+.program-item-wrapper.is-section .item-header-row {
+  justify-content: center;
+  margin-bottom: 0;
+}
+
+.program-item-wrapper.is-section .item-type {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.program-item-wrapper.is-section .item-type ion-icon {
+  display: none;
+}
+
+.program-item-wrapper.is-section .item-title {
+  color: white;
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 0;
+}
+
+.program-item-wrapper.is-section .item-subtitle,
+.program-item-wrapper.is-section .item-notes,
+.program-item-wrapper.is-section .item-resources {
+  display: none;
+}
+
+.program-item-wrapper.is-section .item-meta-column,
+.program-item-wrapper.is-section .item-actions-column {
+  display: none;
+}
+
+/* Edit mode: show actions for section */
+.edit-mode .program-item-wrapper.is-section .item-actions-column {
+  display: flex;
+}
+
+.edit-mode .program-item-wrapper.is-section .item-actions ion-button {
+  --color: white;
 }
 </style>

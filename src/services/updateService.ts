@@ -465,7 +465,7 @@ class UpdateService {
         ],
         fixes: [],
         improvements: [
-          'Intégration de la recherche YouTube similaire à ServiceProgramPageFlat',
+          'Intégration de la recherche YouTube similaire à ServiceProgramPage',
           'Sélection rapide de vidéos YouTube pour les ressources'
         ]
       },
