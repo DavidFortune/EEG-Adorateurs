@@ -122,6 +122,11 @@ const routes: Array<RouteRecordRaw> = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/invite/:serviceId',
+    component: () => import('@/views/InvitePage.vue'),
+    meta: { requiresAuth: false } // Public route - handles auth internally
+  },
+  {
     path: '/about',
     component: () => import('@/views/corporate/AboutPage.vue')
   },

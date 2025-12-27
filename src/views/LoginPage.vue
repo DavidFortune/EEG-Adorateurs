@@ -108,6 +108,7 @@ import {
 import { authService } from '@/firebase/auth';
 import { membersService } from '@/firebase/members';
 import { useOnboardingStore } from '@/stores/onboarding';
+import { invitationService } from '@/services/invitationService';
 
 const router = useRouter();
 const onboardingStore = useOnboardingStore();
@@ -142,16 +143,23 @@ const handleGoogleSignIn = async () => {
   loading.value = true;
   try {
     const user = await authService.signInWithGoogle();
-    
+
     // Check if user has completed onboarding
     const hasCompletedOnboarding = await membersService.hasCompletedOnboarding(user.uid);
-    
+
+    // Check for pending redirect from invitation link
+    const pendingRedirect = invitationService.getAndClearPostLoginRedirect();
+
     if (hasCompletedOnboarding) {
       await showToast('Connexion réussie !', 'success');
-      router.replace('/accueil');
+      router.replace(pendingRedirect || '/accueil');
     } else {
-      onboardingStore.updateFormData({ 
-        email: user.email || '' 
+      // If there's a pending redirect, re-save it for after onboarding
+      if (pendingRedirect) {
+        invitationService.setPostLoginRedirect(pendingRedirect);
+      }
+      onboardingStore.updateFormData({
+        email: user.email || ''
       });
       await showToast('Connexion réussie !', 'success');
       router.push('/onboarding/welcome');
@@ -198,10 +206,17 @@ onMounted(async () => {
     try {
       // Check if user has completed onboarding
       const hasCompletedOnboarding = await membersService.hasCompletedOnboarding(currentUser.uid);
-      
+
+      // Check for pending redirect from invitation link
+      const pendingRedirect = invitationService.getAndClearPostLoginRedirect();
+
       if (hasCompletedOnboarding) {
-        router.replace('/accueil');
+        router.replace(pendingRedirect || '/accueil');
       } else {
+        // If there's a pending redirect, re-save it for after onboarding
+        if (pendingRedirect) {
+          invitationService.setPostLoginRedirect(pendingRedirect);
+        }
         router.replace('/onboarding/welcome');
       }
     } catch (error) {

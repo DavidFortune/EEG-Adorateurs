@@ -9,6 +9,9 @@
         </ion-buttons>
         <ion-title>Détail du Service</ion-title>
         <ion-buttons slot="end">
+          <ion-button @click="shareService" fill="clear">
+            <ion-icon :icon="shareOutline" />
+          </ion-button>
           <ion-button v-if="isAdmin" @click="openAdminActions" fill="clear">
             <ion-icon :icon="ellipsisVertical" />
           </ion-button>
@@ -147,8 +150,9 @@ import {
 import {
   arrowBackOutline, ellipsisVertical, checkmarkCircle, alertCircleOutline,
   closeOutline, pencilOutline, personAddOutline, eyeOutline, eyeOffOutline,
-  trashOutline
+  trashOutline, shareOutline
 } from 'ionicons/icons';
+import { invitationService } from '@/services/invitationService';
 import { Service } from '@/types/service';
 import { serviceService } from '@/services/serviceService';
 import { db } from '@/firebase/config';
@@ -601,6 +605,37 @@ const getInitials = (name: string): string => {
   if (names.length === 0) return '?';
   if (names.length === 1) return names[0].charAt(0).toUpperCase();
   return names[0].charAt(0).toUpperCase() + names[names.length - 1].charAt(0).toUpperCase();
+};
+
+// Share service
+const shareService = async () => {
+  if (!service.value) return;
+
+  try {
+    await invitationService.shareServiceInvite(service.value);
+  } catch (error: any) {
+    // If share was cancelled or failed, fallback to clipboard
+    if (error?.message !== 'Share canceled') {
+      try {
+        const link = invitationService.generateInviteLink(service.value.id);
+        await navigator.clipboard.writeText(link);
+        const toast = await toastController.create({
+          message: 'Lien copié dans le presse-papiers',
+          duration: 2000,
+          color: 'success'
+        });
+        await toast.present();
+      } catch (clipboardError) {
+        console.error('Error copying to clipboard:', clipboardError);
+        const toast = await toastController.create({
+          message: 'Erreur lors du partage',
+          duration: 3000,
+          color: 'danger'
+        });
+        await toast.present();
+      }
+    }
+  }
 };
 
 // Navigation

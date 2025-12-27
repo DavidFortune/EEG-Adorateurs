@@ -53,6 +53,7 @@ import { useOnboardingStore } from '@/stores/onboarding';
 import { authService } from '@/firebase/auth';
 import { membersService } from '@/firebase/members';
 import { teamsService } from '@/firebase/teams';
+import { invitationService } from '@/services/invitationService';
 
 const router = useRouter();
 const onboardingStore = useOnboardingStore();
@@ -149,7 +150,9 @@ const saveUserData = async () => {
 };
 
 const navigateToHome = () => {
-  router.replace('/accueil');
+  // Check for pending redirect from invitation link
+  const pendingRedirect = invitationService.getAndClearPostLoginRedirect();
+  router.replace(pendingRedirect || '/accueil');
 };
 
 onMounted(async () => {

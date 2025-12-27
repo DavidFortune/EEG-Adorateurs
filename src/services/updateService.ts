@@ -241,6 +241,23 @@ class UpdateService {
   async getReleaseNotes(): Promise<ReleaseNote[]> {
     return [
       {
+        version: '1.12.4',
+        date: '2025-12-27',
+        title: 'Liens d\'invitation aux services',
+        description: 'Partagez des liens d\'invitation vers des services spécifiques via WhatsApp, SMS, Email et plus',
+        features: [
+          'Bouton de partage sur la page de détail d\'un service',
+          'Partage natif via WhatsApp, SMS, Email et autres applications',
+          'Liens d\'invitation qui redirigent vers le service après connexion',
+          'Support du flux d\'onboarding pour les nouveaux utilisateurs invités'
+        ],
+        fixes: [],
+        improvements: [
+          'Copie automatique du lien dans le presse-papiers si le partage natif échoue',
+          'Message d\'invitation formaté avec titre du service et date/heure'
+        ]
+      },
+      {
         version: '1.12.3',
         date: '2025-12-27',
         title: 'Création rapide de ressources et améliorations du programme',
