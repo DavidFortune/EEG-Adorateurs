@@ -93,8 +93,8 @@
             <div class="resource-list">
             <ion-loading :is-open="loading" message="Chargement..."></ion-loading>
             
-            <div 
-              v-for="resource in filteredResources" 
+            <div
+              v-for="resource in filteredResources"
               :key="resource.id"
               class="resource-item"
               :class="{ 'selected': isResourceSelected(resource.id) }"
@@ -113,10 +113,20 @@
                     </span>
                   </div>
                 </div>
-                <div class="selection-indicator">
-                  <ion-icon 
-                    :icon="isResourceSelected(resource.id) ? checkmarkCircle : ellipseOutline" 
+                <div class="resource-actions">
+                  <ion-button
+                    v-if="getYouTubeVideoId(resource)"
+                    @click.stop="previewYouTubeVideo(resource)"
+                    fill="clear"
+                    size="small"
+                    color="danger"
+                  >
+                    <ion-icon :icon="playCircleOutline" slot="icon-only" />
+                  </ion-button>
+                  <ion-icon
+                    :icon="isResourceSelected(resource.id) ? checkmarkCircle : ellipseOutline"
                     :color="isResourceSelected(resource.id) ? 'primary' : 'medium'"
+                    class="selection-icon"
                   />
                 </div>
               </div>
@@ -207,6 +217,47 @@
         </ion-toolbar>
       </ion-footer>
     </ion-modal>
+
+    <!-- YouTube Preview Modal -->
+    <ion-modal :is-open="showYouTubePreview" @will-dismiss="closeYouTubePreview">
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>Aperçu vidéo</ion-title>
+          <ion-buttons slot="end">
+            <ion-button @click="closeYouTubePreview">
+              <ion-icon :icon="closeOutline" />
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content>
+        <div class="youtube-preview-container" v-if="previewingResource">
+          <iframe
+            :src="`https://www.youtube.com/embed/${getYouTubeVideoId(previewingResource)}`"
+            frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen
+            class="youtube-iframe"
+          ></iframe>
+          <div class="preview-info">
+            <h3>{{ previewingResource.title }}</h3>
+          </div>
+        </div>
+      </ion-content>
+      <ion-footer>
+        <ion-toolbar>
+          <div class="preview-actions">
+            <ion-button @click="closeYouTubePreview" fill="outline" color="medium">
+              Fermer
+            </ion-button>
+            <ion-button @click="selectPreviewedResource">
+              <ion-icon :icon="checkmarkCircle" slot="start" />
+              Sélectionner
+            </ion-button>
+          </div>
+        </ion-toolbar>
+      </ion-footer>
+    </ion-modal>
   </div>
 </template>
 
@@ -218,7 +269,7 @@ import {
   IonLoading, IonItem, IonInput, IonTextarea, IonSpinner, toastController
 } from '@ionic/vue';
 import {
-  addOutline, closeOutline, checkmarkCircle, ellipseOutline, documentOutline
+  addOutline, closeOutline, checkmarkCircle, ellipseOutline, documentOutline, playCircleOutline
 } from 'ionicons/icons';
 import { ResourceType, type Resource, type ResourceCollection, type ResourceMedia } from '@/types/resource';
 import { getResources, getResourceCollections, createResource } from '@/firebase/resources';
@@ -262,6 +313,10 @@ const creatingResource = ref(false);
 const resources = ref<Resource[]>([]);
 const collections = ref<ResourceCollection[]>([]);
 const tempSelectedId = ref<string | null>(null);
+
+// YouTube preview state
+const showYouTubePreview = ref(false);
+const previewingResource = ref<Resource | null>(null);
 
 // Computed
 const selectedResource = computed(() => {
@@ -389,6 +444,42 @@ const getResourceCollectionNames = (resource: Resource) => {
   if (!resource.collectionId) return [];
   const collection = collections.value.find(c => c.id === resource.collectionId);
   return collection ? [collection.name] : [];
+};
+
+// YouTube preview functions
+const getYouTubeVideoId = (resource: Resource): string | null => {
+  const youtubeContent = resource.contents.find(c => c.type === 'youtube' || c.type === 'video');
+  if (!youtubeContent || !youtubeContent.url) return null;
+
+  // Extract video ID from YouTube URL
+  const url = youtubeContent.url;
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\s?]+)/,
+    /^([a-zA-Z0-9_-]{11})$/ // Direct video ID
+  ];
+
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match) return match[1];
+  }
+  return null;
+};
+
+const previewYouTubeVideo = (resource: Resource) => {
+  previewingResource.value = resource;
+  showYouTubePreview.value = true;
+};
+
+const closeYouTubePreview = () => {
+  showYouTubePreview.value = false;
+  previewingResource.value = null;
+};
+
+const selectPreviewedResource = () => {
+  if (previewingResource.value) {
+    tempSelectedId.value = previewingResource.value.id;
+    closeYouTubePreview();
+  }
 };
 
 const onResourceCreated = async (resource: Resource) => {
@@ -578,7 +669,13 @@ onMounted(() => {
   font-weight: 500;
 }
 
-.selection-indicator {
+.resource-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.selection-icon {
   font-size: 24px;
 }
 
@@ -659,5 +756,35 @@ onMounted(() => {
 
 .create-button {
   margin-top: 8px;
+}
+
+/* YouTube Preview Modal */
+.youtube-preview-container {
+  padding: 1rem;
+}
+
+.youtube-iframe {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.preview-info {
+  padding: 0 0.5rem;
+}
+
+.preview-info h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--ion-color-dark);
+}
+
+.preview-actions {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.75rem 1rem;
 }
 </style>

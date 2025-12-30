@@ -101,7 +101,7 @@ function normalizeBookName(name: string): string {
  * - "Jean 3:16" (single verse)
  * - "Psaume 23:1-6" (verse range)
  * - "1 Corinthiens 13:4-7" (numbered book with range)
- * - "Psaume 23" (full chapter)
+ * - "Psaumes 100" (full chapter - fetches all verses)
  * - "Gen 1:1" (abbreviated)
  */
 export function parseBibleReference(input: string): BibleReference | null {
@@ -130,7 +130,7 @@ export function parseBibleReference(input: string): BibleReference | null {
   }
 
   const chapter = parseInt(chapterStr, 10);
-  const verseStart = verseStartStr ? parseInt(verseStartStr, 10) : 1;
+  const verseStart = verseStartStr ? parseInt(verseStartStr, 10) : undefined;
   const verseEnd = verseEndStr ? parseInt(verseEndStr, 10) : undefined;
 
   return {
@@ -160,11 +160,15 @@ export async function fetchVerses(reference: BibleReference): Promise<BibleVerse
 
     const data: BibleApiResponse[] = await response.json();
 
-    // Filter to the verses we need
-    const endVerse = verseEnd || verseStart;
-    const filteredData = data.filter(item =>
-      item.verse >= verseStart && item.verse <= endVerse
-    );
+    // If no verseStart specified, return all verses (whole chapter)
+    // Otherwise filter to the specified range
+    let filteredData = data;
+    if (verseStart !== undefined) {
+      const endVerse = verseEnd || verseStart;
+      filteredData = data.filter(item =>
+        item.verse >= verseStart && item.verse <= endVerse
+      );
+    }
 
     return filteredData.map(item => ({
       book: bookId,
@@ -193,10 +197,15 @@ export function formatVersesForDisplay(verses: BibleVerse[]): string {
 }
 
 /**
- * Format reference for display (e.g., "Jean 3:16-18")
+ * Format reference for display (e.g., "Jean 3:16-18" or "Psaumes 100")
  */
 export function formatReferenceForDisplay(reference: BibleReference): string {
   const { book, chapter, verseStart, verseEnd } = reference;
+
+  // Whole chapter (no verses specified)
+  if (verseStart === undefined) {
+    return `${book} ${chapter}`;
+  }
 
   if (verseEnd && verseEnd > verseStart) {
     return `${book} ${chapter}:${verseStart}-${verseEnd}`;

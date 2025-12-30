@@ -149,7 +149,7 @@
                     <div class="item-header-row">
                       <div class="item-type">
                         <ion-icon :icon="getItemIcon(item.type)" />
-                        {{ item.type }}
+                        <span v-if="!isSectionItem(item)">{{ item.type }}</span>
                       </div>
 
                       <!-- Expand/Collapse Button for Sub-Items -->
@@ -236,7 +236,19 @@
                       <ion-icon :icon="timeOutline" />
                       {{ item.duration }}min
                     </div>
-                    <div v-if="item.participant" class="item-participant">
+                    <!-- Multiple participants -->
+                    <div v-if="item.participants && item.participants.length > 0" class="item-participants">
+                      <div v-for="participant in item.participants" :key="participant.id" class="item-participant">
+                        <ion-avatar v-if="participant.avatar" class="participant-avatar">
+                          <img :src="participant.avatar" :alt="participant.name" />
+                        </ion-avatar>
+                        <span v-else class="participant-initials">{{ getParticipantInitials(participant.name) }}</span>
+                        {{ participant.name }}
+                        <span v-if="participant.role" class="participant-role">({{ participant.role }})</span>
+                      </div>
+                    </div>
+                    <!-- Legacy single participant support -->
+                    <div v-else-if="item.participant" class="item-participant">
                       <ion-avatar v-if="item.participant.avatar" class="participant-avatar">
                         <img :src="item.participant.avatar" :alt="item.participant.name" />
                       </ion-avatar>
@@ -249,7 +261,7 @@
                   <!-- Edit/Delete Actions (Edit Mode) -->
                   <div v-if="isEditMode" class="item-column item-actions-column">
                     <div class="item-actions">
-                      <ion-button @click="showAddSubItemModalForItem(item.id)" fill="clear" size="small" color="success">
+                      <ion-button v-if="item.type === 'Chant' || item.type === 'Prière'" @click="showAddSubItemModalForItem(item.id)" fill="clear" size="small" color="success">
                         <ion-icon :icon="addOutline" slot="icon-only" />
                       </ion-button>
                       <ion-button @click="showEditItemModalForItem(item)" fill="clear" size="small" color="primary">
@@ -427,10 +439,11 @@
           </ion-item>
 
           <ion-item lines="none">
-            <ion-label position="stacked">Participant (optionnel)</ion-label>
+            <ion-label position="stacked">Participants (optionnel)</ion-label>
             <ParticipantSelector
-              v-model="itemForm.participant"
+              v-model:participants="itemForm.participants"
               :service-id="route.params.id as string"
+              :multiple="true"
             />
           </ion-item>
 
@@ -974,8 +987,8 @@ const itemForm = ref({
   type: '' as ProgramItemType,
   title: '',
   subtitle: '',
-  participant: null as ProgramParticipant | null,
-  duration: 5,
+  participants: [] as ProgramParticipant[],
+  duration: 0,
   notes: '',
   resourceId: null as string | null,
   scriptureReference: '',
@@ -1392,9 +1405,20 @@ const updateProgramInfo = async () => {
   try {
     loading.value = true;
 
+    // Clean up conductor object to remove undefined values
+    let conductor = editProgramForm.value.conductor;
+    if (conductor) {
+      conductor = { ...conductor };
+      Object.keys(conductor).forEach(key => {
+        if ((conductor as any)[key] === undefined) {
+          delete (conductor as any)[key];
+        }
+      });
+    }
+
     await updateProgram(
       program.value.id,
-      { conductor: editProgramForm.value.conductor ?? deleteField() } as any,
+      { conductor: conductor ?? deleteField() } as any,
       user.value.uid
     );
 
@@ -1415,8 +1439,8 @@ const showAddItemModal = () => {
     type: '' as ProgramItemType,
     title: '',
     subtitle: '',
-    participant: null,
-    duration: 5,
+    participants: [],
+    duration: 0,
     notes: '',
     resourceId: null,
     scriptureReference: '',
@@ -1428,12 +1452,20 @@ const showAddItemModal = () => {
 
 const showEditItemModalForItem = (item: ProgramItem) => {
   editingItemId.value = item.id;
+  // Handle migration from single participant to multiple participants
+  let participants: ProgramParticipant[] = [];
+  if (item.participants && item.participants.length > 0) {
+    participants = item.participants;
+  } else if (item.participant) {
+    // Migrate old single participant to array
+    participants = [item.participant];
+  }
   itemForm.value = {
     type: item.type,
     title: item.title,
     subtitle: item.subtitle || '',
-    participant: item.participant || null,
-    duration: item.duration || 5,
+    participants,
+    duration: item.duration || 0,
     notes: item.notes || '',
     resourceId: item.resourceId || null,
     scriptureReference: item.scriptureReference || '',
@@ -1524,7 +1556,15 @@ const addItem = async () => {
 
     // Only add optional fields if they have values
     if (itemForm.value.subtitle) newItem.subtitle = itemForm.value.subtitle;
-    if (itemForm.value.participant) newItem.participant = itemForm.value.participant;
+    if (itemForm.value.participants && itemForm.value.participants.length > 0) {
+      // Clean up participants to remove undefined values
+      newItem.participants = itemForm.value.participants.map(p => {
+        const cleaned: any = { id: p.id, name: p.name, isCustom: p.isCustom };
+        if (p.avatar) cleaned.avatar = p.avatar;
+        if (p.role) cleaned.role = p.role;
+        return cleaned;
+      });
+    }
     if (itemForm.value.duration) newItem.duration = itemForm.value.duration;
     if (itemForm.value.notes) newItem.notes = itemForm.value.notes;
     if (itemForm.value.resourceId) newItem.resourceId = itemForm.value.resourceId;
@@ -1563,8 +1603,18 @@ const updateItem = async () => {
 
     // Only add optional fields if they have values
     if (itemForm.value.subtitle) updates.subtitle = itemForm.value.subtitle;
-    // Always include participant (null to remove, object to set)
-    updates.participant = itemForm.value.participant || undefined;
+    // Always include participants (empty array to remove, array to set)
+    if (itemForm.value.participants && itemForm.value.participants.length > 0) {
+      // Clean up participants to remove undefined values
+      updates.participants = itemForm.value.participants.map(p => {
+        const cleaned: any = { id: p.id, name: p.name, isCustom: p.isCustom };
+        if (p.avatar) cleaned.avatar = p.avatar;
+        if (p.role) cleaned.role = p.role;
+        return cleaned;
+      });
+    }
+    // Clear old participant field if it exists
+    updates.participant = undefined;
     if (itemForm.value.duration) updates.duration = itemForm.value.duration;
     if (itemForm.value.notes) updates.notes = itemForm.value.notes;
     if (itemForm.value.resourceId) updates.resourceId = itemForm.value.resourceId;
@@ -2647,6 +2697,13 @@ onUnmounted(() => {
   color: var(--ion-color-medium-shade);
 }
 
+.item-participants {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-items: flex-end;
+}
+
 .participant-avatar {
   width: 24px;
   height: 24px;
@@ -3293,6 +3350,10 @@ onUnmounted(() => {
     justify-content: flex-start;
   }
 
+  .item-participants {
+    align-items: flex-start;
+  }
+
   .item-actions-column {
     width: 100%;
     margin-top: 0.5rem;
@@ -3448,18 +3509,23 @@ onUnmounted(() => {
   display: none;
 }
 
-.program-item-wrapper.is-section .item-meta-column,
-.program-item-wrapper.is-section .item-actions-column {
+.program-item-wrapper.is-section .item-meta-column {
   display: none;
 }
 
-/* Edit mode: show actions for section */
-.edit-mode .program-item-wrapper.is-section .item-actions-column {
-  display: flex;
+/* Hide actions for section in view mode, show in edit mode */
+.program-item-wrapper.is-section .item-actions-column {
+  display: flex !important;
 }
 
-.edit-mode .program-item-wrapper.is-section .item-actions ion-button {
-  --color: white;
+.program-item-wrapper.is-section .item-actions ion-button {
+  --color: white !important;
+  --ion-color-primary: white;
+  --ion-color-danger: white;
+}
+
+.program-item-wrapper.is-section .item-actions ion-button ion-icon {
+  color: white !important;
 }
 
 /* Scripture Fetch Section */

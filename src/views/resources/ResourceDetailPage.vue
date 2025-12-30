@@ -563,12 +563,22 @@
                 <span class="result-title">{{ result.title }}</span>
                 <span class="result-channel">{{ result.channel }}</span>
               </div>
-              <ion-icon
-                v-if="selectedYouTubeResult?.id === result.id"
-                :icon="checkmarkCircle"
-                color="primary"
-                class="selection-icon"
-              />
+              <div class="result-actions">
+                <ion-button
+                  @click.stop="previewYouTubeResult(result)"
+                  fill="clear"
+                  size="small"
+                  color="danger"
+                >
+                  <ion-icon :icon="playCircleOutline" slot="icon-only" />
+                </ion-button>
+                <ion-icon
+                  v-if="selectedYouTubeResult?.id === result.id"
+                  :icon="checkmarkCircle"
+                  color="primary"
+                  class="selection-icon"
+                />
+              </div>
             </div>
           </div>
 
@@ -595,6 +605,48 @@
           </div>
         </div>
       </ion-content>
+    </ion-modal>
+
+    <!-- YouTube Preview Modal -->
+    <ion-modal :is-open="showYouTubePreviewModal" @will-dismiss="closeYouTubePreview">
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>Aperçu vidéo</ion-title>
+          <ion-buttons slot="end">
+            <ion-button @click="closeYouTubePreview">
+              <ion-icon :icon="closeOutline" />
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content>
+        <div class="youtube-preview-container" v-if="previewingYouTubeVideo">
+          <iframe
+            :src="`https://www.youtube.com/embed/${previewingYouTubeVideo.id}`"
+            frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen
+            class="youtube-preview-iframe"
+          ></iframe>
+          <div class="youtube-preview-info">
+            <h3>{{ previewingYouTubeVideo.title }}</h3>
+            <p class="channel-name">{{ previewingYouTubeVideo.channel }}</p>
+          </div>
+        </div>
+      </ion-content>
+      <ion-footer>
+        <ion-toolbar>
+          <div class="youtube-preview-actions">
+            <ion-button @click="closeYouTubePreview" fill="outline" color="medium">
+              Fermer
+            </ion-button>
+            <ion-button @click="selectAndClosePreview">
+              <ion-icon :icon="checkmarkCircle" slot="start" />
+              Sélectionner
+            </ion-button>
+          </div>
+        </ion-toolbar>
+      </ion-footer>
     </ion-modal>
 
     <!-- Upload File Modal -->
@@ -823,6 +875,10 @@ const youtubeSearchResults = ref<YouTubeSearchResult[]>([]);
 const youtubeSearchLoading = ref(false);
 const youtubeSearchPerformed = ref(false);
 const selectedYouTubeResult = ref<YouTubeSearchResult | null>(null);
+
+// YouTube preview state
+const showYouTubePreviewModal = ref(false);
+const previewingYouTubeVideo = ref<YouTubeSearchResult | null>(null);
 
 // File upload modal state
 const showUploadModal = ref(false);
@@ -1095,6 +1151,24 @@ const selectYouTubeResult = (result: YouTubeSearchResult) => {
     selectedYouTubeResult.value = null;
   } else {
     selectedYouTubeResult.value = result;
+  }
+};
+
+// Preview YouTube video
+const previewYouTubeResult = (result: YouTubeSearchResult) => {
+  previewingYouTubeVideo.value = result;
+  showYouTubePreviewModal.value = true;
+};
+
+const closeYouTubePreview = () => {
+  showYouTubePreviewModal.value = false;
+  previewingYouTubeVideo.value = null;
+};
+
+const selectAndClosePreview = () => {
+  if (previewingYouTubeVideo.value) {
+    selectedYouTubeResult.value = previewingYouTubeVideo.value;
+    closeYouTubePreview();
   }
 };
 
@@ -2549,6 +2623,49 @@ onUnmounted(() => {
 .selection-icon {
   font-size: 1.5rem;
   flex-shrink: 0;
+}
+
+.result-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+/* YouTube Preview Modal */
+.youtube-preview-container {
+  padding: 1rem;
+}
+
+.youtube-preview-iframe {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.youtube-preview-info {
+  padding: 0 0.5rem;
+}
+
+.youtube-preview-info h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--ion-color-dark);
+}
+
+.youtube-preview-info .channel-name {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--ion-color-medium);
+}
+
+.youtube-preview-actions {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.75rem 1rem;
 }
 
 .no-results {

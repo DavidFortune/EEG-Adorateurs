@@ -7,7 +7,7 @@ export interface BibleReference {
   book: string;           // French book name (normalized)
   bookId: number;         // API book ID (1-66)
   chapter: number;
-  verseStart: number;
+  verseStart?: number;    // Optional - if undefined, fetch whole chapter
   verseEnd?: number;      // Optional for verse ranges
 }
 

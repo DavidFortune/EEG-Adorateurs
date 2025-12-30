@@ -29,14 +29,16 @@
         <!-- Segment Tabs -->
         <ion-segment v-model="selectedSegment" class="segment-tabs">
           <ion-segment-button value="programme">
-            <ion-label>Programme</ion-label>
+            <ion-icon :icon="listOutline" class="segment-icon" />
+            <ion-label class="segment-label">Programme</ion-label>
           </ion-segment-button>
-          <!-- Hidden for now, keeping logic for later -->
-          <ion-segment-button v-if="false" value="ressources">
-            <ion-label>Ressources</ion-label>
+          <ion-segment-button value="ressources">
+            <ion-icon :icon="musicalNotesOutline" class="segment-icon" />
+            <ion-label class="segment-label">Ressources</ion-label>
           </ion-segment-button>
           <ion-segment-button value="members">
-            <ion-label>Membres</ion-label>
+            <ion-icon :icon="peopleOutline" class="segment-icon" />
+            <ion-label class="segment-label">Membres</ion-label>
           </ion-segment-button>
         </ion-segment>
 
@@ -150,7 +152,7 @@ import {
 import {
   arrowBackOutline, ellipsisVertical, checkmarkCircle, alertCircleOutline,
   closeOutline, pencilOutline, personAddOutline, eyeOutline, eyeOffOutline,
-  trashOutline, shareOutline
+  trashOutline, shareOutline, listOutline, musicalNotesOutline, peopleOutline
 } from 'ionicons/icons';
 import { invitationService } from '@/services/invitationService';
 import { Service } from '@/types/service';
@@ -777,6 +779,25 @@ onUnmounted(() => {
   font-weight: 500;
   text-transform: none;
   min-height: 44px;
+}
+
+.segment-icon {
+  font-size: 1.2rem;
+}
+
+.segment-label {
+  margin-left: 6px;
+}
+
+/* Mobile: show only icons */
+@media (max-width: 576px) {
+  .segment-label {
+    display: none;
+  }
+
+  .segment-icon {
+    font-size: 1.3rem;
+  }
 }
 
 .tab-content {

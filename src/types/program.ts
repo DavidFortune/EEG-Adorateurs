@@ -31,7 +31,8 @@ export interface ProgramItem {
   title: string;
   subtitle?: string;
   notes?: string;
-  participant?: ProgramParticipant;
+  participant?: ProgramParticipant; // DEPRECATED: use participants instead
+  participants?: ProgramParticipant[]; // Multiple participants
   duration?: number; // in minutes
   lyrics?: string; // For songs
   resourceId?: string; // Link to a single resource (1:1 relationship)

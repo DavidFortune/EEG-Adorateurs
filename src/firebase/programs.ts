@@ -321,32 +321,41 @@ export const deleteSectionFromProgram = async (
  * Add item to program
  */
 export const addItemToProgram = async (
-  programId: string, 
-  item: Omit<ProgramItem, 'id'>, 
+  programId: string,
+  item: Omit<ProgramItem, 'id'>,
   userId: string
 ): Promise<ProgramItem> => {
   try {
     const programRef = doc(db, PROGRAMS_COLLECTION, programId);
     const programDoc = await getDoc(programRef);
-    
+
     if (!programDoc.exists()) {
       throw new Error('Program not found');
     }
-    
+
     const programData = programDoc.data() as FirestoreProgram;
+
+    // Create new item and remove undefined values (Firestore doesn't accept them)
     const newItem: ProgramItem = {
       ...item,
       id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
     };
-    
+
+    // Remove undefined values
+    Object.keys(newItem).forEach(key => {
+      if ((newItem as any)[key] === undefined) {
+        delete (newItem as any)[key];
+      }
+    });
+
     const updatedItems = [...programData.items, newItem];
-    
+
     await updateDoc(programRef, {
       items: updatedItems,
       updatedAt: serverTimestamp(),
       updatedBy: userId
     });
-    
+
     return newItem;
   } catch (error) {
     console.error('Error adding item:', error);

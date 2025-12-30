@@ -1,9 +1,30 @@
 <template>
   <div class="participant-selector">
-    <!-- Display selected participant -->
-    <div v-if="modelValue" class="selected-participant">
+    <!-- Display selected participants (multiple mode) -->
+    <div v-if="multiple && selectedParticipants.length > 0" class="selected-participants-list">
+      <div v-for="participant in selectedParticipants" :key="participant.id" class="selected-participant">
+        <ion-avatar class="participant-avatar">
+          <img v-if="getParticipantAvatar(participant)" :src="getParticipantAvatar(participant) ?? undefined" :alt="participant.name" />
+          <span v-else class="initials">{{ getInitials(participant.name) }}</span>
+        </ion-avatar>
+        <div class="participant-details">
+          <span class="participant-name">{{ participant.name }}</span>
+          <span v-if="participant.role" class="participant-role">{{ participant.role }}</span>
+        </div>
+        <ion-button fill="clear" size="small" color="danger" @click="removeParticipantFromList(participant.id)">
+          <ion-icon :icon="closeOutline" slot="icon-only" />
+        </ion-button>
+      </div>
+      <ion-button @click="openModal" fill="outline" size="small" class="add-more-btn">
+        <ion-icon :icon="personAddOutline" slot="start" />
+        Ajouter
+      </ion-button>
+    </div>
+
+    <!-- Display selected participant (single mode) -->
+    <div v-else-if="!multiple && modelValue" class="selected-participant">
       <ion-avatar class="participant-avatar">
-        <img v-if="participantAvatar" :src="participantAvatar" :alt="modelValue.name" />
+        <img v-if="participantAvatar" :src="participantAvatar ?? undefined" :alt="modelValue.name" />
         <span v-else class="initials">{{ getInitials(modelValue.name) }}</span>
       </ion-avatar>
       <div class="participant-details">
@@ -138,16 +159,26 @@ import type { Member } from '@/types/member';
 import type { ProgramParticipant } from '@/types/program';
 
 interface Props {
-  modelValue: ProgramParticipant | null;
+  modelValue?: ProgramParticipant | null;
+  participants?: ProgramParticipant[];
   serviceId: string;
+  multiple?: boolean;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  modelValue: null,
+  participants: () => [],
+  multiple: false
+});
 
 const emit = defineEmits<{
   'update:modelValue': [value: ProgramParticipant | null];
+  'update:participants': [value: ProgramParticipant[]];
   'guest-added': [memberId: string];
 }>();
+
+// Computed: selected participants for multiple mode
+const selectedParticipants = computed(() => props.participants || []);
 
 // Modal state
 const isOpen = ref(false);
@@ -162,12 +193,20 @@ const searchQuery = ref('');
 const customName = ref('');
 const customRole = ref('');
 
-// Computed: participant avatar (for existing members)
+// Computed: participant avatar (for existing members - single mode)
 const participantAvatar = computed(() => {
   if (!props.modelValue || props.modelValue.isCustom) return null;
   const member = members.value.find(m => m.id === props.modelValue?.id);
-  return member?.avatar || null;
+  return member?.avatar || props.modelValue?.avatar || null;
 });
+
+// Get avatar for a participant (multiple mode)
+const getParticipantAvatar = (participant: ProgramParticipant): string | null => {
+  if (participant.isCustom) return null;
+  if (participant.avatar) return participant.avatar;
+  const member = members.value.find(m => m.id === participant.id);
+  return member?.avatar || null;
+};
 
 // Computed: filtered members based on search
 const filteredMembers = computed(() => {
@@ -205,6 +244,9 @@ const getInitials = (name: string): string => {
 
 // Check if member is selected
 const isSelected = (memberId: string): boolean => {
+  if (props.multiple) {
+    return selectedParticipants.value.some(p => p.id === memberId && !p.isCustom);
+  }
   return props.modelValue?.id === memberId && !props.modelValue?.isCustom;
 };
 
@@ -241,16 +283,27 @@ const selectMember = async (member: Member) => {
     }
   }
 
-  // Create participant object with avatar
+  // Create participant object with avatar (only include avatar if it exists)
   const participant: ProgramParticipant = {
     id: member.id,
     name: member.fullName,
-    avatar: member.avatar || undefined,
     isCustom: false
   };
+  if (member.avatar) {
+    participant.avatar = member.avatar;
+  }
 
-  emit('update:modelValue', participant);
-  closeModal();
+  if (props.multiple) {
+    // Check if already selected
+    if (!isSelected(member.id)) {
+      const newList = [...selectedParticipants.value, participant];
+      emit('update:participants', newList);
+    }
+    closeModal();
+  } else {
+    emit('update:modelValue', participant);
+    closeModal();
+  }
 };
 
 // Confirm custom participant
@@ -260,17 +313,31 @@ const confirmCustom = () => {
   const participant: ProgramParticipant = {
     id: `custom_${Date.now()}`,
     name: customName.value.trim(),
-    role: customRole.value.trim() || undefined,
     isCustom: true
   };
+  if (customRole.value.trim()) {
+    participant.role = customRole.value.trim();
+  }
 
-  emit('update:modelValue', participant);
-  closeModal();
+  if (props.multiple) {
+    const newList = [...selectedParticipants.value, participant];
+    emit('update:participants', newList);
+    closeModal();
+  } else {
+    emit('update:modelValue', participant);
+    closeModal();
+  }
 };
 
-// Remove participant
+// Remove participant (single mode)
 const removeParticipant = () => {
   emit('update:modelValue', null);
+};
+
+// Remove participant from list (multiple mode)
+const removeParticipantFromList = (participantId: string) => {
+  const newList = selectedParticipants.value.filter(p => p.id !== participantId);
+  emit('update:participants', newList);
 };
 
 // Preload members when component mounts
@@ -346,6 +413,23 @@ watch(activeTab, (newTab) => {
 .add-participant-btn {
   --padding-start: 12px;
   --padding-end: 12px;
+}
+
+.selected-participants-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.selected-participants-list .selected-participant {
+  margin-bottom: 0;
+}
+
+.add-more-btn {
+  --padding-start: 12px;
+  --padding-end: 12px;
+  align-self: flex-start;
+  margin-top: 4px;
 }
 
 /* Modal content */
