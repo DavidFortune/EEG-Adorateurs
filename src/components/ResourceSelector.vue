@@ -1,42 +1,45 @@
 <template>
   <div class="resource-selector">
-    <div class="selected-resource" v-if="selectedResource">
-      <h4>Ressource liée</h4>
-      <div class="selected-resource-item">
-        <div class="resource-info">
-          <div class="resource-avatar">
-            <span>{{ getResourceTypeIcon(selectedResource) }}</span>
+    <!-- Single selection mode: show selected resource -->
+    <template v-if="!modalOnly">
+      <div class="selected-resource" v-if="selectedResource">
+        <h4>Ressource liée</h4>
+        <div class="selected-resource-item">
+          <div class="resource-info">
+            <div class="resource-avatar">
+              <span>{{ getResourceTypeIcon(selectedResource) }}</span>
+            </div>
+            <div class="resource-details">
+              <span class="resource-title">{{ selectedResource.title }}</span>
+              <span class="resource-types">{{ getResourceTypeList(selectedResource) }}</span>
+            </div>
           </div>
-          <div class="resource-details">
-            <span class="resource-title">{{ selectedResource.title }}</span>
-            <span class="resource-types">{{ getResourceTypeList(selectedResource) }}</span>
-          </div>
+          <ion-button
+            @click="removeResource()"
+            fill="clear"
+            size="small"
+            color="danger"
+          >
+            <ion-icon :icon="closeOutline" slot="icon-only" />
+          </ion-button>
         </div>
-        <ion-button 
-          @click="removeResource()" 
-          fill="clear" 
-          size="small" 
-          color="danger"
+      </div>
+
+      <div class="resource-search">
+        <ion-button
+          @click="openResourceModal"
+          :fill="buttonFill"
+          :size="buttonSize"
+          :disabled="loading"
         >
-          <ion-icon :icon="closeOutline" slot="icon-only" />
+          <ion-icon :icon="addOutline" slot="start" />
+          {{ modelValue ? 'Changer la ressource' : 'Lier une ressource' }}
         </ion-button>
       </div>
-    </div>
-
-    <div class="resource-search">
-      <ion-button
-        @click="openResourceModal"
-        :fill="buttonFill"
-        :size="buttonSize"
-        :disabled="loading"
-      >
-        <ion-icon :icon="addOutline" slot="start" />
-        {{ modelValue ? 'Changer la ressource' : 'Lier une ressource' }}
-      </ion-button>
-    </div>
+    </template>
 
     <!-- Resource Selection Modal -->
-    <ion-modal :is-open="isModalOpen" @will-dismiss="closeResourceModal">
+    <ion-modal :is-open="actualModalOpen" @will-dismiss="closeResourceModal">
       <ion-header>
         <ion-toolbar>
           <ion-title>Sélectionner une ressource</ion-title>
@@ -210,8 +213,8 @@
             <ion-button @click="closeResourceModal" fill="outline" color="medium">
               Annuler
             </ion-button>
-            <ion-button @click="confirmSelection" :disabled="!tempSelectedId">
-              Confirmer
+            <ion-button @click="confirmSelection" :disabled="!hasSelection">
+              {{ multiple ? `Confirmer (${selectionCount})` : 'Confirmer' }}
             </ion-button>
           </div>
         </ion-toolbar>
@@ -262,7 +265,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import {
   IonButton, IonIcon, IonModal, IonHeader, IonToolbar, IonTitle, IonButtons,
   IonContent, IonFooter, IonSearchbar, IonSegment, IonSegmentButton, IonLabel,
@@ -277,16 +280,30 @@ import NaturalResourceSelector from '@/components/NaturalResourceSelector.vue';
 import { useUser } from '@/composables/useUser';
 
 interface Props {
-  modelValue: string | null;
+  modelValue?: string | null;
+  selectedIds?: string[];
+  excludeIds?: string[];
+  multiple?: boolean;
+  modalOnly?: boolean;
+  isOpen?: boolean;
   buttonFill?: 'clear' | 'outline' | 'solid';
   buttonSize?: 'small' | 'default' | 'large';
 }
 
 interface Emits {
   (event: 'update:modelValue', value: string | null): void;
+  (event: 'update:selectedIds', value: string[]): void;
+  (event: 'update:isOpen', value: boolean): void;
+  (event: 'confirm', selectedIds: string[]): void;
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  modelValue: null,
+  selectedIds: () => [],
+  excludeIds: () => [],
+  multiple: false,
+  modalOnly: false,
+  isOpen: false,
   buttonFill: 'outline',
   buttonSize: 'default'
 });
@@ -313,10 +330,14 @@ const creatingResource = ref(false);
 const resources = ref<Resource[]>([]);
 const collections = ref<ResourceCollection[]>([]);
 const tempSelectedId = ref<string | null>(null);
+const tempSelectedIds = ref<string[]>([]);
 
 // YouTube preview state
 const showYouTubePreview = ref(false);
 const previewingResource = ref<Resource | null>(null);
+
+// Computed for modal open state (internal or external control)
+const actualModalOpen = computed(() => props.modalOnly ? props.isOpen : isModalOpen.value);
 
 // Computed
 const selectedResource = computed(() => {
@@ -326,6 +347,11 @@ const selectedResource = computed(() => {
 
 const filteredResources = computed(() => {
   let filtered = resources.value;
+
+  // Exclude already selected/linked resources
+  if (props.excludeIds.length > 0) {
+    filtered = filtered.filter(resource => !props.excludeIds.includes(resource.id));
+  }
 
   // Filter by search query
   if (searchQuery.value.trim()) {
@@ -344,20 +370,27 @@ const filteredResources = computed(() => {
   }
 
   return filtered;
+
 });
+
+// Computed: selection count for multi-select mode
+const selectionCount = computed(() => tempSelectedIds.value.length);
 
 // Methods
 const openResourceModal = async () => {
-  tempSelectedId.value = props.modelValue;
+  tempSelectedId.value = props.modelValue ?? null;
+  tempSelectedIds.value = [...props.selectedIds];
   isModalOpen.value = true;
   await loadResources();
 };
 
 const closeResourceModal = () => {
   isModalOpen.value = false;
+  emit('update:isOpen', false);
   searchQuery.value = '';
   selectedCollectionId.value = '';
   tempSelectedId.value = null;
+  tempSelectedIds.value = [];
   activeTab.value = 'existing';
   // Reset quick create form
   quickCreateForm.value = { title: '', collectionId: '', lyrics: '' };
@@ -392,21 +425,45 @@ const filterByCollection = (event: CustomEvent) => {
 };
 
 const toggleResource = (resource: Resource) => {
-  if (tempSelectedId.value === resource.id) {
-    tempSelectedId.value = null;
+  if (props.multiple) {
+    const index = tempSelectedIds.value.indexOf(resource.id);
+    if (index === -1) {
+      tempSelectedIds.value.push(resource.id);
+    } else {
+      tempSelectedIds.value.splice(index, 1);
+    }
   } else {
-    tempSelectedId.value = resource.id;
+    if (tempSelectedId.value === resource.id) {
+      tempSelectedId.value = null;
+    } else {
+      tempSelectedId.value = resource.id;
+    }
   }
 };
 
 const isResourceSelected = (resourceId: string) => {
+  if (props.multiple) {
+    return tempSelectedIds.value.includes(resourceId);
+  }
   return tempSelectedId.value === resourceId;
 };
 
 const confirmSelection = () => {
-  emit('update:modelValue', tempSelectedId.value);
+  if (props.multiple) {
+    emit('update:selectedIds', [...tempSelectedIds.value]);
+    emit('confirm', [...tempSelectedIds.value]);
+  } else {
+    emit('update:modelValue', tempSelectedId.value);
+  }
   closeResourceModal();
 };
+
+const hasSelection = computed(() => {
+  if (props.multiple) {
+    return tempSelectedIds.value.length > 0;
+  }
+  return tempSelectedId.value !== null;
+});
 
 const removeResource = () => {
   emit('update:modelValue', null);
@@ -543,6 +600,15 @@ const handleQuickCreate = async () => {
     creatingResource.value = false;
   }
 };
+
+// Watch for external modal control
+watch(() => props.isOpen, async (newVal) => {
+  if (newVal && props.modalOnly) {
+    tempSelectedIds.value = [...props.selectedIds];
+    tempSelectedId.value = props.modelValue ?? null;
+    await loadResources();
+  }
+});
 
 // Load initial data if needed
 onMounted(() => {

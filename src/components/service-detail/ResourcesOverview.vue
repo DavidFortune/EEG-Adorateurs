@@ -58,99 +58,23 @@
       </div>
     </div>
 
-    <!-- Add Resources Modal -->
-    <ion-modal :is-open="isModalOpen" @will-dismiss="closeModal">
-      <ion-header>
-        <ion-toolbar>
-          <ion-title>Ajouter des ressources</ion-title>
-          <ion-buttons slot="end">
-            <ion-button @click="closeModal" fill="clear">
-              <ion-icon :icon="closeOutline" />
-            </ion-button>
-          </ion-buttons>
-        </ion-toolbar>
-        <ion-toolbar>
-          <ion-searchbar
-            v-model="searchQuery"
-            placeholder="Rechercher une ressource..."
-            :debounce="300"
-          />
-        </ion-toolbar>
-      </ion-header>
-
-      <ion-content>
-        <div class="modal-content">
-          <!-- Collection Filter -->
-          <div v-if="collections.length > 0" class="collection-filter">
-            <ion-segment :value="selectedCollectionId" @ion-change="onCollectionChange" scrollable>
-              <ion-segment-button value="">
-                <ion-label>Toutes</ion-label>
-              </ion-segment-button>
-              <ion-segment-button
-                v-for="collection in collections"
-                :key="collection.id"
-                :value="collection.id"
-              >
-                <ion-label>{{ collection.symbol }}</ion-label>
-              </ion-segment-button>
-            </ion-segment>
-          </div>
-
-          <!-- Loading -->
-          <div v-if="loadingResources" class="modal-loading">
-            <ion-spinner name="crescent" />
-          </div>
-
-          <!-- Resource List -->
-          <div v-else class="modal-resource-list">
-            <div
-              v-for="resource in filteredAvailableResources"
-              :key="resource.id"
-              class="modal-resource-item"
-              :class="{ selected: selectedResourceIds.includes(resource.id) }"
-              @click="toggleResourceSelection(resource.id)"
-            >
-              <div class="modal-resource-info">
-                <span class="modal-resource-title">{{ resource.title }}</span>
-                <span class="modal-resource-collection">{{ getCollectionName(resource.collectionId) }}</span>
-              </div>
-              <ion-icon
-                :icon="selectedResourceIds.includes(resource.id) ? checkmarkCircle : ellipseOutline"
-                :color="selectedResourceIds.includes(resource.id) ? 'primary' : 'medium'"
-                class="selection-icon"
-              />
-            </div>
-
-            <div v-if="filteredAvailableResources.length === 0" class="no-results">
-              <p>Aucune ressource trouvée</p>
-            </div>
-          </div>
-        </div>
-      </ion-content>
-
-      <ion-footer>
-        <ion-toolbar>
-          <div class="modal-actions">
-            <ion-button @click="closeModal" fill="outline" color="medium">
-              Annuler
-            </ion-button>
-            <ion-button @click="confirmSelection" :disabled="selectedResourceIds.length === 0">
-              Ajouter ({{ selectedResourceIds.length }})
-            </ion-button>
-          </div>
-        </ion-toolbar>
-      </ion-footer>
-    </ion-modal>
+    <!-- Resource Selector (modal only mode) -->
+    <ResourceSelector
+      :is-open="isModalOpen"
+      :multiple="true"
+      :modal-only="true"
+      :exclude-ids="existingResourceIds"
+      @update:is-open="isModalOpen = $event"
+      @confirm="handleResourcesConfirmed"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import {
-  IonSpinner, IonIcon, IonChip, IonButton, IonModal, IonHeader, IonToolbar,
-  IonTitle, IonButtons, IonContent, IonFooter, IonSearchbar, IonSegment,
-  IonSegmentButton, IonLabel
+  IonSpinner, IonIcon, IonChip, IonButton
 } from '@ionic/vue';
 import {
   folderOpenOutline,
@@ -162,13 +86,10 @@ import {
   musicalNoteOutline,
   documentOutline,
   addOutline,
-  closeOutline,
-  checkmarkCircle,
-  ellipseOutline,
   linkOutline
 } from 'ionicons/icons';
-import type { Resource, ResourceType, ResourceCollection } from '@/types/resource';
-import { getResources, getResourceCollections } from '@/firebase/resources';
+import type { Resource, ResourceType } from '@/types/resource';
+import ResourceSelector from '@/components/ResourceSelector.vue';
 
 const router = useRouter();
 
@@ -193,92 +114,19 @@ const emit = defineEmits<{
 
 // Modal state
 const isModalOpen = ref(false);
-const loadingResources = ref(false);
-const searchQuery = ref('');
-const selectedCollectionId = ref('');
-const selectedResourceIds = ref<string[]>([]);
-
-// Data for modal
-const allResources = ref<Resource[]>([]);
-const collections = ref<ResourceCollection[]>([]);
 
 const goToResource = (resourceId: string) => {
   router.push(`/resource-detail/${resourceId}`);
 };
 
-// Filter resources for modal (exclude already associated)
-const filteredAvailableResources = computed(() => {
-  let filtered = allResources.value.filter(
-    r => !props.existingResourceIds.includes(r.id)
-  );
-
-  // Filter by search
-  if (searchQuery.value.trim()) {
-    const query = searchQuery.value.toLowerCase();
-    filtered = filtered.filter(r =>
-      r.title.toLowerCase().includes(query) ||
-      r.tags?.some(tag => tag.toLowerCase().includes(query))
-    );
-  }
-
-  // Filter by collection
-  if (selectedCollectionId.value) {
-    filtered = filtered.filter(r => r.collectionId === selectedCollectionId.value);
-  }
-
-  return filtered;
-});
-
-const getCollectionName = (collectionId: string): string => {
-  const collection = collections.value.find(c => c.id === collectionId);
-  return collection?.name || '';
-};
-
-const openAddModal = async () => {
+const openAddModal = () => {
   isModalOpen.value = true;
-  selectedResourceIds.value = [];
-  searchQuery.value = '';
-  selectedCollectionId.value = '';
+};
 
-  if (allResources.value.length === 0) {
-    loadingResources.value = true;
-    try {
-      const [resourcesData, collectionsData] = await Promise.all([
-        getResources(),
-        getResourceCollections()
-      ]);
-      allResources.value = resourcesData;
-      collections.value = collectionsData;
-    } catch (error) {
-      console.error('Error loading resources:', error);
-    } finally {
-      loadingResources.value = false;
-    }
+const handleResourcesConfirmed = (resourceIds: string[]) => {
+  if (resourceIds.length > 0) {
+    emit('addResources', resourceIds);
   }
-};
-
-const closeModal = () => {
-  isModalOpen.value = false;
-};
-
-const onCollectionChange = (event: CustomEvent) => {
-  selectedCollectionId.value = event.detail.value;
-};
-
-const toggleResourceSelection = (resourceId: string) => {
-  const index = selectedResourceIds.value.indexOf(resourceId);
-  if (index === -1) {
-    selectedResourceIds.value.push(resourceId);
-  } else {
-    selectedResourceIds.value.splice(index, 1);
-  }
-};
-
-const confirmSelection = () => {
-  if (selectedResourceIds.value.length > 0) {
-    emit('addResources', [...selectedResourceIds.value]);
-  }
-  closeModal();
 };
 
 const getResourceIcon = (resource: Resource): string => {
@@ -485,77 +333,5 @@ const getResourceTypeLabel = (resource: Resource): string => {
   font-size: 0.85rem;
   color: var(--ion-color-medium);
   margin: 4px 0 0 0;
-}
-
-/* Modal Styles */
-.modal-content {
-  padding: 16px;
-}
-
-.collection-filter {
-  margin-bottom: 16px;
-}
-
-.modal-loading {
-  display: flex;
-  justify-content: center;
-  padding: 32px;
-}
-
-.modal-resource-list {
-  display: flex;
-  flex-direction: column;
-}
-
-.modal-resource-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 12px;
-  border-bottom: 1px solid var(--ion-color-light);
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.modal-resource-item:active,
-.modal-resource-item.selected {
-  background: var(--ion-color-primary-tint);
-}
-
-.modal-resource-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-  min-width: 0;
-}
-
-.modal-resource-title {
-  font-weight: 600;
-  font-size: 0.95rem;
-  color: var(--ion-color-dark);
-}
-
-.modal-resource-collection {
-  font-size: 0.8rem;
-  color: var(--ion-color-medium);
-}
-
-.selection-icon {
-  font-size: 1.5rem;
-  flex-shrink: 0;
-}
-
-.no-results {
-  text-align: center;
-  padding: 32px;
-  color: var(--ion-color-medium);
-}
-
-.modal-actions {
-  display: flex;
-  justify-content: space-between;
-  width: 100%;
-  padding: 8px 16px;
 }
 </style>
