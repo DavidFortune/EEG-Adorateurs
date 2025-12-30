@@ -2,6 +2,47 @@
 
 All notable changes to EEG Adorateurs will be documented in this file.
 
+## [1.12.7] - 2025-12-30
+
+### Added
+- **Multiple Participants**: Support for multiple participants per program item
+  - New multi-select mode in ParticipantSelector component
+  - Display list of selected participants with avatars and roles
+  - Easy add/remove functionality for each participant
+
+- **YouTube Video Preview**: Preview videos before selection
+  - Play button in ResourceSelector to preview existing YouTube resources
+  - Play button in ResourceDetailPage "Add media" modal for search results
+  - Embedded YouTube player in preview modal
+
+- **Full Chapter Scripture Fetch**: Fetch entire Bible chapters
+  - When no verse range is specified (e.g., "Psaumes 100"), fetches all verses
+  - Made verseStart optional in BibleReference type
+
+### Enhanced
+- **ServiceDetailPage Segments**: Restored resources tab with responsive design
+  - Three segments: Programme, Ressources, Membres
+  - Icons displayed on all screen sizes
+  - Labels hidden on mobile (< 576px) for compact view
+
+- **Program Item Subitems**: Re-enabled for songs and prayers
+  - Add subitems button for 'Chant' and 'Prière' types only
+  - Removed for other item types to reduce clutter
+
+- **Section Display**: Improved section item styling
+  - Removed "Section" label (icon only)
+  - White edit/delete buttons in edit mode for better visibility
+  - Default duration set to 0
+
+### Fixed
+- **Firestore Undefined Values**: Prevented errors from undefined field values
+  - Cleanup in addItemToProgram, updateProgramInfo, addItem, updateItem
+  - ParticipantSelector no longer sets undefined avatar/role properties
+
+### Technical
+- Added fix-broken-avatars.js script for cleaning invalid avatar URLs
+- Added serviceAccountKey.json to .gitignore
+
 ## [1.10.2] - 2025-11-15
 
 ### Added
