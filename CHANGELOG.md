@@ -2,6 +2,31 @@
 
 All notable changes to EEG Adorateurs will be documented in this file.
 
+## [1.12.8] - 2026-01-04
+
+### Added
+- **Program Item Reordering**: Drag-and-drop reordering for program items and sub-items
+  - Touch-optimized using Ionic's native reorder components
+  - Reorder main program items in edit mode
+  - Reorder sub-items within expanded items
+  - Visual feedback during drag operations
+  - Automatic persistence to Firebase
+
+- **Add Item Button at Bottom**: Duplicate "Ajouter un élément" button at the end of the program list in edit mode for easier access
+
+### Enhanced
+- **Resource Selector for Services**: Reused ResourceSelector component in ServiceDetailPage
+  - Multi-select mode with tabs (Existantes, YouTube, Créer)
+  - Excludes already linked resources from selection
+
+### Fixed
+- **Scheduling Conflict Assignment**: Fixed Firebase permissions error when assigning members with conflicts
+  - Updated Firestore rules to allow updating `availabilities` field on member documents
+
+- **Smarter Conflict Detection**: Improved conflict checking when assigning team members
+  - Now only checks conflicts for services where the member's teams are required
+  - Prevents false conflict warnings for unrelated services
+
 ## [1.12.7] - 2025-12-30
 
 ### Added

@@ -299,6 +299,18 @@ export const useSchedulingStore = defineStore('scheduling', () => {
         return { canAssign: true, assignedConflicts: [], availabilityConflicts: [] };
       }
 
+      // Get member's teams to filter relevant services
+      const memberTeams = await teamsService.getMemberTeams(memberId);
+      const memberTeamNames = new Set(memberTeams.map(t => t.name));
+
+      // Filter services to only those where the member's teams are required
+      const relevantServices = allServices.filter(service => {
+        if (!service.teamRequirements) return false;
+        return service.teamRequirements.some(req =>
+          req.isActive && memberTeamNames.has(req.teamName)
+        );
+      });
+
       // Get member's assignments across all services
       const memberAssignments = await assignmentsService.getAllMemberAssignments(memberId);
       const assignedServiceIds = new Set(memberAssignments.map(a => a.serviceId));
@@ -307,8 +319,8 @@ export const useSchedulingStore = defineStore('scheduling', () => {
       const memberDetails = await membersService.getMemberById(memberId);
       const memberAvailabilities = memberDetails?.availabilities || {};
 
-      // Check each service for conflicts
-      for (const service of allServices) {
+      // Check only relevant services for conflicts
+      for (const service of relevantServices) {
         if (service.id === targetServiceId) continue;
 
         // Check if times overlap

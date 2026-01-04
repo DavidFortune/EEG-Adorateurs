@@ -14,8 +14,9 @@ service cloud.firestore {
       allow create: if request.auth != null;
       allow update: if request.auth != null &&
         (request.auth.uid == resource.data.firebaseUserId ||
-         // Allow updating teams field for team management
-         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['teams', 'updatedAt'])));
+         // Allow updating teams and availabilities fields for team scheduling
+         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['teams', 'updatedAt'])) ||
+         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['availabilities', 'updatedAt'])));
       allow delete: if false; // Never allow deletion
     }
     

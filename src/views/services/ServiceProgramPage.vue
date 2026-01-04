@@ -121,23 +121,22 @@
         <!-- Program Items (Flat List) -->
         <div v-if="program && program.items.length > 0" class="program-content">
           <div class="flat-items-view">
-            <div
-              v-for="(item, index) in sortedItems"
-              :key="item.id"
-              class="program-item-wrapper"
-              :class="{ 'has-subitems': hasSubItems(item), 'expanded': isItemExpanded(item.id), 'is-section': isSectionItem(item) }"
-            >
+            <ion-reorder-group :disabled="!isEditMode" @ionItemReorder="handleItemReorder">
+              <div
+                v-for="(item, index) in sortedItems"
+                :key="item.id"
+                class="program-item-wrapper"
+                :class="{ 'has-subitems': hasSubItems(item), 'expanded': isItemExpanded(item.id), 'is-section': isSectionItem(item) }"
+              >
               <div
                 class="program-item"
                 :class="`item-${item.type.toLowerCase().replace(/\s+/g, '-')}`"
               >
                 <div class="item-layout">
                   <!-- Drag Handle (Edit Mode) -->
-                  <div v-if="isEditMode" class="item-column item-handle-column">
-                    <div class="drag-handle">
-                      <ion-icon :icon="reorderThreeOutline" />
-                    </div>
-                  </div>
+                  <ion-reorder v-if="isEditMode" class="item-column item-handle-column">
+                    <ion-icon :icon="reorderThreeOutline" class="drag-handle-icon" />
+                  </ion-reorder>
 
                   <!-- Order Number (hidden for Section items, excludes sections from count) -->
                   <div v-if="!isSectionItem(item)" class="item-column item-order-column">
@@ -276,14 +275,18 @@
 
                 <!-- Sub-Items (Expanded) -->
                 <div v-if="hasSubItems(item) && isItemExpanded(item.id)" class="sub-items-container">
-                  <div
-                    v-for="subItem in getSortedSubItems(item)"
-                    :key="subItem.id"
-                    class="sub-item"
-                  >
-                    <div class="sub-item-layout">
-                      <div class="sub-item-bullet">•</div>
-                      <div class="sub-item-content">
+                  <ion-reorder-group :disabled="!isEditMode" @ionItemReorder="(e) => handleSubItemReorder(e, item.id)">
+                    <div
+                      v-for="subItem in getSortedSubItems(item)"
+                      :key="subItem.id"
+                      class="sub-item"
+                    >
+                      <div class="sub-item-layout">
+                        <ion-reorder v-if="isEditMode" class="sub-item-handle">
+                          <ion-icon :icon="reorderTwoOutline" />
+                        </ion-reorder>
+                        <div v-else class="sub-item-bullet">•</div>
+                        <div class="sub-item-content">
                         <span class="sub-item-title">
                           {{ subItem.resourceId && getLinkedResource(subItem.resourceId) ? getLinkedResource(subItem.resourceId)?.title : subItem.title }}
                         </span>
@@ -322,9 +325,19 @@
                       </div>
                     </div>
                   </div>
+                  </ion-reorder-group>
                 </div>
               </div>
             </div>
+            </ion-reorder-group>
+          </div>
+
+          <!-- Add Item Button (Bottom) -->
+          <div v-if="isEditMode" class="add-item-container add-item-bottom">
+            <ion-button @click="showAddItemModal" fill="outline" size="default" class="add-item-button">
+              <ion-icon :icon="addOutline" slot="start" />
+              Ajouter un élément
+            </ion-button>
           </div>
         </div>
       </div>
@@ -917,14 +930,14 @@ import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonBackButton,
   IonButton, IonIcon, IonCard, IonCardContent, IonLoading, IonModal, IonAvatar,
   IonItem, IonLabel, IonInput, IonTextarea, IonSelect, IonSelectOption,
-  IonSpinner, toastController, alertController
+  IonSpinner, IonReorderGroup, IonReorder, toastController, alertController
 } from '@ionic/vue';
 import {
   calendarOutline, createOutline, listOutline, timeOutline,
   personOutline, documentTextOutline, musicalNotesOutline,
   closeOutline, musicalNoteOutline, libraryOutline, micOutline,
   megaphoneOutline, giftOutline, handLeftOutline, personCircleOutline,
-  checkmarkOutline, reorderThreeOutline, addOutline, trashOutline,
+  checkmarkOutline, reorderThreeOutline, reorderTwoOutline, addOutline, trashOutline,
   playCircleOutline, volumeHighOutline, documentOutline,
   chatboxEllipsesOutline, chevronDownOutline, chevronForwardOutline,
   arrowBackOutline, logoYoutube, playBackOutline, playForwardOutline,
@@ -946,7 +959,8 @@ import {
   deleteItemFromProgram,
   addSubItemToItem,
   updateSubItemInItem,
-  deleteSubItemFromItem
+  deleteSubItemFromItem,
+  updateProgramOrder
 } from '@/firebase/programs';
 import type { Service } from '@/types/service';
 import type { ServiceProgram, ProgramItem, ProgramParticipant, ProgramSubItem } from '@/types/program';
@@ -1657,6 +1671,107 @@ const deleteItem = async (itemId: string) => {
     await showToast('Erreur lors de la suppression', 'danger');
   } finally {
     loading.value = false;
+  }
+};
+
+// Handle item reorder (drag and drop)
+const handleItemReorder = async (event: CustomEvent) => {
+  if (!program.value || !user.value) {
+    event.detail.complete();
+    return;
+  }
+
+  const { from, to } = event.detail;
+
+  // Don't process if position unchanged
+  if (from === to) {
+    event.detail.complete();
+    return;
+  }
+
+  // Clone items array and perform reorder
+  const itemsCopy = [...program.value.items];
+  const [movedItem] = itemsCopy.splice(from, 1);
+  itemsCopy.splice(to, 0, movedItem);
+
+  // Update order property for all items
+  itemsCopy.forEach((item, index) => {
+    item.order = index;
+  });
+
+  // Optimistic UI update
+  program.value.items = itemsCopy;
+
+  // Complete the reorder animation
+  event.detail.complete();
+
+  // Persist to Firebase
+  try {
+    await updateProgramOrder(
+      program.value.id,
+      program.value.sections,
+      itemsCopy,
+      user.value.uid
+    );
+  } catch (error) {
+    console.error('Error saving item order:', error);
+    // Reload program to revert on error
+    await loadProgram();
+    await showToast('Erreur lors de la réorganisation', 'danger');
+  }
+};
+
+// Handle sub-item reorder (drag and drop)
+const handleSubItemReorder = async (event: CustomEvent, parentItemId: string) => {
+  if (!program.value || !user.value) {
+    event.detail.complete();
+    return;
+  }
+
+  const { from, to } = event.detail;
+
+  // Don't process if position unchanged
+  if (from === to) {
+    event.detail.complete();
+    return;
+  }
+
+  // Find parent item
+  const parentItem = program.value.items.find(i => i.id === parentItemId);
+  if (!parentItem?.subItems) {
+    event.detail.complete();
+    return;
+  }
+
+  // Clone sub-items array and perform reorder
+  const subItemsCopy = [...parentItem.subItems];
+  const [movedSubItem] = subItemsCopy.splice(from, 1);
+  subItemsCopy.splice(to, 0, movedSubItem);
+
+  // Update order property for all sub-items
+  subItemsCopy.forEach((subItem, index) => {
+    subItem.order = index;
+  });
+
+  // Optimistic UI update
+  parentItem.subItems = subItemsCopy;
+
+  // Complete the reorder animation
+  event.detail.complete();
+
+  // Persist to Firebase
+  try {
+    await updateItemInProgram(
+      program.value.id,
+      parentItemId,
+      { subItems: subItemsCopy },
+      user.value.uid
+    );
+  } catch (error) {
+    console.error('Error saving sub-item order:', error);
+    // Reload program to revert on error
+    await loadProgram();
+    await showToast('Erreur lors de la réorganisation', 'danger');
   }
 };
 
@@ -2476,18 +2591,59 @@ onUnmounted(() => {
   width: 30px;
 }
 
-.drag-handle {
+/* Drag handle styles for ion-reorder */
+ion-reorder.item-handle-column {
   cursor: grab;
-  color: var(--ion-color-medium);
-  font-size: 1.5rem;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0.25rem;
+  flex-shrink: 0;
+  width: 40px;
 }
 
-.drag-handle:active {
+ion-reorder.item-handle-column:active {
   cursor: grabbing;
+}
+
+.drag-handle-icon {
+  color: var(--ion-color-medium);
+  font-size: 1.5rem;
+}
+
+/* Visual feedback during drag */
+.program-item-wrapper.item-reorder-active {
+  background: var(--ion-color-light-shade);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  z-index: 100;
+}
+
+/* Sub-item reorder handle */
+.sub-item-handle {
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.125rem;
+  flex-shrink: 0;
+  width: 24px;
+}
+
+.sub-item-handle:active {
+  cursor: grabbing;
+}
+
+.sub-item-handle ion-icon {
+  font-size: 1rem;
+  color: var(--ion-color-medium);
+}
+
+/* Sub-item visual feedback during drag */
+.sub-item.item-reorder-active {
+  background: var(--ion-color-light-tint);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
 }
 
 .item-order-column {
