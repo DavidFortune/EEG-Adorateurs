@@ -2,6 +2,26 @@
 
 All notable changes to EEG Adorateurs will be documented in this file.
 
+## [1.12.9] - 2026-01-04
+
+### Added
+- **Position (Poste) Feature**: New position management system for team members
+  - Define positions per team (e.g., Guitariste, Chef de louange)
+  - Assign default positions to team members
+  - Drag-and-drop reordering of positions
+  - Position displayed in team member list and scheduling view
+  - Position ID format: `teamname-positionname` (lowercase, hyphenated)
+
+### Enhanced
+- **Scheduling Integration**: Positions now integrated with member scheduling
+  - Member's default position automatically assigned when scheduling
+  - Position displayed in MemberItem during scheduling
+  - Position stored with service assignments
+
+### Fixed
+- **Resource Collection Error**: Fixed Firebase error when loading resources without a collection
+  - Added guard for empty/undefined collectionId in getResourceCollectionById
+
 ## [1.12.8] - 2026-01-04
 
 ### Added
