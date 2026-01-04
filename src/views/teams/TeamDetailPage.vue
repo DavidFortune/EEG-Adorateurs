@@ -82,6 +82,44 @@
           </ion-button>
         </div>
 
+        <!-- Positions Section -->
+        <ion-card v-if="canManageMembers" class="positions-card">
+          <ion-card-header>
+            <div class="card-header-with-action">
+              <ion-card-title class="section-title">
+                <ion-icon :icon="ribbonOutline" class="section-icon"></ion-icon>
+                Postes ({{ team.positions?.length || 0 }})
+              </ion-card-title>
+              <ion-button fill="clear" size="small" @click="openAddPositionModal">
+                <ion-icon :icon="addOutline" slot="icon-only"></ion-icon>
+              </ion-button>
+            </div>
+          </ion-card-header>
+          <ion-card-content>
+            <div v-if="!team.positions || team.positions.length === 0" class="empty-positions">
+              <p>Aucun poste défini</p>
+              <ion-button fill="outline" size="small" @click="openAddPositionModal">
+                Ajouter un poste
+              </ion-button>
+            </div>
+            <ion-reorder-group v-else :disabled="false" @ionItemReorder="handlePositionReorder">
+              <ion-item v-for="position in sortedPositions" :key="position.id" class="position-item">
+                <ion-icon :icon="ribbonOutline" slot="start" color="primary" />
+                <ion-label>
+                  <h3>{{ position.name }}</h3>
+                  <p class="position-usage">{{ getMembersWithPosition(position.id).length }} membre(s)</p>
+                </ion-label>
+                <ion-buttons slot="end">
+                  <ion-button fill="clear" @click="openEditPositionModal(position)">
+                    <ion-icon :icon="pencilOutline" slot="icon-only" />
+                  </ion-button>
+                </ion-buttons>
+                <ion-reorder slot="end"></ion-reorder>
+              </ion-item>
+            </ion-reorder-group>
+          </ion-card-content>
+        </ion-card>
+
         <!-- Pending Members Section -->
         <ion-card v-if="pendingMembers.length > 0 && canManageMembers" class="pending-members-card">
           <ion-card-header>
@@ -172,6 +210,10 @@
                   <div class="member-details">
                     <h4 class="member-name">{{ getMemberData(teamMember.memberId)?.fullName || 'Membre inconnu' }}</h4>
                     <p class="member-role">{{ getRoleDisplayName(teamMember.role) }}</p>
+                    <p class="member-position" v-if="getMemberPositionName(teamMember)">
+                      <ion-icon :icon="ribbonOutline" class="position-icon"></ion-icon>
+                      {{ getMemberPositionName(teamMember) }}
+                    </p>
                     <p class="member-joined">Rejoint le {{ formatDate(teamMember.joinedAt) }}</p>
                   </div>
                 </div>
@@ -482,6 +524,124 @@
           </div>
         </ion-content>
       </ion-modal>
+
+      <!-- Position Modal (Add/Edit) -->
+      <ion-modal :is-open="showPositionModal" @did-dismiss="closePositionModal">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>{{ editingPosition ? 'Modifier le poste' : 'Ajouter un poste' }}</ion-title>
+            <ion-buttons slot="end">
+              <ion-button fill="clear" @click="closePositionModal">
+                <ion-icon :icon="closeOutline"></ion-icon>
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="ion-padding">
+          <div class="modal-content">
+            <div class="form-section">
+              <ion-label class="form-label">
+                <strong>Nom du poste *</strong>
+              </ion-label>
+              <ion-item lines="none" class="form-item">
+                <ion-input
+                  v-model="positionName"
+                  placeholder="Ex: Guitariste, Chef de louange..."
+                  @keyup.enter="savePosition"
+                ></ion-input>
+              </ion-item>
+            </div>
+
+            <div class="modal-buttons">
+              <ion-button
+                expand="block"
+                @click="savePosition"
+                :disabled="!positionName?.trim()"
+                color="primary"
+                size="large"
+              >
+                {{ editingPosition ? 'Modifier' : 'Ajouter' }}
+              </ion-button>
+
+              <ion-button
+                v-if="editingPosition"
+                expand="block"
+                fill="outline"
+                color="danger"
+                @click="confirmDeletePosition"
+                :disabled="getMembersWithPosition(editingPosition.id).length > 0"
+              >
+                Supprimer le poste
+              </ion-button>
+              <p v-if="editingPosition && getMembersWithPosition(editingPosition.id).length > 0" class="delete-warning">
+                Ce poste ne peut pas être supprimé car il est utilisé par {{ getMembersWithPosition(editingPosition.id).length }} membre(s).
+              </p>
+
+              <ion-button
+                expand="block"
+                fill="clear"
+                @click="closePositionModal"
+              >
+                Annuler
+              </ion-button>
+            </div>
+          </div>
+        </ion-content>
+      </ion-modal>
+
+      <!-- Change Member Position Modal -->
+      <ion-modal :is-open="showChangeMemberPositionModal" @did-dismiss="showChangeMemberPositionModal = false">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>Changer le poste</ion-title>
+            <ion-buttons slot="end">
+              <ion-button fill="clear" @click="showChangeMemberPositionModal = false">
+                <ion-icon :icon="closeOutline"></ion-icon>
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content>
+          <div class="modal-content">
+            <div class="member-info-header" v-if="memberToChangePosition">
+              <ion-avatar class="member-avatar">
+                <img v-if="getMemberData(memberToChangePosition.memberId)?.avatar"
+                     :src="getMemberData(memberToChangePosition.memberId)?.avatar"
+                     :alt="getMemberData(memberToChangePosition.memberId)?.fullName" />
+                <div v-else class="avatar-initials">
+                  {{ getMemberInitials(memberToChangePosition.memberId) }}
+                </div>
+              </ion-avatar>
+              <div>
+                <h3>{{ getMemberData(memberToChangePosition.memberId)?.fullName || 'Membre' }}</h3>
+                <p class="current-role">Poste actuel: {{ getMemberPositionName(memberToChangePosition) || 'Aucun' }}</p>
+              </div>
+            </div>
+
+            <ion-list>
+              <ion-radio-group v-model="selectedPositionId">
+                <ion-item>
+                  <ion-radio value="" slot="start"></ion-radio>
+                  <ion-label>Aucun poste</ion-label>
+                </ion-item>
+                <ion-item v-for="position in sortedPositions" :key="position.id">
+                  <ion-radio :value="position.id" slot="start"></ion-radio>
+                  <ion-label>{{ position.name }}</ion-label>
+                </ion-item>
+              </ion-radio-group>
+            </ion-list>
+
+            <div class="modal-buttons">
+              <ion-button
+                expand="block"
+                @click="saveMemberPosition"
+              >
+                Enregistrer
+              </ion-button>
+            </div>
+          </div>
+        </ion-content>
+      </ion-modal>
     </ion-content>
   </ion-page>
 </template>
@@ -490,20 +650,21 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import {
-  IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton, 
-  IonBackButton, IonIcon, IonCard, IonCardHeader, IonCardTitle, IonCardContent, 
+  IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
+  IonBackButton, IonIcon, IonCard, IonCardHeader, IonCardTitle, IonCardContent,
   IonSpinner, IonAvatar, IonModal, IonItem, IonLabel, IonSelect, IonSelectOption,
+  IonInput, IonReorderGroup, IonReorder, IonList, IonRadioGroup, IonRadio,
   alertController, toastController
 } from '@ionic/vue';
 import {
   peopleOutline, createOutline, alertCircleOutline, calendarOutline,
   ellipsisVerticalOutline, trashOutline, closeOutline, addOutline,
-  swapHorizontalOutline, checkmarkDoneOutline, timeOutline
+  swapHorizontalOutline, checkmarkDoneOutline, timeOutline, ribbonOutline, pencilOutline
 } from 'ionicons/icons';
 import { teamsService } from '@/firebase/teams';
 import { membersService } from '@/firebase/members';
 import { useUser } from '@/composables/useUser';
-import type { Team, TeamMember } from '@/types/team';
+import type { Team, TeamMember, TeamPosition } from '@/types/team';
 import type { Member } from '@/types/member';
 import { timezoneUtils } from '@/utils/timezone';
 
@@ -525,6 +686,14 @@ const memberToChangeRole = ref<TeamMember | null>(null);
 const memberToApprove = ref<TeamMember | null>(null);
 const newRole = ref<'leader' | 'member' | 'guest'>('member');
 const approveRole = ref<'leader' | 'member' | 'guest'>('member');
+
+// Position state
+const showPositionModal = ref(false);
+const showChangeMemberPositionModal = ref(false);
+const editingPosition = ref<TeamPosition | null>(null);
+const positionName = ref('');
+const memberToChangePosition = ref<TeamMember | null>(null);
+const selectedPositionId = ref<string>('');
 
 const teamId = route.params.id as string;
 
@@ -638,6 +807,177 @@ const formatDate = (dateString: string) => {
   return timezoneUtils.formatDateForDisplay(dateString);
 };
 
+// Position computed properties and functions
+const sortedPositions = computed(() => {
+  if (!team.value?.positions) return [];
+  return [...team.value.positions].sort((a, b) => a.order - b.order);
+});
+
+const getMembersWithPosition = (positionId: string) => {
+  if (!team.value) return [];
+  return team.value.members.filter(m => m.positionId === positionId);
+};
+
+const getMemberPositionName = (teamMember: TeamMember): string | null => {
+  if (!team.value?.positions || !teamMember.positionId) return null;
+  const position = team.value.positions.find(p => p.id === teamMember.positionId);
+  return position?.name || null;
+};
+
+const openAddPositionModal = () => {
+  editingPosition.value = null;
+  positionName.value = '';
+  showPositionModal.value = true;
+};
+
+const openEditPositionModal = (position: TeamPosition) => {
+  editingPosition.value = position;
+  positionName.value = position.name;
+  showPositionModal.value = true;
+};
+
+const closePositionModal = () => {
+  showPositionModal.value = false;
+  editingPosition.value = null;
+  positionName.value = '';
+};
+
+const savePosition = async () => {
+  if (!positionName.value.trim() || !team.value) return;
+
+  try {
+    if (editingPosition.value) {
+      await teamsService.updatePosition(teamId, editingPosition.value.id, positionName.value.trim());
+    } else {
+      await teamsService.addPosition(teamId, positionName.value.trim());
+    }
+
+    await loadTeam();
+    closePositionModal();
+
+    const toast = await toastController.create({
+      message: editingPosition.value ? 'Poste modifié' : 'Poste ajouté',
+      duration: 2000,
+      color: 'success'
+    });
+    toast.present();
+  } catch (error: any) {
+    console.error('Error saving position:', error);
+    const toast = await toastController.create({
+      message: error.message || 'Erreur lors de l\'enregistrement',
+      duration: 3000,
+      color: 'danger'
+    });
+    toast.present();
+  }
+};
+
+const confirmDeletePosition = async () => {
+  if (!editingPosition.value) return;
+
+  const alert = await alertController.create({
+    header: 'Supprimer le poste',
+    message: `Êtes-vous sûr de vouloir supprimer le poste "${editingPosition.value.name}" ?`,
+    buttons: [
+      { text: 'Annuler', role: 'cancel' },
+      {
+        text: 'Supprimer',
+        role: 'destructive',
+        handler: async () => {
+          try {
+            await teamsService.deletePosition(teamId, editingPosition.value!.id);
+            await loadTeam();
+            closePositionModal();
+
+            const toast = await toastController.create({
+              message: 'Poste supprimé',
+              duration: 2000,
+              color: 'success'
+            });
+            toast.present();
+          } catch (error: any) {
+            console.error('Error deleting position:', error);
+            const toast = await toastController.create({
+              message: error.message || 'Erreur lors de la suppression',
+              duration: 3000,
+              color: 'danger'
+            });
+            toast.present();
+          }
+        }
+      }
+    ]
+  });
+  await alert.present();
+};
+
+const handlePositionReorder = async (event: CustomEvent) => {
+  if (!team.value?.positions) {
+    event.detail.complete();
+    return;
+  }
+
+  const { from, to } = event.detail;
+  const positionsCopy = [...team.value.positions].sort((a, b) => a.order - b.order);
+  const [movedPosition] = positionsCopy.splice(from, 1);
+  positionsCopy.splice(to, 0, movedPosition);
+
+  // Update order values
+  const orderedIds = positionsCopy.map(p => p.id);
+
+  event.detail.complete();
+
+  try {
+    await teamsService.reorderPositions(teamId, orderedIds);
+    await loadTeam();
+  } catch (error) {
+    console.error('Error reordering positions:', error);
+    const toast = await toastController.create({
+      message: 'Erreur lors du réordonnancement',
+      duration: 2000,
+      color: 'danger'
+    });
+    toast.present();
+  }
+};
+
+const openChangeMemberPositionModal = (teamMember: TeamMember) => {
+  memberToChangePosition.value = teamMember;
+  selectedPositionId.value = teamMember.positionId || '';
+  showChangeMemberPositionModal.value = true;
+};
+
+const saveMemberPosition = async () => {
+  if (!memberToChangePosition.value) return;
+
+  try {
+    await teamsService.updateMemberPosition(
+      teamId,
+      memberToChangePosition.value.memberId,
+      selectedPositionId.value || null
+    );
+
+    await loadTeam();
+    showChangeMemberPositionModal.value = false;
+    memberToChangePosition.value = null;
+
+    const toast = await toastController.create({
+      message: 'Poste du membre mis à jour',
+      duration: 2000,
+      color: 'success'
+    });
+    toast.present();
+  } catch (error: any) {
+    console.error('Error updating member position:', error);
+    const toast = await toastController.create({
+      message: error.message || 'Erreur lors de la mise à jour',
+      duration: 3000,
+      color: 'danger'
+    });
+    toast.present();
+  }
+};
+
 const loadTeam = async () => {
   try {
     loading.value = true;
@@ -720,6 +1060,12 @@ const showMemberActions = async (teamMember: TeamMember) => {
         text: 'Changer le rôle',
         handler: () => openChangeRoleModal(teamMember)
       },
+      ...(team.value?.positions && team.value.positions.length > 0
+        ? [{
+            text: 'Changer le poste',
+            handler: () => openChangeMemberPositionModal(teamMember)
+          }]
+        : []),
       {
         text: 'Retirer de l\'équipe',
         role: 'destructive',
@@ -1132,6 +1478,61 @@ onMounted(() => {
   font-size: 0.75rem;
   color: #6B7280;
   margin: 0;
+}
+
+.member-position {
+  font-size: 0.8125rem;
+  color: #059669;
+  font-weight: 500;
+  margin: 0 0 0.25rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.position-icon {
+  font-size: 0.875rem;
+}
+
+/* Positions Section */
+.positions-card {
+  margin-bottom: 1.5rem;
+}
+
+.empty-positions {
+  text-align: center;
+  padding: 1.5rem;
+  color: #6B7280;
+}
+
+.empty-positions p {
+  margin: 0 0 1rem 0;
+}
+
+.position-item {
+  --background: transparent;
+  --padding-start: 0;
+  --inner-padding-end: 0;
+}
+
+.position-item h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+.position-usage {
+  font-size: 0.75rem;
+  color: #6B7280;
+  margin: 0.25rem 0 0 0;
+}
+
+.delete-warning {
+  font-size: 0.75rem;
+  color: var(--ion-color-danger);
+  text-align: center;
+  margin: 0.5rem 0 0 0;
 }
 
 .member-status {

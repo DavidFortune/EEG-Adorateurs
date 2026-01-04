@@ -230,13 +230,24 @@ export const useSchedulingStore = defineStore('scheduling', () => {
 
           // Check if member is assigned to current team
           const isAssignedToCurrentTeam = assignedMemberIds.has(teamMember.memberId);
-          
+
           // Check if member is assigned to another team for this service
-          const memberOtherAssignments = assignments.filter(a => 
+          const memberOtherAssignments = assignments.filter(a =>
             a.memberId === teamMember.memberId && a.teamId !== team.id
           );
           const isAssignedToOtherTeam = memberOtherAssignments.length > 0;
           const assignedTeamName = isAssignedToOtherTeam ? memberOtherAssignments[0].teamName : undefined;
+
+          // Get member's default position from team membership
+          const defaultPositionId = teamMember.positionId;
+          const defaultPositionName = defaultPositionId
+            ? team.positions?.find(p => p.id === defaultPositionId)?.name
+            : undefined;
+
+          // Get assigned position if member is assigned to this team
+          const memberAssignment = teamAssignments.find(a => a.memberId === teamMember.memberId);
+          const assignedPositionId = memberAssignment?.positionId;
+          const assignedPositionName = memberAssignment?.positionName;
 
           members.push({
             id: teamMember.memberId,
@@ -245,7 +256,11 @@ export const useSchedulingStore = defineStore('scheduling', () => {
             isAssigned: isAssignedToCurrentTeam,
             isAssignedToOtherTeam,
             assignedTeamName,
-            avatar: memberDetails.avatar
+            avatar: memberDetails.avatar,
+            positionId: defaultPositionId,
+            positionName: defaultPositionName,
+            assignedPositionId,
+            assignedPositionName
           });
         }
 
@@ -400,17 +415,24 @@ export const useSchedulingStore = defineStore('scheduling', () => {
         const allMembers = await membersService.getAllMembers();
         const memberDetails = allMembers.find(m => m.id === memberId);
         if (memberDetails) {
+          // Use member's default position from team membership
           await assignmentsService.createAssignment(
             {
               serviceId: event.id,
               teamId: teamId,
               memberId: memberId,
-              assignedBy: currentUserId.value
+              assignedBy: currentUserId.value,
+              positionId: member.positionId,
+              positionName: member.positionName
             },
             memberDetails.fullName,
-            team.name
+            team.name,
+            member.positionId,
+            member.positionName
           );
           member.isAssigned = true;
+          member.assignedPositionId = member.positionId;
+          member.assignedPositionName = member.positionName;
           team.assigned++;
         }
       }

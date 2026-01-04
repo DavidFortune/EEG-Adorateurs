@@ -1,12 +1,14 @@
-import { 
-  collection, 
-  doc, 
-  getDocs, 
-  addDoc, 
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  addDoc,
+  updateDoc,
   deleteDoc,
-  query, 
+  query,
   where,
-  Timestamp 
+  Timestamp
 } from 'firebase/firestore';
 import { db } from './config';
 import type { 
@@ -39,11 +41,17 @@ export const assignmentsService = {
   /**
    * Create a new assignment
    */
-  async createAssignment(request: CreateAssignmentRequest, memberName: string, teamName: string): Promise<ServiceAssignment> {
+  async createAssignment(
+    request: CreateAssignmentRequest,
+    memberName: string,
+    teamName: string,
+    positionId?: string,
+    positionName?: string
+  ): Promise<ServiceAssignment> {
     try {
       // First check if member already has an assignment for this service
       const existingAssignments = await this.getMemberServiceAssignments(request.serviceId, request.memberId);
-      
+
       // If member already has assignments for this service, remove them first
       if (existingAssignments.length > 0) {
         for (const assignment of existingAssignments) {
@@ -57,6 +65,8 @@ export const assignmentsService = {
         teamName,
         memberId: request.memberId,
         memberName,
+        positionId: positionId || request.positionId,
+        positionName: positionName || request.positionName,
         assignedAt: new Date().toISOString(),
         assignedBy: request.assignedBy
       };
@@ -219,6 +229,51 @@ export const assignmentsService = {
     } catch (error) {
       console.error('Error getting all member assignments:', error);
       throw new Error('Failed to fetch all member assignments');
+    }
+  },
+
+  /**
+   * Update position on an existing assignment
+   */
+  async updateAssignmentPosition(
+    assignmentId: string,
+    positionId: string | null,
+    positionName: string | null
+  ): Promise<void> {
+    try {
+      const docRef = doc(db, ASSIGNMENTS_COLLECTION, assignmentId);
+      const docSnap = await getDoc(docRef);
+
+      if (!docSnap.exists()) {
+        throw new Error('Assignment not found');
+      }
+
+      await updateDoc(docRef, {
+        positionId: positionId || null,
+        positionName: positionName || null
+      });
+    } catch (error) {
+      console.error('Error updating assignment position:', error);
+      throw new Error('Failed to update assignment position');
+    }
+  },
+
+  /**
+   * Get assignment by ID
+   */
+  async getAssignmentById(assignmentId: string): Promise<ServiceAssignment | null> {
+    try {
+      const docRef = doc(db, ASSIGNMENTS_COLLECTION, assignmentId);
+      const docSnap = await getDoc(docRef);
+
+      if (!docSnap.exists()) {
+        return null;
+      }
+
+      return convertFirestoreToAssignment({ id: docSnap.id, ...docSnap.data() } as FirestoreAssignment);
+    } catch (error) {
+      console.error('Error getting assignment by ID:', error);
+      throw new Error('Failed to fetch assignment');
     }
   }
 };

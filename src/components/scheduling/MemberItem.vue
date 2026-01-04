@@ -18,6 +18,9 @@
     
     <div class="member-info">
       <div class="member-name">{{ member.name }}</div>
+      <div class="member-position" v-if="displayPosition">
+        {{ displayPosition }}
+      </div>
       <div class="member-status-text">{{ getStatusText() }}</div>
     </div>
     
@@ -64,6 +67,16 @@ const memberItemClasses = computed(() => ({
   'member-item--clickable': props.isEditing && (props.member.availability === 'available' || props.member.availability === 'maybe' || props.member.availability === null) && !props.member.isAssignedToOtherTeam,
   'member-item--editing': props.isEditing
 }));
+
+// Display position: show assigned position if exists, otherwise show default position
+const displayPosition = computed(() => {
+  // If assigned, show the assigned position (or default if no override)
+  if (props.member.isAssigned) {
+    return props.member.assignedPositionName || props.member.positionName || null;
+  }
+  // Otherwise show the default position
+  return props.member.positionName || null;
+});
 
 function getInitials(name: string): string {
   return name
@@ -276,6 +289,13 @@ function handleClick() {
   font-weight: 600;
   font-size: 1rem;
   color: var(--ion-color-dark);
+  margin-bottom: 2px;
+}
+
+.member-position {
+  font-size: 0.8125rem;
+  color: #059669;
+  font-weight: 500;
   margin-bottom: 2px;
 }
 

@@ -11,9 +11,26 @@ import {
   Timestamp 
 } from 'firebase/firestore';
 import { db } from './config';
-import type { Team, TeamFormData, TeamMember } from '@/types/team';
+import type { Team, TeamFormData, TeamMember, TeamPosition } from '@/types/team';
 
 const TEAMS_COLLECTION = 'teams';
+
+/**
+ * Generate a position ID from team name and position name.
+ * Format: "teamname-positionname" (lowercase, "-" as separator)
+ */
+export function generatePositionId(teamName: string, positionName: string): string {
+  const normalize = (str: string) => str
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove accents
+    .replace(/[^a-z0-9\s-]/g, '')    // Remove special chars
+    .replace(/\s+/g, '-')            // Replace spaces with -
+    .replace(/-+/g, '-')             // Collapse multiple -
+    .replace(/^-|-$/g, '');          // Trim - from ends
+
+  return `${normalize(teamName)}-${normalize(positionName)}`;
+}
 
 interface FirestoreTeam extends Omit<Team, 'createdAt' | 'updatedAt'> {
   createdAt: Timestamp;
@@ -453,5 +470,218 @@ export const teamsService = {
       console.error('Error getting member teams:', error);
       throw new Error('Failed to fetch member teams');
     }
+  },
+
+  // ============================================
+  // Position Management Functions
+  // ============================================
+
+  /**
+   * Add a position to a team
+   */
+  async addPosition(teamId: string, positionName: string): Promise<TeamPosition> {
+    try {
+      const team = await this.getTeamById(teamId);
+      if (!team) {
+        throw new Error('Team not found');
+      }
+
+      const positionId = generatePositionId(team.name, positionName);
+      const positions = team.positions || [];
+
+      // Check if position with same ID already exists
+      if (positions.some(p => p.id === positionId)) {
+        throw new Error('Un poste avec ce nom existe déjà');
+      }
+
+      const newPosition: TeamPosition = {
+        id: positionId,
+        name: positionName,
+        order: positions.length
+      };
+
+      const updatedPositions = [...positions, newPosition];
+
+      const docRef = doc(db, TEAMS_COLLECTION, teamId);
+      await updateDoc(docRef, {
+        positions: updatedPositions,
+        updatedAt: Timestamp.now()
+      });
+
+      return newPosition;
+    } catch (error) {
+      console.error('Error adding position:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Update a position name (regenerates ID, updates member references)
+   */
+  async updatePosition(teamId: string, oldPositionId: string, newPositionName: string): Promise<TeamPosition> {
+    try {
+      const team = await this.getTeamById(teamId);
+      if (!team) {
+        throw new Error('Team not found');
+      }
+
+      const positions = team.positions || [];
+      const positionIndex = positions.findIndex(p => p.id === oldPositionId);
+      if (positionIndex === -1) {
+        throw new Error('Position not found');
+      }
+
+      const newPositionId = generatePositionId(team.name, newPositionName);
+
+      // Check if new ID already exists (and it's not the same position)
+      if (newPositionId !== oldPositionId && positions.some(p => p.id === newPositionId)) {
+        throw new Error('Un poste avec ce nom existe déjà');
+      }
+
+      const updatedPosition: TeamPosition = {
+        id: newPositionId,
+        name: newPositionName,
+        order: positions[positionIndex].order
+      };
+
+      // Update positions array
+      const updatedPositions = [...positions];
+      updatedPositions[positionIndex] = updatedPosition;
+
+      // Update member positionIds if they reference the old ID
+      const updatedMembers = team.members.map(member =>
+        member.positionId === oldPositionId
+          ? { ...member, positionId: newPositionId }
+          : member
+      );
+
+      const docRef = doc(db, TEAMS_COLLECTION, teamId);
+      await updateDoc(docRef, {
+        positions: updatedPositions,
+        members: updatedMembers,
+        updatedAt: Timestamp.now()
+      });
+
+      return updatedPosition;
+    } catch (error) {
+      console.error('Error updating position:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Delete a position from a team
+   */
+  async deletePosition(teamId: string, positionId: string): Promise<void> {
+    try {
+      const team = await this.getTeamById(teamId);
+      if (!team) {
+        throw new Error('Team not found');
+      }
+
+      const positions = team.positions || [];
+
+      // Check if any member uses this position as default
+      const membersUsingPosition = team.members.filter(m => m.positionId === positionId);
+      if (membersUsingPosition.length > 0) {
+        throw new Error('Ce poste est utilisé par des membres. Retirez-le d\'abord de leurs profils.');
+      }
+
+      // Remove position and reorder remaining
+      const updatedPositions = positions
+        .filter(p => p.id !== positionId)
+        .map((p, index) => ({ ...p, order: index }));
+
+      const docRef = doc(db, TEAMS_COLLECTION, teamId);
+      await updateDoc(docRef, {
+        positions: updatedPositions,
+        updatedAt: Timestamp.now()
+      });
+    } catch (error) {
+      console.error('Error deleting position:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Reorder positions in a team
+   */
+  async reorderPositions(teamId: string, orderedPositionIds: string[]): Promise<void> {
+    try {
+      const team = await this.getTeamById(teamId);
+      if (!team) {
+        throw new Error('Team not found');
+      }
+
+      const positions = team.positions || [];
+      const positionMap = new Map(positions.map(p => [p.id, p]));
+
+      // Create new ordered array
+      const updatedPositions = orderedPositionIds
+        .map((id, index) => {
+          const position = positionMap.get(id);
+          if (!position) return null;
+          return { ...position, order: index };
+        })
+        .filter((p): p is TeamPosition => p !== null);
+
+      const docRef = doc(db, TEAMS_COLLECTION, teamId);
+      await updateDoc(docRef, {
+        positions: updatedPositions,
+        updatedAt: Timestamp.now()
+      });
+    } catch (error) {
+      console.error('Error reordering positions:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Update a member's default position in a team
+   */
+  async updateMemberPosition(teamId: string, memberId: string, positionId: string | null): Promise<void> {
+    try {
+      const team = await this.getTeamById(teamId);
+      if (!team) {
+        throw new Error('Team not found');
+      }
+
+      // Validate position exists if provided
+      if (positionId) {
+        const positions = team.positions || [];
+        if (!positions.some(p => p.id === positionId)) {
+          throw new Error('Position not found');
+        }
+      }
+
+      const updatedMembers = team.members.map(member =>
+        member.memberId === memberId
+          ? { ...member, positionId: positionId || undefined }
+          : member
+      );
+
+      const docRef = doc(db, TEAMS_COLLECTION, teamId);
+      await updateDoc(docRef, {
+        members: updatedMembers,
+        updatedAt: Timestamp.now()
+      });
+    } catch (error) {
+      console.error('Error updating member position:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get position by ID from a team
+   */
+  getPositionById(team: Team, positionId: string): TeamPosition | undefined {
+    return team.positions?.find(p => p.id === positionId);
+  },
+
+  /**
+   * Get position name by ID from a team
+   */
+  getPositionName(team: Team, positionId: string): string | undefined {
+    return team.positions?.find(p => p.id === positionId)?.name;
   }
 };
