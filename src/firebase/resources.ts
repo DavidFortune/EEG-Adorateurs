@@ -151,7 +151,12 @@ export const getResourceCollections = async (): Promise<ResourceCollection[]> =>
   }
 };
 
-export const getResourceCollectionById = async (collectionId: string): Promise<ResourceCollection | null> => {
+export const getResourceCollectionById = async (collectionId: string | undefined | null): Promise<ResourceCollection | null> => {
+  // Guard against empty/undefined collectionId
+  if (!collectionId) {
+    return null;
+  }
+
   try {
     const docRef = doc(db, COLLECTIONS_COLLECTION, collectionId);
     const docSnap = await getDoc(docRef);
