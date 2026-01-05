@@ -28,11 +28,17 @@ class _ChannelListScreenState extends State<ChannelListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Channels')),
-      body: StreamChannelListView(
-        controller: _listController,
-        itemBuilder: _channelTileBuilder,
-        onChannelTap: _onChannelTap,
+      appBar: const StreamChannelListHeader(
+        subtitle: Text('Channels'),
+        showConnectionStateTile: true,
+      ),
+      body: RefreshIndicator(
+        onRefresh: () => _listController.refresh(),
+        child: StreamChannelListView(
+          controller: _listController,
+          itemBuilder: _channelTileBuilder,
+          onChannelTap: _onChannelTap,
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _createNewChannel(context),

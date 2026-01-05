@@ -22,6 +22,17 @@ if not API_KEY or not API_SECRET:
 
 server_client = stream_chat.StreamChat(api_key=API_KEY, api_secret=API_SECRET)
 
+# Subscribe to all events (empty list = all events)
+server_client.update_app_settings(
+    event_hooks=[
+        {
+            "enabled": True,
+            "hook_type": "webhook",
+            "webhook_url": "https://indubitably-unimmediate-donna.ngrok-free.dev",
+            "event_types": []  # empty list = all events
+        }
+    ]
+)
 
 class TokenRequest(BaseModel):
     user_id: str

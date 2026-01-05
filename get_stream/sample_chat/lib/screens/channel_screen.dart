@@ -7,11 +7,11 @@ class ChannelScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: StreamChannelHeader(),
+      appBar: StreamChannelHeader(showConnectionStateTile: true),
       body: Column(
         children: <Widget>[
           Expanded(child: StreamMessageListView()),
-          StreamMessageInput(),
+          StreamMessageInput(disableAttachments: true),
         ],
       ),
     );

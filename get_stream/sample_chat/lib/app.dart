@@ -149,6 +149,18 @@ class _StreamChatAppState extends ConsumerState<StreamChatApp> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    return StreamChat(client: client, child: const ChannelListScreen());
+    return StreamChat(
+      client: client,
+      streamChatThemeData: StreamChatThemeData(
+        colorTheme: StreamColorTheme.light(
+          accentPrimary: const Color(0xffffe072),
+        ),
+        channelHeaderTheme: const StreamChannelHeaderThemeData(
+          color: Color(0xffd34646),
+          titleStyle: TextStyle(color: Colors.white),
+        ),
+      ),
+      child: const ChannelListScreen(),
+    );
   }
 }
