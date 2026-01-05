@@ -226,6 +226,15 @@
                     <ion-icon :icon="ellipsisVerticalOutline"></ion-icon>
                   </ion-button>
                 </div>
+                <div class="member-actions" v-if="canManageMembers && teamMember.role === 'owner'">
+                  <ion-button
+                    fill="clear"
+                    size="small"
+                    @click="() => showOwnerActions(teamMember)"
+                  >
+                    <ion-icon :icon="ellipsisVerticalOutline"></ion-icon>
+                  </ion-button>
+                </div>
               </div>
             </div>
           </ion-card-content>
@@ -1077,7 +1086,42 @@ const showMemberActions = async (teamMember: TeamMember) => {
       }
     ]
   });
-  
+
+  await alert.present();
+};
+
+const showOwnerActions = async (teamMember: TeamMember) => {
+  const buttons: any[] = [];
+
+  // Add position change option if positions exist
+  if (team.value?.positions && team.value.positions.length > 0) {
+    buttons.push({
+      text: 'Changer le poste',
+      handler: () => openChangeMemberPositionModal(teamMember)
+    });
+  }
+
+  // Add transfer ownership option if there are other members
+  if (hasOtherMembers.value) {
+    buttons.push({
+      text: 'Transférer la propriété',
+      handler: () => {
+        showTransferOwnershipModal.value = true;
+      }
+    });
+  }
+
+  buttons.push({
+    text: 'Annuler',
+    role: 'cancel'
+  });
+
+  const alert = await alertController.create({
+    header: 'Actions du propriétaire',
+    subHeader: getMemberData(teamMember.memberId)?.fullName,
+    buttons
+  });
+
   await alert.present();
 };
 

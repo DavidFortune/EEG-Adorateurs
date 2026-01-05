@@ -17,9 +17,9 @@
     </div>
     
     <div class="member-info">
-      <div class="member-name">{{ member.name }}</div>
-      <div class="member-position" v-if="displayPosition">
-        {{ displayPosition }}
+      <div class="member-name">
+        {{ member.name }}
+        <span class="member-position" v-if="displayPosition">{{ displayPosition }}</span>
       </div>
       <div class="member-status-text">{{ getStatusText() }}</div>
     </div>
@@ -293,10 +293,10 @@ function handleClick() {
 }
 
 .member-position {
-  font-size: 0.8125rem;
-  color: #059669;
-  font-weight: 500;
-  margin-bottom: 2px;
+  font-size: 0.75rem;
+  color: #9CA3AF;
+  font-weight: 400;
+  margin-left: 6px;
 }
 
 .member-status-text {

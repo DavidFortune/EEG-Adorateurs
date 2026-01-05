@@ -77,11 +77,12 @@ import { useRoute } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent,
-  IonBackButton, IonButtons, IonIcon, IonLoading, alertController, toastController
+  IonBackButton, IonButtons, IonIcon, IonLoading, alertController, toastController, actionSheetController
 } from '@ionic/vue';
 import {
-  alertCircleOutline, peopleOutline, calendarOutline, lockClosedOutline
+  alertCircleOutline, peopleOutline, calendarOutline, lockClosedOutline, ribbonOutline, trashOutline
 } from 'ionicons/icons';
+import { assignmentsService } from '@/firebase/assignments';
 import { useUser } from '@/composables/useUser';
 import { timezoneUtils } from '@/utils/timezone';
 import { useSchedulingStore } from '@/stores/schedulingStore';
@@ -243,6 +244,130 @@ const formatConflictService = (service: Service, teamName?: string): string => {
   return `• ${service.title}\n   ${dateTime}${teamText}`;
 };
 
+// Show action sheet for assigned member
+async function showAssignedMemberActions(teamId: string, memberId: string, memberName: string) {
+  const serviceId = currentEvent.value?.id;
+  if (!serviceId) return;
+
+  const buttons: any[] = [];
+
+  // Add "Change position" option if team has positions
+  if (team.value?.positions && team.value.positions.length > 0) {
+    buttons.push({
+      text: 'Changer le poste',
+      icon: ribbonOutline,
+      handler: () => {
+        showPositionSelector(serviceId, teamId, memberId, memberName);
+      }
+    });
+  }
+
+  // Add "Remove assignment" option
+  buttons.push({
+    text: 'Retirer l\'assignation',
+    icon: trashOutline,
+    role: 'destructive',
+    handler: async () => {
+      await toggleMemberAssignment(teamId, memberId);
+      await loadCurrentEventTeams();
+    }
+  });
+
+  // Add cancel button
+  buttons.push({
+    text: 'Annuler',
+    role: 'cancel'
+  });
+
+  const actionSheet = await actionSheetController.create({
+    header: memberName,
+    buttons
+  });
+
+  await actionSheet.present();
+}
+
+// Show position selector for changing member position
+async function showPositionSelector(serviceId: string, teamId: string, memberId: string, memberName: string) {
+  if (!team.value?.positions) return;
+
+  // Get current assignment to find the assignment ID
+  const assignments = await assignmentsService.getMemberServiceAssignments(serviceId, memberId);
+  const currentAssignment = assignments.find(a => a.teamId === teamId);
+
+  if (!currentAssignment) {
+    console.error('Assignment not found');
+    return;
+  }
+
+  // Find the member's default position
+  const teamMember = team.value.members.find(m => m.memberId === memberId);
+  const defaultPositionId = teamMember?.positionId;
+
+  // Build inputs for the alert
+  const inputs = team.value.positions.map(position => ({
+    type: 'radio' as const,
+    label: position.name + (position.id === defaultPositionId ? ' (par défaut)' : ''),
+    value: position.id,
+    checked: currentAssignment.positionId === position.id ||
+             (!currentAssignment.positionId && position.id === defaultPositionId)
+  }));
+
+  // Add "No position" option
+  inputs.unshift({
+    type: 'radio' as const,
+    label: 'Aucun poste',
+    value: '',
+    checked: !currentAssignment.positionId && !defaultPositionId
+  });
+
+  const alert = await alertController.create({
+    header: 'Changer le poste',
+    subHeader: memberName,
+    inputs,
+    buttons: [
+      {
+        text: 'Annuler',
+        role: 'cancel'
+      },
+      {
+        text: 'Confirmer',
+        handler: async (selectedPositionId: string) => {
+          try {
+            const selectedPosition = team.value?.positions?.find(p => p.id === selectedPositionId);
+            await assignmentsService.updateAssignmentPosition(
+              currentAssignment.id,
+              selectedPositionId || null,
+              selectedPosition?.name || null
+            );
+
+            await loadCurrentEventTeams();
+
+            const toast = await toastController.create({
+              message: selectedPosition ? `Poste changé: ${selectedPosition.name}` : 'Poste retiré',
+              duration: 2000,
+              color: 'success',
+              position: 'top'
+            });
+            await toast.present();
+          } catch (error) {
+            console.error('Error updating position:', error);
+            const toast = await toastController.create({
+              message: 'Erreur lors de la mise à jour du poste',
+              duration: 2000,
+              color: 'danger',
+              position: 'top'
+            });
+            await toast.present();
+          }
+        }
+      }
+    ]
+  });
+
+  await alert.present();
+}
+
 // Handle member click with conflict checking
 async function handleMemberClick(teamId: string, memberId: string) {
   const serviceId = currentEvent.value?.id;
@@ -252,10 +377,9 @@ async function handleMemberClick(teamId: string, memberId: string) {
   const teamData = allFilteredTeams.value.find(t => t.id === teamId);
   const member = teamData?.members.find(m => m.id === memberId);
 
-  // If member is already assigned to this team, just toggle (remove)
+  // If member is already assigned to this team, show action sheet
   if (member?.isAssigned) {
-    await toggleMemberAssignment(teamId, memberId);
-    await loadCurrentEventTeams();
+    await showAssignedMemberActions(teamId, memberId, member.name);
     return;
   }
 
