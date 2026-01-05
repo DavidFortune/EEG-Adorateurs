@@ -65,8 +65,8 @@ export const assignmentsService = {
         teamName,
         memberId: request.memberId,
         memberName,
-        positionId: positionId || request.positionId,
-        positionName: positionName || request.positionName,
+        positionId: positionId || request.positionId || null,
+        positionName: positionName || request.positionName || null,
         assignedAt: new Date().toISOString(),
         assignedBy: request.assignedBy
       };

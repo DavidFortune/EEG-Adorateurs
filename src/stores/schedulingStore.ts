@@ -14,14 +14,16 @@ import { firestoreService } from '@/firebase/firestore';
 import { teamsService } from '@/firebase/teams';
 import { assignmentsService } from '@/firebase/assignments';
 import { membersService } from '@/firebase/members';
-import { timezoneUtils } from '@/utils/timezone';
 
 function convertServiceToSchedulingEvent(service: Service): SchedulingEvent {
-  // Format date for display (e.g., "Dim 14 sept")
-  const displayDate = timezoneUtils.formatDateForDisplay(service.date)
-    .replace(/^\w/, c => c.toUpperCase())
-    .replace(/\s+\d{4}$/, '') // Remove year
-    .substring(0, 12); // Truncate if too long
+  // Format date for display (e.g., "Dim 14 jan")
+  const datetime = new Date(`${service.date}T12:00:00`);
+  const displayDate = datetime.toLocaleDateString('fr-CA', {
+    timeZone: 'America/Toronto',
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short'
+  }).replace(/^\w/, c => c.toUpperCase());
 
   return {
     id: service.id,

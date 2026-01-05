@@ -5,8 +5,8 @@ export interface ServiceAssignment {
   teamName: string;
   memberId: string;
   memberName: string;
-  positionId?: string;   // Position for this specific assignment (can override default)
-  positionName?: string; // Denormalized for display
+  positionId?: string | null;   // Position for this specific assignment (can override default)
+  positionName?: string | null; // Denormalized for display
   assignedAt: string;    // ISO timestamp
   assignedBy: string;    // Admin member ID who made the assignment
 }

@@ -25,7 +25,14 @@
         <p>Cette équipe n'existe pas ou a été supprimée.</p>
       </div>
 
-      <div v-else-if="!loading && team">
+      <!-- Access denied for non-authorized users -->
+      <div v-else-if="!loading && team && !canManageThisTeam" class="empty-state ion-text-center ion-padding">
+        <ion-icon :icon="lockClosedOutline" size="large" color="warning" />
+        <h3>Accès restreint</h3>
+        <p>Seuls les administrateurs, propriétaires et responsables de cette équipe peuvent gérer le planning.</p>
+      </div>
+
+      <div v-else-if="!loading && team && canManageThisTeam">
         <!-- Event Selector -->
         <EventSelector
           :events="events"
@@ -73,8 +80,9 @@ import {
   IonBackButton, IonButtons, IonIcon, IonLoading, alertController, toastController
 } from '@ionic/vue';
 import {
-  alertCircleOutline, peopleOutline, calendarOutline
+  alertCircleOutline, peopleOutline, calendarOutline, lockClosedOutline
 } from 'ionicons/icons';
+import { useUser } from '@/composables/useUser';
 import { timezoneUtils } from '@/utils/timezone';
 import { useSchedulingStore } from '@/stores/schedulingStore';
 import { teamsService } from '@/firebase/teams';
@@ -88,6 +96,7 @@ import type { SchedulingEvent } from '@/types/scheduling';
 
 const route = useRoute();
 const schedulingStore = useSchedulingStore();
+const { member: currentUser, isAdmin } = useUser();
 
 // Get refs from scheduling store
 const {
@@ -121,6 +130,23 @@ const events = ref<SchedulingEvent[]>([]);
 // Track if user has selected a service
 const hasSelectedService = computed(() => {
   return activeEventIndex.value >= 0 && events.value.length > 0 && filteredActiveEventIndex.value >= 0;
+});
+
+// Check if current user can manage this team's scheduling
+const canManageThisTeam = computed(() => {
+  if (!team.value || !currentUser.value) return false;
+
+  // Admins can manage all teams
+  if (isAdmin.value) return true;
+
+  // Check if user is owner or leader of this team
+  const userMembership = team.value.members.find(m => m.memberId === currentUser.value?.id);
+  if (!userMembership) return false;
+
+  const isApproved = userMembership.status === 'approved' || !userMembership.status;
+  const isOwnerOrLeader = userMembership.role === 'owner' || userMembership.role === 'leader';
+
+  return isApproved && isOwnerOrLeader;
 });
 
 // Update filtered events when dependencies change

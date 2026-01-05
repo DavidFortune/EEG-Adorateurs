@@ -2,6 +2,24 @@
 
 All notable changes to EEG Adorateurs will be documented in this file.
 
+## [1.12.10] - 2026-01-04
+
+### Enhanced
+- **Service Card Date Display**: Added 3-letter month abbreviation to service cards in TeamSchedulingView
+  - Now shows "Dim 14 jan" instead of just "Dimanche 14"
+  - Uses short weekday and short month for compact display
+
+### Security
+- **TeamSchedulingView Access Control**: Restricted scheduling access to authorized users only
+  - Admins can manage all teams
+  - Team owners and leaders can manage their own team
+  - Unauthorized users see "Accès restreint" message
+
+### Fixed
+- **Assignment Position Error**: Fixed Firebase error when assigning members without a position
+  - Position fields now default to null instead of undefined
+  - Firebase rejects undefined values but accepts null
+
 ## [1.12.9] - 2026-01-04
 
 ### Added

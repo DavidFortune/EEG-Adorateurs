@@ -15,10 +15,10 @@ export interface MemberAssignment {
   isAssignedToOtherTeam: boolean;
   assignedTeamName?: string;
   avatar?: string;
-  positionId?: string;         // Default position from team membership
-  positionName?: string;       // For display
-  assignedPositionId?: string; // Override position for this service if assigned
-  assignedPositionName?: string;
+  positionId?: string;                    // Default position from team membership
+  positionName?: string;                  // For display
+  assignedPositionId?: string | null;     // Override position for this service if assigned
+  assignedPositionName?: string | null;
 }
 
 export interface TeamAssignment {
