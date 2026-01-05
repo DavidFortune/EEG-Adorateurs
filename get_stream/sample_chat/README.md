@@ -51,6 +51,29 @@ flutter run --dart-define-from-file=config/.env.dev.json
 
 **Important:** The `--dart-define-from-file` flag is required to load the API key at compile time.
 
+#### Optional: Configure Log Level
+
+You can control the verbosity of logging by setting the `LOG_LEVEL` environment variable:
+
+```bash
+# Debug level (default) - shows all logs
+flutter run --dart-define-from-file=config/.env.dev.json
+
+# Info level - shows info, warning, and error logs
+flutter run --dart-define=LOG_LEVEL=info --dart-define-from-file=config/.env.dev.json
+
+# Warning level - shows only warnings and errors
+flutter run --dart-define=LOG_LEVEL=warning --dart-define-from-file=config/.env.dev.json
+
+# Error level - shows only errors
+flutter run --dart-define=LOG_LEVEL=error --dart-define-from-file=config/.env.dev.json
+
+# Off - disables all logging
+flutter run --dart-define=LOG_LEVEL=off --dart-define-from-file=config/.env.dev.json
+```
+
+Available log levels: `debug`, `info`, `warning`, `error`, `off`
+
 ## Troubleshooting
 
 If you encounter any issues, please refer to [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for common problems and solutions.

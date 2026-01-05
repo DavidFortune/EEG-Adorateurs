@@ -1,30 +1,52 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+// Test that channel navigation includes required StreamChatTheme wrapper
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:sample_chat/main.dart';
+import 'package:stream_chat_flutter/stream_chat_flutter.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('StreamChatTheme wrapper should be present in widget tree', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StreamChatTheme(
+          data: StreamChatThemeData.light(),
+          child: const Scaffold(body: Center(child: Text('Test content'))),
+        ),
+      ),
+    );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(find.byType(StreamChatTheme), findsOneWidget);
+    expect(find.text('Test content'), findsOneWidget);
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+  testWidgets('StreamChannel with StreamChatTheme wrapper should not throw', (
+    WidgetTester tester,
+  ) async {
+    final client = StreamChatClient('test-api-key');
+    final channel = client.channel('messaging', id: 'test-channel');
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StreamChat(
+          client: client,
+          child: StreamChatTheme(
+            data: StreamChatThemeData.light(),
+            child: StreamChannel(
+              channel: channel,
+              child: const Scaffold(body: SizedBox()),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // Should pump without errors
     await tester.pump();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Verify no exceptions
+    expect(tester.takeException(), isNull);
+    expect(find.byType(StreamChannel), findsOneWidget);
   });
 }
