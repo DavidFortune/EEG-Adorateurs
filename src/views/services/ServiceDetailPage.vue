@@ -160,6 +160,7 @@ import { serviceService } from '@/services/serviceService';
 import { db } from '@/firebase/config';
 import { doc, onSnapshot, Timestamp, collection, query, where } from 'firebase/firestore';
 import { membersService } from '@/firebase/members';
+import { teamsService } from '@/firebase/teams';
 import { getProgramByServiceId } from '@/firebase/programs';
 import { getResourceById, getResourceCollectionById } from '@/firebase/resources';
 import { useUser } from '@/composables/useUser';
@@ -182,7 +183,7 @@ interface ResourceWithCollection extends Resource {
 interface TeamAssignmentGroup {
   teamId: string;
   teamName: string;
-  members: Array<ServiceAssignment & { avatar?: string }>;
+  members: Array<ServiceAssignment & { avatar?: string; position?: string }>;
   requiredMembers?: number;
 }
 
@@ -365,6 +366,43 @@ const processAssignments = async (assignments: ServiceAssignment[]) => {
     })
   );
 
+  // Get team details for default positions
+  const teamIds = [...new Set(assignments.map(a => a.teamId))];
+  const teamDetails = new Map<string, Awaited<ReturnType<typeof teamsService.getTeamById>>>();
+
+  await Promise.all(
+    teamIds.map(async (teamId) => {
+      try {
+        const team = await teamsService.getTeamById(teamId);
+        if (team) {
+          teamDetails.set(teamId, team);
+        }
+      } catch (error) {
+        console.error(`Error loading team ${teamId}:`, error);
+      }
+    })
+  );
+
+  // Helper to resolve position for an assignment
+  const resolvePosition = (assignment: ServiceAssignment): string | undefined => {
+    // Priority 1: Service-specific position
+    if (assignment.positionName) {
+      return assignment.positionName;
+    }
+
+    // Priority 2: Default position from team membership
+    const team = teamDetails.get(assignment.teamId);
+    if (team) {
+      const teamMember = team.members.find(m => m.memberId === assignment.memberId);
+      if (teamMember?.positionId) {
+        return teamsService.getPositionName(team, teamMember.positionId);
+      }
+    }
+
+    // Priority 3: Nothing
+    return undefined;
+  };
+
   // Group assignments by team
   const groupedByTeam = assignments.reduce((acc, assignment) => {
     if (!acc[assignment.teamId]) {
@@ -379,7 +417,8 @@ const processAssignments = async (assignments: ServiceAssignment[]) => {
     const member = memberDetails.get(assignment.memberId);
     acc[assignment.teamId].members.push({
       ...assignment,
-      avatar: member?.avatar
+      avatar: member?.avatar,
+      position: resolvePosition(assignment)
     });
 
     return acc;

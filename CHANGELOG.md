@@ -2,6 +2,14 @@
 
 All notable changes to EEG Adorateurs will be documented in this file.
 
+## [1.12.11] - 2026-01-10
+
+### Enhanced
+- **Member Position Display**: Display member position under their name in ServiceDetailPage
+  - Priority: service-specific position > default team position > nothing
+  - Fetches team data to resolve default positions from team membership
+  - Styled with smaller font in medium gray below member name
+
 ## [1.12.10] - 2026-01-04
 
 ### Enhanced

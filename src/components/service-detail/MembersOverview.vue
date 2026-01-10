@@ -36,6 +36,7 @@
               <div v-else class="avatar-initials">{{ getInitials(member.memberName) }}</div>
             </ion-avatar>
             <span class="member-name">{{ member.memberName }}</span>
+            <span v-if="member.position" class="member-position">{{ member.position }}</span>
           </div>
         </div>
       </div>
@@ -77,7 +78,7 @@ import type { ServiceAssignment } from '@/types/assignment';
 interface TeamAssignmentGroup {
   teamId: string;
   teamName: string;
-  members: Array<ServiceAssignment & { avatar?: string }>;
+  members: Array<ServiceAssignment & { avatar?: string; position?: string }>;
   requiredMembers?: number;
 }
 
@@ -232,6 +233,16 @@ const getTeamStatusColor = (team: TeamAssignmentGroup): string => {
   -webkit-box-orient: vertical;
   line-height: 1.2;
   max-height: 2.4em;
+}
+
+.member-position {
+  font-size: 0.65rem;
+  color: var(--ion-color-medium);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .guests-section {
