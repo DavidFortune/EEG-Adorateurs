@@ -60,14 +60,12 @@ service cloud.firestore {
       allow create, update, delete: if request.auth != null;
     }
     
-    // Programs collection - visibility depends on draft status
+    // Programs collection - visibility controlled in app layer via canUserViewProgram()
+    // Note: Firestore queries can't evaluate per-document rules, so we allow read
+    // for all authenticated users and filter visibility in the application
     match /programs/{programId} {
-      // Read: published OR admin OR in draftViewerIds
-      allow read: if request.auth != null && (
-        resource.data.isDraft == false ||
-        get(/databases/$(database)/documents/members/$(request.auth.uid)).data.isAdmin == true ||
-        request.auth.uid in resource.data.draftViewerIds
-      );
+      // Read: all authenticated users (app layer handles draft visibility)
+      allow read: if request.auth != null;
 
       // Create: any authenticated user
       allow create: if request.auth != null;
