@@ -157,10 +157,30 @@
 
         <!-- Add Item Button (Top) -->
         <div v-if="isEditMode && program" class="add-item-container">
-          <ion-button @click="showAddItemModal" fill="outline" size="default" class="add-item-button">
+          <ion-button @click="showAddItemModal()" fill="outline" size="default" class="add-item-button">
             <ion-icon :icon="addOutline" slot="start" />
             Ajouter un élément
           </ion-button>
+
+          <!-- Quick-Add Type Buttons -->
+          <div class="quick-add-buttons">
+            <ion-button fill="clear" size="small" @click="showAddItemModal(ProgramItemType.SONG)">
+              <ion-icon :icon="musicalNoteOutline" slot="start" />
+              Chant
+            </ion-button>
+            <ion-button fill="clear" size="small" @click="showAddItemModal(ProgramItemType.PRAYER)">
+              <ion-icon :icon="handLeftOutline" slot="start" />
+              Prière
+            </ion-button>
+            <ion-button fill="clear" size="small" @click="showAddItemModal(ProgramItemType.SCRIPTURE)">
+              <ion-icon :icon="libraryOutline" slot="start" />
+              Lecture
+            </ion-button>
+            <ion-button fill="clear" size="small" @click="showAddItemModal(ProgramItemType.SERMON)">
+              <ion-icon :icon="micOutline" slot="start" />
+              Prédication
+            </ion-button>
+          </div>
         </div>
 
         <!-- Program Items (Flat List) -->
@@ -223,8 +243,19 @@
                       {{ item.notes }}
                     </div>
 
-                    <!-- Resource Links -->
-                    <div v-if="item.resourceId && getLinkedResource(item.resourceId)" class="item-resources">
+                    <!-- Inline Resource Quick Add (Edit Mode) -->
+                    <ResourceQuickAdd
+                      v-if="isEditMode && !isSectionItem(item)"
+                      :resource="item.resourceId ? getLinkedResource(item.resourceId) ?? null : null"
+                      :collection="item.resourceId ? getResourceCollectionCached(item.resourceId) : null"
+                      :editable="true"
+                      @add="openInlineResourceSelector(item.id)"
+                      @remove="handleInlineResourceRemove(item.id)"
+                      @preview="(r) => showMediaContent(r.contents[0], r.title)"
+                    />
+
+                    <!-- Resource Links (View Mode - not in edit mode since ResourceQuickAdd handles it) -->
+                    <div v-if="!isEditMode && item.resourceId && getLinkedResource(item.resourceId)" class="item-resources">
                       <div class="media-buttons">
                         <button
                           v-for="content in getLinkedResource(item.resourceId)?.contents"
@@ -379,7 +410,7 @@
 
           <!-- Add Item Button (Bottom) -->
           <div v-if="isEditMode" class="add-item-container add-item-bottom">
-            <ion-button @click="showAddItemModal" fill="outline" size="default" class="add-item-button">
+            <ion-button @click="showAddItemModal()" fill="outline" size="default" class="add-item-button">
               <ion-icon :icon="addOutline" slot="start" />
               Ajouter un élément
             </ion-button>
@@ -453,16 +484,46 @@
             </div>
           </div>
 
-          <ion-item class="title-field-with-button">
-            <ion-label position="stacked">Titre *</ion-label>
-            <ion-input
-              v-model="itemForm.title"
-              :placeholder="itemForm.type === 'Lecture biblique' ? 'Ex: Jean 3:16-18' : 'Ex: Moment d\'adoration'"
-            ></ion-input>
-            <div slot="end" class="resource-selector-inline">
-              <ResourceSelector v-model="itemForm.resourceId" button-fill="solid" button-size="small" />
+          <div class="title-autocomplete-wrapper">
+            <ion-item class="title-field-with-button">
+              <ion-label position="stacked">Titre *</ion-label>
+              <ion-input
+                v-model="itemForm.title"
+                :placeholder="itemForm.type === 'Lecture biblique' ? 'Ex: Jean 3:16-18' : 'Ex: Moment d\'adoration'"
+                @ionInput="handleTitleInput"
+                @ionBlur="handleTitleBlur"
+                @ionFocus="handleTitleInput"
+              ></ion-input>
+              <div slot="end" class="resource-selector-inline">
+                <ResourceSelector v-model="itemForm.resourceId" button-fill="solid" button-size="small" />
+              </div>
+            </ion-item>
+
+            <!-- Title Suggestions Dropdown -->
+            <div v-if="showTitleSuggestions && titleSuggestions.length > 0" class="title-suggestions-dropdown">
+              <div class="suggestions-header">
+                <ion-icon :icon="sparklesOutline" color="primary" />
+                <span>Suggestions</span>
+              </div>
+              <div
+                v-for="resource in titleSuggestions"
+                :key="resource.id"
+                class="suggestion-item"
+                @click="selectTitleSuggestion(resource)"
+              >
+                <span class="suggestion-icon">{{ getResourceTypeIcon(resource) }}</span>
+                <div class="suggestion-info">
+                  <span class="suggestion-title">{{ resource.title }}</span>
+                  <span v-if="resource.collectionId" class="suggestion-badge">
+                    {{ getResourceCollectionSymbol(resource) }}
+                  </span>
+                </div>
+                <ion-button fill="solid" size="small" color="success" @click.stop="selectTitleSuggestion(resource)">
+                  Utiliser
+                </ion-button>
+              </div>
             </div>
-          </ion-item>
+          </div>
 
           <!-- Scripture Fetch Button (only for "Lecture biblique") -->
           <div v-if="itemForm.type === 'Lecture biblique'" class="scripture-fetch-section">
@@ -1020,6 +1081,28 @@
           </div>
         </ion-content>
       </ion-modal>
+
+      <!-- Inline Resource Bottom Sheet Selector -->
+      <ResourceBottomSheet
+        :is-open="showInlineResourceSelector"
+        :user-id="user?.uid || ''"
+        :item-type="inlineResourceItemType"
+        :item-title="inlineResourceItemTitle"
+        @update:is-open="(val) => { if (!val) closeInlineResourceSelector(); }"
+        @select="handleInlineResourceSelect"
+        @open-existing="handleOpenFullResourceSelector"
+        @open-you-tube="handleOpenYouTubeSearch"
+        @open-url="handleOpenUrlPaste"
+        @create-new="handleCreateNewResource"
+      />
+
+      <!-- Full Resource Selector Modal (for advanced actions) -->
+      <ResourceSelector
+        :modal-only="true"
+        :is-open="showFullResourceSelector"
+        @update:is-open="(val) => { if (!val) closeFullResourceSelector(); }"
+        @update:model-value="handleInlineResourceSelect"
+      />
     </ion-content>
   </ion-page>
 </template>
@@ -1044,9 +1127,12 @@ import {
   chatboxEllipsesOutline, chevronDownOutline, chevronForwardOutline,
   arrowBackOutline, logoYoutube, playBackOutline, playForwardOutline,
   removeOutline, bookOutline, copyOutline,
-  lockClosedOutline, peopleOutline, checkmarkCircleOutline
+  lockClosedOutline, peopleOutline, checkmarkCircleOutline,
+  sparklesOutline
 } from 'ionicons/icons';
 import ResourceSelector from '@/components/ResourceSelector.vue';
+import ResourceQuickAdd from '@/components/ResourceQuickAdd.vue';
+import ResourceBottomSheet from '@/components/ResourceBottomSheet.vue';
 import ParticipantSelector from '@/components/ParticipantSelector.vue';
 import SendProgramSMSModal from '@/components/SendProgramSMSModal.vue';
 import { serviceService } from '@/services/serviceService';
@@ -1074,9 +1160,11 @@ import type { Member } from '@/types/member';
 import { membersService } from '@/firebase/members';
 import { ProgramItemType } from '@/types/program';
 import type { Resource, ResourceOption } from '@/types/resource';
-import { getResourceById, getAllResourceOptions, updateResource, subscribeToResource } from '@/firebase/resources';
+import { getResourceById, getAllResourceOptions, updateResource, subscribeToResource, getResourceCollectionById, getResources } from '@/firebase/resources';
+import type { ResourceCollection } from '@/types/resource';
 import { deleteField, type Unsubscribe } from 'firebase/firestore';
 import { isYouTubeUrl, getYouTubeEmbedUrl, getSpotifyEmbedUrl } from '@/utils/resource-utils';
+import { getSuggestionsByTitle, getSmartSuggestions, getResourceTypeIcon } from '@/utils/resource-suggestions';
 import { bibleService } from '@/services/bibleService';
 
 const route = useRoute();
@@ -1197,10 +1285,37 @@ const allMembers = ref<Member[]>([]);
 const loadingMembers = ref(false);
 const draftViewerSearchQuery = ref('');
 
+// Inline Resource Selector State
+const showInlineResourceSelector = ref(false);
+const showFullResourceSelector = ref(false);
+const inlineResourceItemId = ref<string | null>(null);
+const inlineResourceItemType = ref('');
+const inlineResourceItemTitle = ref('');
+const resourceCollections = ref<Map<string, ResourceCollection>>(new Map());
+
+// Title Autocomplete State
+const allResources = ref<Resource[]>([]);
+const showTitleSuggestions = ref(false);
+const loadingResources = ref(false);
+
 // Computed Properties
 const serviceId = computed(() => route.params.id as string);
 
 const programItemTypes = computed(() => Object.values(ProgramItemType));
+
+// Title autocomplete suggestions
+const titleSuggestions = computed(() => {
+  if (!itemForm.value.title || itemForm.value.title.length < 2) return [];
+  if (allResources.value.length === 0) return [];
+
+  return getSmartSuggestions(
+    itemForm.value.type,
+    itemForm.value.title,
+    allResources.value,
+    [],
+    5
+  );
+});
 
 const sortedItems = computed(() => {
   if (!program.value) return [];
@@ -1307,6 +1422,12 @@ const getItemIcon = (type: ProgramItemType) => {
     'Autre': documentTextOutline
   };
   return iconMap[type as string] || documentTextOutline;
+};
+
+const getResourceCollectionSymbol = (resource: Resource): string => {
+  if (!resource.collectionId) return '';
+  const collection = resourceCollections.value.get(resource.collectionId);
+  return collection?.symbol || '';
 };
 
 const getMediaTypeIcon = (type: string) => {
@@ -1669,10 +1790,10 @@ const updateProgramInfo = async () => {
 };
 
 // Item Management
-const showAddItemModal = () => {
+const showAddItemModal = async (preselectedType?: ProgramItemType) => {
   editingItemId.value = null;
   itemForm.value = {
-    type: '' as ProgramItemType,
+    type: preselectedType || '' as ProgramItemType,
     title: '',
     subtitle: '',
     participants: [],
@@ -1683,7 +1804,43 @@ const showAddItemModal = () => {
     scriptureText: '',
     scriptureVersion: ''
   };
+  showTitleSuggestions.value = false;
   showItemFormModal.value = true;
+
+  // Load resources for autocomplete if not already loaded
+  if (allResources.value.length === 0) {
+    loadResourcesForAutocomplete();
+  }
+};
+
+const loadResourcesForAutocomplete = async () => {
+  if (loadingResources.value) return;
+  try {
+    loadingResources.value = true;
+    allResources.value = await getResources();
+  } catch (error) {
+    console.error('Error loading resources for autocomplete:', error);
+  } finally {
+    loadingResources.value = false;
+  }
+};
+
+const selectTitleSuggestion = (resource: Resource) => {
+  itemForm.value.title = resource.title;
+  itemForm.value.resourceId = resource.id;
+  showTitleSuggestions.value = false;
+};
+
+const handleTitleInput = () => {
+  // Show suggestions when typing
+  showTitleSuggestions.value = itemForm.value.title.length >= 2;
+};
+
+const handleTitleBlur = () => {
+  // Delay hiding to allow click on suggestion
+  setTimeout(() => {
+    showTitleSuggestions.value = false;
+  }, 200);
 };
 
 const showEditItemModalForItem = (item: ProgramItem) => {
@@ -1894,6 +2051,144 @@ const deleteItem = async (itemId: string) => {
   } finally {
     loading.value = false;
   }
+};
+
+// Inline Resource Actions
+const openInlineResourceSelector = (itemId: string) => {
+  inlineResourceItemId.value = itemId;
+
+  // Get item context for smart suggestions
+  const item = program.value?.items.find(i => i.id === itemId);
+  if (item) {
+    inlineResourceItemType.value = item.type || '';
+    inlineResourceItemTitle.value = item.title || '';
+  } else {
+    inlineResourceItemType.value = '';
+    inlineResourceItemTitle.value = '';
+  }
+
+  showInlineResourceSelector.value = true;
+};
+
+const closeInlineResourceSelector = () => {
+  showInlineResourceSelector.value = false;
+  // Don't clear inlineResourceItemId here - it's needed for follow-up actions
+};
+
+const closeFullResourceSelector = () => {
+  showFullResourceSelector.value = false;
+  inlineResourceItemId.value = null;
+};
+
+// Bottom sheet action handlers
+const handleOpenFullResourceSelector = () => {
+  closeInlineResourceSelector();
+  showFullResourceSelector.value = true;
+};
+
+const handleOpenYouTubeSearch = () => {
+  // For now, use the full resource selector with YouTube tab
+  // Future: dedicated YouTube search modal
+  closeInlineResourceSelector();
+  showFullResourceSelector.value = true;
+};
+
+const handleOpenUrlPaste = () => {
+  // For now, use the full resource selector
+  // Future: dedicated URL paste modal
+  closeInlineResourceSelector();
+  showFullResourceSelector.value = true;
+};
+
+const handleCreateNewResource = async (title: string) => {
+  closeInlineResourceSelector();
+  if (title) {
+    // Open resource selector for creation
+    // The title could be pre-filled in a future implementation
+    showFullResourceSelector.value = true;
+  }
+};
+
+const handleInlineResourceSelect = async (resourceId: string | null) => {
+  if (!program.value || !user.value || !inlineResourceItemId.value) return;
+
+  // Close both selectors
+  closeInlineResourceSelector();
+  showFullResourceSelector.value = false;
+
+  try {
+    loading.value = true;
+    const item = program.value.items.find(i => i.id === inlineResourceItemId.value);
+    if (!item) return;
+
+    // Use deleteField for removal, or set the resourceId
+    const updates = resourceId
+      ? { resourceId }
+      : { resourceId: deleteField() as unknown as string };
+
+    await updateItemInProgram(
+      program.value.id,
+      inlineResourceItemId.value,
+      updates,
+      user.value.uid
+    );
+
+    // Subscribe to the new resource if selected
+    if (resourceId) {
+      subscribeToLinkedResource(resourceId);
+    }
+
+    await showToast(resourceId ? 'Ressource liée' : 'Ressource supprimée', 'success');
+  } catch (error) {
+    console.error('Error updating item resource:', error);
+    await showToast('Erreur lors de la mise à jour', 'danger');
+  } finally {
+    loading.value = false;
+    inlineResourceItemId.value = null;
+  }
+};
+
+const handleInlineResourceRemove = async (itemId: string) => {
+  if (!program.value || !user.value) return;
+
+  try {
+    loading.value = true;
+    await updateItemInProgram(
+      program.value.id,
+      itemId,
+      { resourceId: deleteField() as unknown as string },
+      user.value.uid
+    );
+    await showToast('Ressource supprimée', 'success');
+  } catch (error) {
+    console.error('Error removing resource:', error);
+    await showToast('Erreur lors de la suppression', 'danger');
+  } finally {
+    loading.value = false;
+  }
+};
+
+const getResourceCollection = async (resource: Resource): Promise<ResourceCollection | null> => {
+  if (!resource.collectionId) return null;
+
+  // Check cache first
+  if (resourceCollections.value.has(resource.collectionId)) {
+    return resourceCollections.value.get(resource.collectionId) || null;
+  }
+
+  // Fetch and cache
+  const collection = await getResourceCollectionById(resource.collectionId);
+  if (collection) {
+    resourceCollections.value.set(resource.collectionId, collection);
+  }
+  return collection;
+};
+
+// Get collection synchronously from cache (for template use)
+const getResourceCollectionCached = (resourceId: string): ResourceCollection | null => {
+  const resource = linkedResources.value.get(resourceId);
+  if (!resource?.collectionId) return null;
+  return resourceCollections.value.get(resource.collectionId) || null;
 };
 
 // Handle item reorder (drag and drop)
@@ -2758,11 +3053,32 @@ onUnmounted(() => {
 .add-item-container {
   margin: 1rem 0;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
 }
 
 .add-item-button {
   min-width: 200px;
+}
+
+/* Quick-Add Type Buttons */
+.quick-add-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+}
+
+.quick-add-buttons ion-button {
+  --padding-start: 12px;
+  --padding-end: 12px;
+  font-size: 12px;
+  text-transform: none;
+}
+
+.quick-add-buttons ion-icon {
+  font-size: 16px;
 }
 
 /* Program Items */
@@ -3769,6 +4085,88 @@ ion-reorder.item-handle-column:active {
   display: flex;
   align-items: center;
   margin-left: 0.5rem;
+}
+
+/* Title Autocomplete */
+.title-autocomplete-wrapper {
+  position: relative;
+}
+
+.title-suggestions-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid var(--ion-color-light-shade);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  max-height: 280px;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+
+.title-suggestions-dropdown .suggestions-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 16px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ion-color-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--ion-color-light);
+}
+
+.title-suggestions-dropdown .suggestion-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.title-suggestions-dropdown .suggestion-item:hover {
+  background: var(--ion-color-light);
+}
+
+.title-suggestions-dropdown .suggestion-item:last-child {
+  border-radius: 0 0 12px 12px;
+}
+
+.suggestion-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.suggestion-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.suggestion-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ion-color-dark);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.suggestion-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ion-color-primary);
+  background: var(--ion-color-primary-tint);
+  padding: 2px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
 }
 
 /* Type Selection Section */

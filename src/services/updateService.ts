@@ -241,6 +241,27 @@ class UpdateService {
   async getReleaseNotes(): Promise<ReleaseNote[]> {
     return [
       {
+        version: '1.13.1',
+        date: '2025-01-15',
+        title: 'Améliorations UX des ressources',
+        description: 'Nouvelle expérience utilisateur pour la sélection et la création de ressources dans le programme de service',
+        features: [
+          'Bottom sheet redessiné pour la sélection de ressources avec vue principale, existantes, YouTube, URL et création',
+          'Suggestions intelligentes basées sur le type d\'élément et le titre (correspondance floue)',
+          'Auto-complétion du titre lors de la création d\'éléments de programme',
+          'Boutons de création rapide pour les types courants (Chant, Prière, Lecture, Prédication)',
+          'Recherche YouTube intégrée avec résultats visuels',
+          'Collage d\'URL avec détection automatique du type (YouTube, Spotify, etc.)',
+          'Filtre par collection dans la sélection de ressources existantes'
+        ],
+        fixes: [],
+        improvements: [
+          'Algorithme de correspondance floue pour les suggestions de ressources',
+          'Historique des recherches récentes sauvegardé localement',
+          'Interface plus intuitive pour lier des ressources aux éléments du programme'
+        ]
+      },
+      {
         version: '1.13.0',
         date: '2025-01-14',
         title: 'Mode brouillon pour les programmes',

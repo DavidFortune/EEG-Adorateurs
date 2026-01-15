@@ -175,6 +175,144 @@ Show last 8 resources used across all programs:
 - Updated on each resource link
 - Quick tap to add
 
+### 2.4 Separated Insert Types (Optimized Flows)
+
+**Current Problem**: YouTube search and URL paste share the same input, causing confusion and suboptimal UX for each use case.
+
+**Proposed**: Dedicated entry points with tailored experiences for each insert type.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Comment ajouter une ressource ?                            │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
+│  │ 📚          │  │ 🔍          │  │ 🔗          │         │
+│  │ Existante   │  │ YouTube     │  │ Lien URL    │         │
+│  └─────────────┘  └─────────────┘  └─────────────┘         │
+│                                                             │
+│  ┌─────────────┐                                           │
+│  │ ✨          │                                           │
+│  │ Créer       │                                           │
+│  └─────────────┘                                           │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### 2.4.1 Existing Resource Flow
+```
+┌─────────────────────────────────────────────────────────────┐
+│  ← Ressources existantes                                    │
+├─────────────────────────────────────────────────────────────┤
+│  🔍 Rechercher dans vos ressources...                       │
+│                                                             │
+│  ── Récents ───────────────────────────────────────────    │
+│  🎵 Grâce Infinie [CAI]                              [+]   │
+│  🎵 Hosanna [AJC]                                    [+]   │
+│                                                             │
+│  ── Par collection ────────────────────────────────────    │
+│  [CAI ▼] [AJC] [Hymnes] [Tous]                             │
+│                                                             │
+│  🎵 À toi la gloire                                  [+]   │
+│  🎵 Béni soit ton nom                                [+]   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Optimizations**:
+- Collection filter chips for quick filtering
+- Instant search within your resources only
+- No YouTube results mixed in (cleaner, faster)
+
+#### 2.4.2 YouTube Search Flow
+```
+┌─────────────────────────────────────────────────────────────┐
+│  ← Recherche YouTube                                        │
+├─────────────────────────────────────────────────────────────┤
+│  🔍 Rechercher une vidéo YouTube...              [Chercher] │
+│                                                             │
+│  ── Résultats ─────────────────────────────────────────    │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ ▶️ [Thumbnail]  Amazing Grace - Hillsong            │   │
+│  │                 4:32 · 12M vues                      │   │
+│  │                                    [Aperçu] [Lier]  │   │
+│  └─────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ ▶️ [Thumbnail]  Grace - Laura Story                 │   │
+│  │                 5:18 · 8M vues                       │   │
+│  │                                    [Aperçu] [Lier]  │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  ── Recherches récentes ───────────────────────────────    │
+│  "amazing grace"  "hillsong worship"  "louange française"  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Optimizations**:
+- Dedicated YouTube search with explicit "Chercher" button
+- Video thumbnails and metadata preview
+- "Aperçu" button to watch before linking
+- Recent YouTube searches saved locally
+- No confusion with URL paste
+
+#### 2.4.3 URL Link Flow
+```
+┌─────────────────────────────────────────────────────────────┐
+│  ← Coller un lien                                           │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Collez un lien YouTube, PDF, ou autre:                     │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ https://youtube.com/watch?v=...                     │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                        [Coller depuis presse-papiers 📋]   │
+│                                                             │
+│  ── Aperçu ────────────────────────────────────────────    │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ ▶️ Amazing Grace - Hillsong Worship                 │   │
+│  │    YouTube · 4:32                                   │   │
+│  │    [Voir la vidéo]                                  │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│                              [Annuler]  [Lier cette URL]   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Optimizations**:
+- Clear single-purpose: paste a URL
+- Auto-detect URL type (YouTube, PDF, image, etc.)
+- "Paste from clipboard" button for mobile convenience
+- Preview fetched metadata before confirming
+- Supports any URL, not just YouTube
+
+#### 2.4.4 Create New Resource Flow
+```
+┌─────────────────────────────────────────────────────────────┐
+│  ← Créer une ressource                                      │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Titre: _______________________________________________     │
+│                                                             │
+│  Collection: [Sélectionner ▼]                              │
+│                                                             │
+│  Type de contenu:                                           │
+│  ○ Paroles/Texte    ○ Lien YouTube    ○ PDF                │
+│                                                             │
+│  [Contenu selon le type sélectionné...]                    │
+│                                                             │
+│                              [Annuler]  [Créer et lier]    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Benefits of Separation**:
+
+| Aspect | Combined (Current) | Separated (Proposed) |
+|--------|-------------------|----------------------|
+| **Clarity** | Confusing input purpose | Clear single purpose |
+| **Speed** | Waits for YouTube API on every keystroke | Only searches when intended |
+| **UX** | URL paste triggers search | URL paste = URL paste |
+| **Discoverability** | Hidden capabilities | All options visible upfront |
+| **Mobile** | Hard to switch modes | Tap the mode you want |
+
 ---
 
 ## Phase 3: Smart Suggestions
@@ -271,6 +409,7 @@ While dragging, show resource preview tooltip
 | 1.1 | Inline resource quick-add | High | Medium | **P0** |
 | 1.3 | Remove without modal | High | Low | **P0** |
 | 2.1 | Bottom sheet selector | High | High | **P1** |
+| 2.4 | Separated insert types | High | Medium | **P1** |
 | 2.2 | Universal search | High | Medium | **P1** |
 | 2.3 | Recent resources | Medium | Low | **P1** |
 | 1.2 | Swipe actions | Medium | Medium | **P2** |
@@ -351,27 +490,36 @@ While dragging, show resource preview tooltip
 ## Implementation Checklist
 
 ### Phase 1: Inline Resource Actions
-- [ ] Create ResourceQuickAdd component
-- [ ] Add inline add button to program items
-- [ ] Add inline resource chip display
-- [ ] Implement tap-to-remove with confirmation
-- [ ] Add swipe gesture support (Hammer.js or custom)
-- [ ] Add haptic feedback
+- [x] Create ResourceQuickAdd component
+- [x] Add inline add button to program items
+- [x] Add inline resource chip display
+- [x] Implement tap-to-remove with confirmation
+- [x] Add swipe gesture support (Hammer.js or custom)
+- [x] Add haptic feedback
 
 ### Phase 2: Bottom Sheet Selector
-- [ ] Create ResourceBottomSheet component
-- [ ] Implement drag-to-expand behavior
-- [ ] Add universal search across sources
-- [ ] Implement recent resources section
-- [ ] Add instant link buttons
+- [x] Create ResourceBottomSheet component
+- [x] Implement drag-to-expand behavior (Ionic breakpoints: 0.5, 0.75, 1)
+- [x] Add universal search across sources
+- [x] Implement recent resources section (localStorage persistence)
+- [x] Add instant link buttons (with fallback to full ResourceSelector)
+
+### Phase 2.4: Separated Insert Types
+- [x] Create insert type selection screen (4 options: Existante, YouTube, Lien URL, Créer)
+- [x] Implement dedicated Existing Resource flow with collection filter chips
+- [x] Implement dedicated YouTube Search flow with thumbnails and "Chercher" button
+- [x] Implement dedicated URL Link flow with clipboard paste button and preview
+- [x] Implement dedicated Create Resource flow with content type selector
+- [x] Add recent YouTube searches persistence (localStorage)
+- [x] Add URL type auto-detection (YouTube, PDF, image, etc.)
 
 ### Phase 3: Smart Suggestions
-- [ ] Create suggestion utility functions
-- [ ] Implement type-based filtering
-- [ ] Add title-based fuzzy matching
-- [ ] Show suggestions inline
+- [x] Create suggestion utility functions (src/utils/resource-suggestions.ts)
+- [x] Implement type-based filtering (Chant → songs, Lecture biblique → scripture)
+- [x] Add title-based fuzzy matching (word overlap scoring)
+- [x] Show suggestions inline (highlighted section at top of bottom sheet)
 
 ### Phase 4: Simplified Creation
-- [ ] Add autocomplete to title input
-- [ ] Implement suggestion selection
-- [ ] Create quick-add type buttons
+- [x] Add autocomplete to title input (shows suggestions as you type)
+- [x] Implement suggestion selection (auto-fills title and links resource)
+- [x] Create quick-add type buttons (Chant, Prière, Lecture, Prédication)
