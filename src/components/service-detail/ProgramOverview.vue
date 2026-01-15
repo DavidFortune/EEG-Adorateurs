@@ -11,7 +11,12 @@
       <!-- Summary Row (always visible) -->
       <div class="program-summary">
         <div class="summary-info">
-          <template v-if="hasProgram">
+          <!-- Draft Badge -->
+          <ion-chip v-if="isDraft" color="warning" size="small" class="draft-chip">
+            <ion-icon :icon="lockClosedOutline" />
+            Brouillon
+          </ion-chip>
+          <template v-if="hasProgram && canViewContent">
             <span v-if="program?.conductor?.name" class="summary-item">
               <ion-icon :icon="personOutline" />
               {{ program.conductor.name }}
@@ -25,6 +30,10 @@
               {{ formatDuration(program.totalDuration) }}
             </span>
           </template>
+          <span v-else-if="!canViewContent" class="summary-item empty-hint">
+            <ion-icon :icon="lockClosedOutline" />
+            Programme en préparation
+          </span>
           <span v-else class="summary-item empty-hint">
             <ion-icon :icon="documentTextOutline" />
             Aucun programme
@@ -36,15 +45,22 @@
         </ion-button>
       </div>
 
+      <!-- Access Denied State -->
+      <div v-if="program && !canViewContent" class="access-denied-state">
+        <ion-icon :icon="lockClosedOutline" size="large" color="warning" />
+        <h3>Programme en préparation</h3>
+        <p>Ce programme n'est pas encore accessible.</p>
+      </div>
+
       <!-- Empty State (below summary) -->
-      <div v-if="!hasProgram" class="empty-state">
+      <div v-else-if="!hasProgram" class="empty-state">
         <ion-icon :icon="documentTextOutline" size="large" color="medium" />
         <h3>Aucun programme</h3>
         <p>Le programme de ce service n'a pas encore été créé.</p>
       </div>
 
-      <!-- Program Items -->
-      <template v-else v-for="(item, index) in sortedItems" :key="item.id">
+      <!-- Program Items (only visible if user has access) -->
+      <template v-if="canViewContent" v-for="(item, index) in sortedItems" :key="item.id">
         <!-- Section Item (special styling) -->
         <div v-if="item.type === 'Section'" class="program-item section-item">
           <span class="section-title">{{ item.title }}</span>
@@ -74,13 +90,14 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { IonSpinner, IonIcon, IonChip, IonButton } from '@ionic/vue';
-import { documentTextOutline, personOutline, listOutline, timeOutline, chevronForwardOutline } from 'ionicons/icons';
+import { documentTextOutline, personOutline, listOutline, timeOutline, chevronForwardOutline, lockClosedOutline } from 'ionicons/icons';
 import type { ServiceProgram, ProgramItemType } from '@/types/program';
 
 interface Props {
   program: ServiceProgram | null;
   loading: boolean;
   isAdmin: boolean;
+  canView?: boolean; // Whether current user can view the program (default: true)
 }
 
 const props = defineProps<Props>();
@@ -91,6 +108,14 @@ defineEmits<{
 
 const hasProgram = computed(() => {
   return props.program && props.program.items.length > 0;
+});
+
+const canViewContent = computed(() => {
+  return props.canView !== false; // Default to true if not specified
+});
+
+const isDraft = computed(() => {
+  return props.program?.isDraft ?? false;
 });
 
 const itemCount = computed(() => {
@@ -311,5 +336,37 @@ const getTypeColor = (type: ProgramItemType): string => {
   --padding-end: 6px;
   margin: 0;
   flex-shrink: 0;
+}
+
+/* Draft Mode Styles */
+.draft-chip {
+  height: 24px;
+  font-size: 0.75rem;
+  --padding-start: 8px;
+  --padding-end: 8px;
+  margin: 0;
+}
+
+.access-denied-state {
+  text-align: center;
+  padding: 32px 16px;
+}
+
+.access-denied-state ion-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.access-denied-state h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--ion-color-dark);
+  margin: 0 0 8px 0;
+}
+
+.access-denied-state p {
+  font-size: 0.9rem;
+  color: var(--ion-color-medium);
+  margin: 0;
 }
 </style>

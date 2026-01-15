@@ -67,6 +67,11 @@ export interface ServiceProgram {
   updatedAt: Date;
   createdBy?: string; // User ID who created the program
   updatedBy?: string; // User ID who last updated the program
+  // Draft mode fields
+  isDraft: boolean; // true = draft (limited visibility), false = published
+  draftViewerIds: string[]; // Firebase UIDs allowed to view/edit when in draft
+  publishedAt?: Date; // Timestamp when program was published
+  publishedBy?: string; // Firebase UID who published the program
 }
 
 export interface CreateProgramRequest {

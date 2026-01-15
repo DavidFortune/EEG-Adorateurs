@@ -241,6 +241,23 @@ class UpdateService {
   async getReleaseNotes(): Promise<ReleaseNote[]> {
     return [
       {
+        version: '1.13.0',
+        date: '2025-01-14',
+        title: 'Mode brouillon pour les programmes',
+        description: 'Les programmes peuvent maintenant être en mode brouillon, visibles uniquement par les admins et membres autorisés jusqu\'à publication',
+        features: [
+          'Nouveau mode brouillon pour les programmes (par défaut pour les nouveaux programmes)',
+          'Gestion des accès au brouillon : ajout/retrait de membres autorisés',
+          'Publication en un clic (action irréversible)',
+          'Badge "Brouillon" visible sur les programmes non publiés'
+        ],
+        fixes: [],
+        improvements: [
+          'Les programmes existants sont traités comme publiés (rétrocompatibilité)',
+          'Règles de sécurité Firestore mises à jour pour le contrôle d\'accès'
+        ]
+      },
+      {
         version: '1.12.6',
         date: '2025-12-27',
         title: 'Participants et conducteur améliorés',

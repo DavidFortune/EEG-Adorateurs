@@ -6,6 +6,11 @@
           <ion-back-button :default-href="`/service-detail/${route.params.id}`"></ion-back-button>
         </ion-buttons>
         <ion-title>{{ isEditMode ? 'Édition du programme' : 'Programme' }}</ion-title>
+        <!-- Draft Status Badge -->
+        <ion-chip v-if="program && isDraft" color="warning" slot="end" class="draft-badge">
+          <ion-icon :icon="lockClosedOutline" />
+          <ion-label>Brouillon</ion-label>
+        </ion-chip>
         <ion-buttons slot="end">
           <ion-button v-if="!isEditMode && hasYouTubeVideos" @click="showYouTubePlaylist" fill="clear" color="danger">
             <ion-icon :icon="logoYoutube" />
@@ -34,6 +39,46 @@
         </div>
       </div>
 
+      <!-- Draft Controls (Admin Only) -->
+      <div v-if="isAdmin && program && isDraft" class="draft-controls">
+        <ion-card color="warning">
+          <ion-card-content>
+            <div class="draft-controls-header">
+              <h3>
+                <ion-icon :icon="lockClosedOutline" />
+                Mode brouillon
+              </h3>
+            </div>
+            <p class="draft-description">
+              Ce programme est en mode brouillon. Seuls les administrateurs et les membres autorisés peuvent le voir.
+            </p>
+
+            <div class="draft-actions">
+              <ion-button @click="openDraftViewersModal" fill="outline" color="dark">
+                <ion-icon :icon="peopleOutline" slot="start" />
+                Gérer les accès ({{ program.draftViewerIds.length }})
+              </ion-button>
+
+              <ion-button @click="confirmPublish" fill="solid" color="success">
+                <ion-icon :icon="checkmarkCircleOutline" slot="start" />
+                Publier le programme
+              </ion-button>
+            </div>
+          </ion-card-content>
+        </ion-card>
+      </div>
+
+      <!-- Access Denied Message (Non-Admin, Not in Viewers) -->
+      <div v-if="program && !canViewProgram" class="access-denied">
+        <ion-card>
+          <ion-card-content class="text-center">
+            <ion-icon :icon="lockClosedOutline" class="large-icon" color="warning" />
+            <h3>Programme en préparation</h3>
+            <p>Ce programme est encore en cours de préparation et n'est pas accessible pour le moment.</p>
+          </ion-card-content>
+        </ion-card>
+      </div>
+
       <!-- YouTube Playlist Feature Notice -->
       <div v-if="!isEditMode && hasYouTubeVideos" class="youtube-feature-notice">
         <div class="notice-content">
@@ -47,7 +92,7 @@
         </div>
       </div>
 
-      <div class="content-container">
+      <div v-if="canViewProgram || !program" class="content-container">
         <!-- Program Summary -->
         <div v-if="program" class="program-summary">
           <ion-card>
@@ -919,6 +964,62 @@
           </div>
         </ion-content>
       </ion-modal>
+
+      <!-- Draft Viewers Modal -->
+      <ion-modal :is-open="showDraftViewersModal" @didDismiss="showDraftViewersModal = false">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>Gérer les accès</ion-title>
+            <ion-buttons slot="end">
+              <ion-button @click="showDraftViewersModal = false">
+                <ion-icon :icon="closeOutline" />
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+          <ion-toolbar>
+            <ion-searchbar
+              v-model="draftViewerSearchQuery"
+              placeholder="Rechercher un membre..."
+              :debounce="300"
+            ></ion-searchbar>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content>
+          <div v-if="loadingMembers" class="modal-loading">
+            <ion-spinner name="crescent" />
+            <p>Chargement des membres...</p>
+          </div>
+
+          <ion-list v-else>
+            <ion-item
+              v-for="member in filteredDraftViewerMembers"
+              :key="member.id"
+              :button="true"
+              @click="toggleDraftViewer(member.firebaseUserId)"
+            >
+              <ion-avatar slot="start">
+                <img v-if="member.avatar" :src="member.avatar" :alt="member.fullName" />
+                <div v-else class="avatar-initials">{{ getMemberInitials(member.fullName) }}</div>
+              </ion-avatar>
+              <ion-label>
+                <h3>{{ member.fullName }}</h3>
+                <p>{{ member.email }}</p>
+              </ion-label>
+              <ion-checkbox
+                slot="end"
+                :checked="draftViewerIds.includes(member.firebaseUserId)"
+                @click.stop
+              ></ion-checkbox>
+            </ion-item>
+          </ion-list>
+
+          <div class="modal-footer">
+            <ion-button @click="saveDraftViewers" expand="block" color="primary">
+              Enregistrer les accès
+            </ion-button>
+          </div>
+        </ion-content>
+      </ion-modal>
     </ion-content>
   </ion-page>
 </template>
@@ -930,7 +1031,8 @@ import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonBackButton,
   IonButton, IonIcon, IonCard, IonCardContent, IonLoading, IonModal, IonAvatar,
   IonItem, IonLabel, IonInput, IonTextarea, IonSelect, IonSelectOption,
-  IonSpinner, IonReorderGroup, IonReorder, toastController, alertController
+  IonSpinner, IonReorderGroup, IonReorder, toastController, alertController,
+  IonList, IonCheckbox, IonChip, IonSearchbar
 } from '@ionic/vue';
 import {
   calendarOutline, createOutline, listOutline, timeOutline,
@@ -941,7 +1043,8 @@ import {
   playCircleOutline, volumeHighOutline, documentOutline,
   chatboxEllipsesOutline, chevronDownOutline, chevronForwardOutline,
   arrowBackOutline, logoYoutube, playBackOutline, playForwardOutline,
-  removeOutline, bookOutline, copyOutline
+  removeOutline, bookOutline, copyOutline,
+  lockClosedOutline, peopleOutline, checkmarkCircleOutline
 } from 'ionicons/icons';
 import ResourceSelector from '@/components/ResourceSelector.vue';
 import ParticipantSelector from '@/components/ParticipantSelector.vue';
@@ -960,10 +1063,15 @@ import {
   addSubItemToItem,
   updateSubItemInItem,
   deleteSubItemFromItem,
-  updateProgramOrder
+  updateProgramOrder,
+  publishProgram,
+  updateDraftViewers,
+  canUserViewProgram
 } from '@/firebase/programs';
 import type { Service } from '@/types/service';
 import type { ServiceProgram, ProgramItem, ProgramParticipant, ProgramSubItem } from '@/types/program';
+import type { Member } from '@/types/member';
+import { membersService } from '@/firebase/members';
 import { ProgramItemType } from '@/types/program';
 import type { Resource, ResourceOption } from '@/types/resource';
 import { getResourceById, getAllResourceOptions, updateResource, subscribeToResource } from '@/firebase/resources';
@@ -1082,6 +1190,13 @@ const resourceSubscriptions = ref<Map<string, Unsubscribe>>(new Map());
 // Real-time subscription for program
 const programSubscription = ref<Unsubscribe | null>(null);
 
+// Draft Mode State
+const showDraftViewersModal = ref(false);
+const draftViewerIds = ref<string[]>([]);
+const allMembers = ref<Member[]>([]);
+const loadingMembers = ref(false);
+const draftViewerSearchQuery = ref('');
+
 // Computed Properties
 const serviceId = computed(() => route.params.id as string);
 
@@ -1095,6 +1210,28 @@ const sortedItems = computed(() => {
 const totalDuration = computed(() => {
   if (!program.value) return 0;
   return program.value.items.reduce((sum, item) => sum + (item.duration || 0), 0);
+});
+
+// Draft Mode Computed Properties
+const canViewProgram = computed(() => {
+  return canUserViewProgram(program.value, user.value?.uid, isAdmin.value);
+});
+
+const isDraft = computed(() => {
+  return program.value?.isDraft ?? true;
+});
+
+const canPublish = computed(() => {
+  return isAdmin.value && program.value?.isDraft;
+});
+
+const filteredDraftViewerMembers = computed(() => {
+  if (!draftViewerSearchQuery.value) return allMembers.value;
+  const query = draftViewerSearchQuery.value.toLowerCase();
+  return allMembers.value.filter(m =>
+    m.fullName.toLowerCase().includes(query) ||
+    m.email?.toLowerCase().includes(query)
+  );
 });
 
 const hasYouTubeVideos = computed(() => {
@@ -1397,6 +1534,91 @@ const createInitialProgram = async () => {
 // Edit Mode
 const toggleEditMode = () => {
   isEditMode.value = !isEditMode.value;
+};
+
+// Draft Mode Functions
+const confirmPublish = async () => {
+  const alert = await alertController.create({
+    header: 'Publier le programme',
+    message: 'Une fois publié, le programme sera visible par tous les participants du service. Cette action est irréversible.',
+    buttons: [
+      {
+        text: 'Annuler',
+        role: 'cancel'
+      },
+      {
+        text: 'Publier',
+        handler: async () => {
+          await handlePublish();
+        }
+      }
+    ]
+  });
+  await alert.present();
+};
+
+const handlePublish = async () => {
+  if (!program.value || !user.value) return;
+
+  try {
+    await publishProgram(program.value.id, user.value.uid);
+    await showToast('Programme publié avec succès', 'success');
+  } catch (error) {
+    console.error('Error publishing program:', error);
+    await showToast('Erreur lors de la publication', 'danger');
+  }
+};
+
+const openDraftViewersModal = async () => {
+  if (!program.value) return;
+
+  draftViewerIds.value = [...program.value.draftViewerIds];
+  loadingMembers.value = true;
+  showDraftViewersModal.value = true;
+  draftViewerSearchQuery.value = '';
+
+  try {
+    allMembers.value = await membersService.getAllMembers();
+  } catch (error) {
+    console.error('Error loading members:', error);
+    await showToast('Erreur lors du chargement des membres', 'danger');
+  } finally {
+    loadingMembers.value = false;
+  }
+};
+
+const toggleDraftViewer = (firebaseUid: string) => {
+  const index = draftViewerIds.value.indexOf(firebaseUid);
+  if (index > -1) {
+    draftViewerIds.value.splice(index, 1);
+  } else {
+    draftViewerIds.value.push(firebaseUid);
+  }
+};
+
+const saveDraftViewers = async () => {
+  if (!program.value || !user.value) return;
+
+  try {
+    await updateDraftViewers(
+      program.value.id,
+      draftViewerIds.value,
+      user.value.uid
+    );
+    showDraftViewersModal.value = false;
+    await showToast('Accès mis à jour', 'success');
+  } catch (error) {
+    console.error('Error saving draft viewers:', error);
+    await showToast('Erreur lors de la mise à jour des accès', 'danger');
+  }
+};
+
+const getMemberInitials = (fullName: string): string => {
+  const parts = fullName.trim().split(' ');
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  return fullName.substring(0, 2).toUpperCase();
 };
 
 // Edit Program Modal
@@ -3810,5 +4032,100 @@ ion-reorder.item-handle-column:active {
   margin-top: 16px;
   padding-top: 12px;
   border-top: 1px solid var(--ion-color-light-shade);
+}
+
+/* Draft Mode Styles */
+.draft-badge {
+  margin-right: 8px;
+}
+
+.draft-controls {
+  padding: 0 16px;
+  margin-top: 16px;
+}
+
+.draft-controls ion-card {
+  margin: 0;
+}
+
+.draft-controls-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.draft-controls-header h3 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.draft-description {
+  font-size: 0.9rem;
+  margin-bottom: 16px;
+  opacity: 0.9;
+}
+
+.draft-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.access-denied {
+  padding: 16px;
+}
+
+.access-denied .text-center {
+  text-align: center;
+}
+
+.access-denied .large-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.access-denied h3 {
+  margin: 0 0 8px 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.access-denied p {
+  margin: 0;
+  color: var(--ion-color-medium);
+}
+
+/* Draft Viewers Modal */
+.modal-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  gap: 16px;
+}
+
+.modal-footer {
+  padding: 16px;
+  background: var(--ion-background-color);
+  border-top: 1px solid var(--ion-color-light);
+}
+
+.avatar-initials {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ion-color-primary);
+  color: white;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border-radius: 50%;
 }
 </style>

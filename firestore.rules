@@ -60,12 +60,27 @@ service cloud.firestore {
       allow create, update, delete: if request.auth != null;
     }
     
-    // Programs collection - allow authenticated users to manage service programs
+    // Programs collection - visibility depends on draft status
     match /programs/{programId} {
-      allow read: if request.auth != null;
+      // Read: published OR admin OR in draftViewerIds
+      allow read: if request.auth != null && (
+        resource.data.isDraft == false ||
+        get(/databases/$(database)/documents/members/$(request.auth.uid)).data.isAdmin == true ||
+        request.auth.uid in resource.data.draftViewerIds
+      );
+
+      // Create: any authenticated user
       allow create: if request.auth != null;
-      allow update: if request.auth != null;
-      allow delete: if request.auth != null;
+
+      // Update: admin OR in draftViewerIds (when draft)
+      allow update: if request.auth != null && (
+        get(/databases/$(database)/documents/members/$(request.auth.uid)).data.isAdmin == true ||
+        (resource.data.isDraft == true && request.auth.uid in resource.data.draftViewerIds)
+      );
+
+      // Delete: admin only
+      allow delete: if request.auth != null &&
+        get(/databases/$(database)/documents/members/$(request.auth.uid)).data.isAdmin == true;
     }
     
     // Resources collection - everyone can read, only authenticated users can manage

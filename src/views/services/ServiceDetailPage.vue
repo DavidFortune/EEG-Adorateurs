@@ -50,6 +50,7 @@
             :program="program"
             :loading="loadingProgram"
             :is-admin="isAdmin"
+            :can-view="canViewProgram"
             @view-full="goToProgram"
           />
 
@@ -161,7 +162,7 @@ import { db } from '@/firebase/config';
 import { doc, onSnapshot, Timestamp, collection, query, where } from 'firebase/firestore';
 import { membersService } from '@/firebase/members';
 import { teamsService } from '@/firebase/teams';
-import { getProgramByServiceId } from '@/firebase/programs';
+import { getProgramByServiceId, canUserViewProgram } from '@/firebase/programs';
 import { getResourceById, getResourceCollectionById } from '@/firebase/resources';
 import { useUser } from '@/composables/useUser';
 import type { ServiceProgram } from '@/types/program';
@@ -189,7 +190,7 @@ interface TeamAssignmentGroup {
 
 const route = useRoute();
 const router = useRouter();
-const { isAdmin } = useUser();
+const { user, isAdmin } = useUser();
 
 // Core state
 const service = ref<Service | null>(null);
@@ -224,6 +225,11 @@ let unsubscribeAssignments: (() => void) | null = null;
 // Computed property for all existing resource IDs (to exclude from add modal)
 const existingResourceIds = computed(() => {
   return resources.value.map(r => r.id);
+});
+
+// Computed property for program visibility
+const canViewProgram = computed(() => {
+  return canUserViewProgram(program.value, user.value?.uid, isAdmin.value);
 });
 
 // Convert Firestore document to Service type

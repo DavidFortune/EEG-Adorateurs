@@ -16,11 +16,12 @@ import {
 import { db } from './config';
 import type { ServiceProgram, ProgramSection, ProgramItem } from '@/types/program';
 
-export interface FirestoreProgram extends Omit<ServiceProgram, 'createdAt' | 'updatedAt'> {
+export interface FirestoreProgram extends Omit<ServiceProgram, 'createdAt' | 'updatedAt' | 'publishedAt'> {
   createdAt: Timestamp;
   updatedAt: Timestamp;
   createdBy: string;
   updatedBy: string;
+  publishedAt?: Timestamp;
 }
 
 const PROGRAMS_COLLECTION = 'programs';
@@ -47,7 +48,11 @@ export const getProgramByServiceId = async (serviceId: string): Promise<ServiceP
       ...data,
       id: doc.id,
       createdAt: data.createdAt.toDate(),
-      updatedAt: data.updatedAt.toDate()
+      updatedAt: data.updatedAt.toDate(),
+      // Migration defaults for existing programs without draft fields
+      isDraft: data.isDraft ?? false, // Existing programs default to published
+      draftViewerIds: data.draftViewerIds ?? [],
+      publishedAt: data.publishedAt?.toDate()
     };
   } catch (error) {
     console.error('Error fetching program:', error);
@@ -83,7 +88,11 @@ export const subscribeToProgramByServiceId = (
         ...data,
         id: docSnapshot.id,
         createdAt: data.createdAt?.toDate() || new Date(),
-        updatedAt: data.updatedAt?.toDate() || new Date()
+        updatedAt: data.updatedAt?.toDate() || new Date(),
+        // Migration defaults for existing programs without draft fields
+        isDraft: data.isDraft ?? false, // Existing programs default to published
+        draftViewerIds: data.draftViewerIds ?? [],
+        publishedAt: data.publishedAt?.toDate()
       };
 
       onUpdate(program);
@@ -101,7 +110,7 @@ export const subscribeToProgramByServiceId = (
  * Create a new program
  */
 export const createProgram = async (
-  program: Omit<ServiceProgram, 'id' | 'createdAt' | 'updatedAt'>,
+  program: Omit<ServiceProgram, 'id' | 'createdAt' | 'updatedAt' | 'isDraft' | 'draftViewerIds' | 'publishedAt' | 'publishedBy'>,
   userId: string
 ): Promise<ServiceProgram> => {
   console.log('Firebase createProgram called with:', { program, userId });
@@ -143,6 +152,8 @@ export const createProgram = async (
       ...program,
       items: itemsWithIds,
       sections: sectionsWithIds, // Keep for backward compatibility, but will be empty for new programs
+      isDraft: true, // New programs are drafts by default
+      draftViewerIds: [], // Empty initially - admins manage this list
       createdAt: now,
       updatedAt: now,
       createdBy: userId,
@@ -169,7 +180,8 @@ export const createProgram = async (
       ...createdData,
       id: programRef.id,
       createdAt: createdData.createdAt.toDate(),
-      updatedAt: createdData.updatedAt.toDate()
+      updatedAt: createdData.updatedAt.toDate(),
+      publishedAt: createdData.publishedAt?.toDate()
     };
   } catch (error) {
     console.error('Error creating program:', error);
@@ -589,4 +601,88 @@ export const deleteSubItemFromItem = async (
     console.error('Error deleting sub-item:', error);
     throw error;
   }
+};
+
+/**
+ * Publish a program (one-way operation, cannot be undone)
+ * Once published, the program is visible to all service participants
+ */
+export const publishProgram = async (
+  programId: string,
+  userId: string
+): Promise<void> => {
+  try {
+    const programRef = doc(db, PROGRAMS_COLLECTION, programId);
+    const programDoc = await getDoc(programRef);
+
+    if (!programDoc.exists()) {
+      throw new Error('Program not found');
+    }
+
+    const programData = programDoc.data() as FirestoreProgram;
+
+    // Prevent re-publishing already published programs
+    if (!programData.isDraft) {
+      throw new Error('Program is already published');
+    }
+
+    await updateDoc(programRef, {
+      isDraft: false,
+      publishedAt: serverTimestamp(),
+      publishedBy: userId,
+      updatedAt: serverTimestamp(),
+      updatedBy: userId
+    });
+  } catch (error) {
+    console.error('Error publishing program:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update the list of members who can view a draft program
+ * Only applicable when program is in draft mode
+ */
+export const updateDraftViewers = async (
+  programId: string,
+  viewerIds: string[],
+  userId: string
+): Promise<void> => {
+  try {
+    const programRef = doc(db, PROGRAMS_COLLECTION, programId);
+
+    await updateDoc(programRef, {
+      draftViewerIds: viewerIds,
+      updatedAt: serverTimestamp(),
+      updatedBy: userId
+    });
+  } catch (error) {
+    console.error('Error updating draft viewers:', error);
+    throw error;
+  }
+};
+
+/**
+ * Check if a user can view a program based on draft status and permissions
+ * @returns true if user can view, false otherwise
+ */
+export const canUserViewProgram = (
+  program: ServiceProgram | null,
+  firebaseUid: string | undefined,
+  isAdmin: boolean
+): boolean => {
+  if (!program) return false;
+
+  // Published programs are visible to everyone
+  if (!program.isDraft) return true;
+
+  // Admins can always view drafts
+  if (isAdmin) return true;
+
+  // Check if user is in the draft viewers list
+  if (firebaseUid && program.draftViewerIds.includes(firebaseUid)) {
+    return true;
+  }
+
+  return false;
 };
