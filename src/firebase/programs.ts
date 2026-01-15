@@ -153,7 +153,7 @@ export const createProgram = async (
       items: itemsWithIds,
       sections: sectionsWithIds, // Keep for backward compatibility, but will be empty for new programs
       isDraft: true, // New programs are drafts by default
-      draftViewerIds: [], // Empty initially - admins manage this list
+      draftViewerIds: [userId], // Creator can always view their own draft
       createdAt: now,
       updatedAt: now,
       createdBy: userId,
