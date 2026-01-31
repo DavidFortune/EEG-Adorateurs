@@ -2,6 +2,16 @@
 
 All notable changes to EEG Adorateurs will be documented in this file.
 
+## [1.14.0] - 2026-01-31
+
+### Enhanced
+- **Scripture Presentation Mode**: Improved display of Bible passages in presentation mode
+  - Each verse now appears on a new line for better readability
+  - Verse numbers highlighted in gold color with superscript styling
+  - Long passages automatically split across multiple slides (max 4 verses per slide)
+  - Page indicator (1/3, 2/3, etc.) shown when scripture spans multiple slides
+  - Applies to both "Lecture biblique" and "Prédication" items
+
 ## [1.12.11] - 2026-01-10
 
 ### Enhanced

@@ -12,6 +12,9 @@
           <ion-label>Brouillon</ion-label>
         </ion-chip>
         <ion-buttons slot="end">
+          <ion-button v-if="!isEditMode && program && program.items.length > 0" @click="showPresentation" fill="clear" color="primary">
+            <ion-icon :icon="easelOutline" />
+          </ion-button>
           <ion-button v-if="!isEditMode && hasYouTubeVideos" @click="showYouTubePlaylist" fill="clear" color="danger">
             <ion-icon :icon="logoYoutube" />
           </ion-button>
@@ -525,19 +528,30 @@
             </div>
           </div>
 
-          <!-- Scripture Fetch Button (only for "Lecture biblique") -->
-          <div v-if="itemForm.type === 'Lecture biblique'" class="scripture-fetch-section">
-            <ion-button
-              @click="handleFetchScripture"
-              :disabled="!itemForm.title || fetchingScripture"
-              expand="block"
-              fill="outline"
-              color="primary"
-            >
-              <ion-icon v-if="!fetchingScripture" :icon="bookOutline" slot="start" />
-              <ion-spinner v-else name="crescent" slot="start" />
-              {{ fetchingScripture ? 'Recherche...' : 'Chercher les versets' }}
-            </ion-button>
+          <!-- Scripture Reference Field (for "Lecture biblique" and "Prédication") -->
+          <div v-if="itemForm.type === 'Lecture biblique' || itemForm.type === 'Prédication'" class="scripture-fetch-section">
+            <div class="scripture-input-row">
+              <ion-item class="scripture-input-item">
+                <ion-label position="stacked">
+                  <ion-icon :icon="bookOutline" /> Référence biblique
+                </ion-label>
+                <ion-input
+                  v-model="itemForm.scriptureReference"
+                  placeholder="Ex: Jean 3:16 ou Psaume 23:1-6"
+                  @keyup.enter="handleFetchScripture"
+                ></ion-input>
+              </ion-item>
+              <ion-button
+                @click="handleFetchScripture"
+                :disabled="!itemForm.scriptureReference || fetchingScripture"
+                fill="solid"
+                color="primary"
+                class="scripture-search-btn"
+              >
+                <ion-icon v-if="!fetchingScripture" :icon="searchOutline" slot="icon-only" />
+                <ion-spinner v-else name="crescent" slot="icon-only" />
+              </ion-button>
+            </div>
 
             <!-- Scripture Preview -->
             <div v-if="itemForm.scriptureText" class="scripture-preview">
@@ -906,6 +920,204 @@
         </ion-content>
       </ion-modal>
 
+      <!-- Presentation Modal (PowerPoint-style 16:9 Fullscreen) -->
+      <ion-modal :is-open="showPresentationModalState" @ionModalDidDismiss="closePresentation" class="presentation-modal fullscreen-modal">
+        <ion-content class="presentation-content" :fullscreen="true">
+          <div class="presentation-container"
+            @touchstart="handlePresentationTouchStart"
+            @touchmove="handlePresentationTouchMove"
+            @touchend="handlePresentationTouchEnd"
+          >
+            <!-- Close Button -->
+            <div class="presentation-close-btn">
+              <ion-button @click="closePresentation" fill="clear" color="light">
+                <ion-icon :icon="closeOutline" />
+              </ion-button>
+            </div>
+
+            <!-- Slide Display -->
+            <div v-if="presentationSlides.length > 0" class="slide-section">
+              <!-- Slide Counter -->
+              <div class="slide-counter">
+                {{ currentSlideIndex + 1 }} / {{ presentationSlides.length }}
+              </div>
+
+              <!-- Main Slide -->
+              <div class="slide-wrapper">
+                <!-- Scripture Slide (for Lecture biblique or Prédication with scripture) -->
+                <div v-if="currentSlide?.scriptureReference" class="slide-fullscreen slide-scripture-mode">
+                  <!-- Scripture Header -->
+                  <div class="scripture-slide-header">
+                    <div class="scripture-badge">
+                      <ion-icon :icon="currentSlide.type === 'Prédication' ? micOutline : libraryOutline" />
+                      <span>{{ currentSlide.type === 'Prédication' ? 'Prédication' : 'Lecture biblique' }}</span>
+                    </div>
+                    <div class="scripture-header-right">
+                      <div v-if="currentSlide.scripturePage && currentSlide.scriptureTotal && currentSlide.scriptureTotal > 1" class="scripture-page-indicator">
+                        {{ currentSlide.scripturePage }}/{{ currentSlide.scriptureTotal }}
+                      </div>
+                      <div v-if="currentSlide.itemNumber" class="slide-number">#{{ currentSlide.itemNumber }}</div>
+                    </div>
+                  </div>
+
+                  <!-- Scripture Content -->
+                  <div class="scripture-slide-body">
+                    <!-- For sermons, show the title first (only on first page) -->
+                    <div v-if="currentSlide.type === 'Prédication' && currentSlide.title && (!currentSlide.scripturePage || currentSlide.scripturePage === 1)" class="sermon-title">{{ currentSlide.title }}</div>
+
+                    <div class="scripture-reference-large">{{ currentSlide.scriptureReference }}</div>
+                    <div class="scripture-divider"></div>
+                    <div v-if="currentSlide.scriptureText" class="scripture-text-large scripture-text-formatted" v-html="formatScriptureForDisplay(currentSlide.scriptureText)"></div>
+                    <div v-else class="scripture-no-text">
+                      <ion-icon :icon="bookOutline" />
+                      <span>Texte non disponible</span>
+                    </div>
+                  </div>
+
+                  <!-- Scripture Footer -->
+                  <div v-if="currentSlide.participant || currentSlide.duration" class="scripture-slide-footer">
+                    <div v-if="currentSlide.participant" class="slide-participant">
+                      <ion-icon :icon="personOutline" />
+                      <span>{{ currentSlide.participant }}</span>
+                    </div>
+                    <div v-if="currentSlide.duration" class="slide-duration">
+                      <ion-icon :icon="timeOutline" />
+                      <span>{{ currentSlide.duration }} min</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Lyrics Slide (sub-item or regular song) -->
+                <div v-else-if="currentSlide?.isLyricsSlide" class="slide-fullscreen slide-lyrics-mode">
+                  <!-- Lyrics Header -->
+                  <div class="slide-header-compact">
+                    <div class="slide-parent-info">
+                      <span v-if="currentSlide.parentTitle" class="parent-title">{{ currentSlide.parentTitle }}</span>
+                      <span v-if="currentSlide.isSubItem" class="subitem-counter">Chant {{ currentSlide.subItemIndex }} / {{ currentSlide.totalSubItems }}</span>
+                    </div>
+                    <div v-if="currentSlide.lyricsTotal && currentSlide.lyricsTotal > 1" class="lyrics-page-indicator">
+                      Page {{ currentSlide.lyricsPage }} / {{ currentSlide.lyricsTotal }}
+                    </div>
+                  </div>
+
+                  <!-- Song Title -->
+                  <div class="slide-song-header">
+                    <ion-icon :icon="musicalNoteOutline" class="song-icon" />
+                    <h1 class="slide-song-title">{{ currentSlide.title }}</h1>
+                  </div>
+
+                  <!-- Lyrics Display -->
+                  <div class="slide-lyrics-full">
+                    <div v-if="currentSlide.lyrics" class="lyrics-text">{{ currentSlide.lyrics }}</div>
+                    <div v-else class="no-lyrics-message">
+                      <ion-icon :icon="documentTextOutline" />
+                      <span>Aucune parole disponible</span>
+                    </div>
+                  </div>
+
+                  <!-- Notes (only on first page) -->
+                  <div v-if="currentSlide.notes" class="slide-notes-bottom">
+                    <ion-icon :icon="documentTextOutline" />
+                    <span>{{ currentSlide.notes }}</span>
+                  </div>
+                </div>
+
+                <!-- Regular Slide (non-lyrics) -->
+                <div v-else class="slide-fullscreen" :class="{ 'is-section': currentSlide?.isSection }">
+                  <!-- Slide Header -->
+                  <div class="slide-header">
+                    <div class="slide-type-badge">
+                      <ion-icon :icon="getSlideTypeIcon(currentSlide?.type || ProgramItemType.SONG)" />
+                      <span>{{ getSlideTypeLabel(currentSlide?.type || ProgramItemType.SONG) }}</span>
+                    </div>
+                    <div v-if="currentSlide && !currentSlide.isSection && currentSlide.itemNumber" class="slide-number">
+                      #{{ currentSlide.itemNumber }}
+                    </div>
+                  </div>
+
+                  <!-- Slide Content -->
+                  <div class="slide-body">
+                    <h1 class="slide-title">{{ currentSlide?.title }}</h1>
+                    <p v-if="currentSlide?.subtitle" class="slide-subtitle">
+                      {{ currentSlide.subtitle }}
+                    </p>
+
+                    <!-- Sub-items list (e.g., songs in a worship moment) -->
+                    <div v-if="currentSlide?.subItems && currentSlide.subItems.length > 0" class="slide-subitems">
+                      <div v-for="(subItem, idx) in currentSlide.subItems" :key="idx" class="subitem">
+                        <span class="subitem-number">{{ idx + 1 }}.</span>
+                        <span class="subitem-title">{{ subItem.resourceTitle || subItem.title }}</span>
+                      </div>
+                    </div>
+
+                    <!-- Notes -->
+                    <div v-if="currentSlide?.notes" class="slide-notes">
+                      <ion-icon :icon="documentTextOutline" />
+                      <span>{{ currentSlide.notes }}</span>
+                    </div>
+                  </div>
+
+                  <!-- Slide Footer -->
+                  <div class="slide-footer">
+                    <div v-if="currentSlide?.participant" class="slide-participant">
+                      <ion-icon :icon="personOutline" />
+                      <span>{{ currentSlide.participant }}</span>
+                    </div>
+                    <div v-if="currentSlide?.duration" class="slide-duration">
+                      <ion-icon :icon="timeOutline" />
+                      <span>{{ currentSlide.duration }} min</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Navigation Controls -->
+              <div class="presentation-controls">
+                <ion-button
+                  @click="previousSlide"
+                  :disabled="currentSlideIndex === 0"
+                  fill="solid"
+                  color="light"
+                  class="nav-button"
+                >
+                  <ion-icon :icon="playBackOutline" slot="start" class="hide-mobile" />
+                  <ion-icon :icon="playBackOutline" slot="icon-only" class="show-mobile" />
+                  <span class="hide-mobile">Précédent</span>
+                </ion-button>
+
+                <div class="slide-progress-indicator">
+                  <div
+                    v-for="(slide, index) in presentationSlides"
+                    :key="index"
+                    :class="['slide-progress-dot', { 'active': index === currentSlideIndex, 'viewed': index < currentSlideIndex, 'is-section': slide.isSection, 'is-subitem': slide.isSubItem, 'is-lyrics': slide.isLyricsSlide }]"
+                    @click="goToSlide(index)"
+                    :title="slide.lyricsPage ? `${slide.title} (${slide.lyricsPage}/${slide.lyricsTotal})` : slide.title"
+                  ></div>
+                </div>
+
+                <ion-button
+                  @click="nextSlide"
+                  :disabled="currentSlideIndex === presentationSlides.length - 1"
+                  fill="solid"
+                  color="light"
+                  class="nav-button"
+                >
+                  <span class="hide-mobile">Suivant</span>
+                  <ion-icon :icon="playForwardOutline" slot="icon-only" class="show-mobile" />
+                  <ion-icon :icon="playForwardOutline" slot="end" class="hide-mobile" />
+                </ion-button>
+              </div>
+            </div>
+
+            <!-- No slides -->
+            <div v-else class="no-slides">
+              <ion-icon :icon="documentTextOutline" class="no-slides-icon" />
+              <p>Aucun élément dans le programme</p>
+            </div>
+          </div>
+        </ion-content>
+      </ion-modal>
+
       <!-- Scripture Display Modal -->
       <ion-modal :is-open="showScriptureModalState" @ionModalDidDismiss="closeScriptureModal" :initial-breakpoint="0.7" :breakpoints="[0, 0.5, 0.7, 1]">
         <ion-header>
@@ -1128,7 +1340,7 @@ import {
   arrowBackOutline, logoYoutube, playBackOutline, playForwardOutline,
   removeOutline, bookOutline, copyOutline,
   lockClosedOutline, peopleOutline, checkmarkCircleOutline,
-  sparklesOutline
+  sparklesOutline, easelOutline, searchOutline
 } from 'ionicons/icons';
 import ResourceSelector from '@/components/ResourceSelector.vue';
 import ResourceQuickAdd from '@/components/ResourceQuickAdd.vue';
@@ -1252,6 +1464,49 @@ const youtubeVideos = ref<Array<{
   programItemTitle?: string;
 }>>([]);
 const currentVideoIndex = ref(0);
+
+// Presentation Modal (PowerPoint-style 16:9)
+const showPresentationModalState = ref(false);
+const presentationSlides = ref<Array<{
+  type: ProgramItemType;
+  title: string;
+  subtitle?: string;
+  participant?: string;
+  duration?: number;
+  notes?: string;
+  scriptureReference?: string;
+  scriptureText?: string;
+  lyrics?: string;
+  lyricsPage?: number;
+  lyricsTotal?: number;
+  scripturePage?: number;
+  scriptureTotal?: number;
+  isScriptureSlide?: boolean;
+  itemNumber: number;
+  isSection?: boolean;
+  isSubItem?: boolean;
+  isLyricsSlide?: boolean;
+  parentTitle?: string;
+  subItemIndex?: number;
+  totalSubItems?: number;
+  subItems?: Array<{
+    title: string;
+    resourceTitle?: string;
+  }>;
+}>>([]);
+const currentSlideIndex = ref(0);
+
+// Computed property for current slide
+const currentSlide = computed(() => {
+  if (presentationSlides.value.length === 0) return null;
+  return presentationSlides.value[currentSlideIndex.value];
+});
+
+// Presentation touch/swipe handling
+const presentationTouchStartX = ref(0);
+const presentationTouchEndX = ref(0);
+const presentationTouchStartY = ref(0);
+const presentationTouchEndY = ref(0);
 
 // Touch/Swipe handling
 const touchStartX = ref(0);
@@ -1873,22 +2128,23 @@ const closeItemFormModal = () => {
   editingItemId.value = null;
 };
 
-// Fetch Bible verses for "Lecture biblique" items
+// Fetch Bible verses for "Lecture biblique" and "Prédication" items
 const handleFetchScripture = async () => {
-  if (!itemForm.value.title) {
+  if (!itemForm.value.scriptureReference) {
     await showToast('Veuillez entrer une référence biblique', 'warning');
     return;
   }
 
   fetchingScripture.value = true;
   try {
-    const result = await bibleService.getScripture(itemForm.value.title);
+    const result = await bibleService.getScripture(itemForm.value.scriptureReference);
 
     if (!result) {
       await showToast('Référence biblique non reconnue. Exemple: Jean 3:16 ou Psaume 23:1-6', 'warning');
       return;
     }
 
+    // Update the reference with the normalized version from the API
     itemForm.value.scriptureReference = result.reference;
     itemForm.value.scriptureText = result.text;
     itemForm.value.scriptureVersion = result.version;
@@ -2665,6 +2921,387 @@ watch(showYouTubePlaylistModalState, (isOpen) => {
     setupYouTubeAPIListener();
   }
 });
+
+// Presentation Functions (PowerPoint-style 16:9)
+
+// Helper function to split lyrics into pages
+const splitLyricsIntoPages = (lyrics: string, maxLinesPerPage: number = 12): string[] => {
+  if (!lyrics || lyrics.trim() === '') return [];
+
+  // Split by double newlines (paragraphs/verses) first
+  const paragraphs = lyrics.split(/\n\s*\n/).filter(p => p.trim());
+
+  const pages: string[] = [];
+  let currentPage: string[] = [];
+  let currentLineCount = 0;
+
+  for (const paragraph of paragraphs) {
+    const paragraphLines = paragraph.split('\n').filter(l => l.trim());
+    const paragraphLineCount = paragraphLines.length;
+
+    // If adding this paragraph would exceed the limit, start a new page
+    if (currentLineCount > 0 && currentLineCount + paragraphLineCount > maxLinesPerPage) {
+      pages.push(currentPage.join('\n\n'));
+      currentPage = [];
+      currentLineCount = 0;
+    }
+
+    currentPage.push(paragraph);
+    currentLineCount += paragraphLineCount;
+  }
+
+  // Don't forget the last page
+  if (currentPage.length > 0) {
+    pages.push(currentPage.join('\n\n'));
+  }
+
+  return pages;
+};
+
+// Format scripture text with each verse on a new line
+const formatScriptureForPresentation = (text: string): string => {
+  if (!text) return '';
+
+  // Scripture text often has verse numbers like "16 Text... 17 Text..."
+  // We want to put each verse on its own line
+  // Pattern: number followed by space at the start or after a period/sentence
+  let formatted = text
+    // Add newline before verse numbers (except at the very start)
+    .replace(/(\S)\s+(\d{1,3})\s+/g, '$1\n\n$2 ')
+    // Clean up any double spaces
+    .replace(/\s{2,}/g, ' ')
+    // Ensure verse numbers at start are formatted correctly
+    .replace(/^(\d{1,3})\s+/, '$1 ')
+    .trim();
+
+  return formatted;
+};
+
+// Split scripture into pages (fewer verses per page for readability)
+const splitScriptureIntoPages = (text: string, maxVersesPerPage: number = 4): string[] => {
+  if (!text || text.trim() === '') return [];
+
+  // First format the text
+  const formatted = formatScriptureForPresentation(text);
+
+  // Split by double newlines (each verse)
+  const verses = formatted.split(/\n\n/).filter(v => v.trim());
+
+  if (verses.length === 0) return [formatted];
+
+  const pages: string[] = [];
+  let currentPage: string[] = [];
+
+  for (const verse of verses) {
+    currentPage.push(verse);
+
+    if (currentPage.length >= maxVersesPerPage) {
+      pages.push(currentPage.join('\n\n'));
+      currentPage = [];
+    }
+  }
+
+  // Don't forget the last page
+  if (currentPage.length > 0) {
+    pages.push(currentPage.join('\n\n'));
+  }
+
+  return pages;
+};
+
+// Format scripture text for display with HTML line breaks
+const formatScriptureForDisplay = (text: string): string => {
+  if (!text) return '';
+  // Convert double newlines to <br><br> for proper HTML rendering
+  // Also highlight verse numbers with styling
+  return text
+    .replace(/\n\n/g, '<br><br>')
+    .replace(/^(\d{1,3})\s/gm, '<span class="verse-number">$1</span> ');
+};
+
+const collectPresentationSlides = () => {
+  const slides: typeof presentationSlides.value = [];
+
+  if (!program.value) return slides;
+
+  let itemNumber = 0;
+
+  for (const item of sortedItems.value) {
+    const isSection = item.type === ProgramItemType.SECTION || item.type === ProgramItemType.TITLE;
+
+    if (!isSection) {
+      itemNumber++;
+    }
+
+    // Get resource info if available
+    let resourceTitle = '';
+    let lyrics = '';
+    if (item.resourceId) {
+      const resource = getLinkedResource(item.resourceId);
+      if (resource) {
+        resourceTitle = resource.title;
+        // Get lyrics if available
+        const lyricsContent = resource.contents?.find(c => c.type === 'lyrics');
+        if (lyricsContent?.content) {
+          lyrics = lyricsContent.content;
+        }
+      }
+    }
+
+    // Get participant name
+    let participantName = '';
+    if (item.participants && item.participants.length > 0) {
+      participantName = item.participants.map(p => p.name).join(', ');
+    }
+
+    // Check if item has sub-items (e.g., songs in a worship moment)
+    if (item.subItems && item.subItems.length > 0) {
+      // First, add the parent item as a "header" slide
+      const subItemsInfo = item.subItems.map(sub => {
+        const subResource = sub.resourceId ? getLinkedResource(sub.resourceId) : null;
+        return {
+          title: sub.title,
+          resourceTitle: subResource?.title
+        };
+      });
+
+      slides.push({
+        type: item.type,
+        title: resourceTitle || item.title,
+        subtitle: item.subtitle,
+        participant: participantName,
+        duration: item.duration,
+        notes: item.notes,
+        itemNumber: isSection ? 0 : itemNumber,
+        isSection: isSection,
+        subItems: subItemsInfo
+      });
+
+      // Then, create individual slides for each sub-item with lyrics
+      const sortedSubItems = [...item.subItems].sort((a, b) => a.order - b.order);
+      sortedSubItems.forEach((subItem, subIndex) => {
+        let subLyrics = '';
+        let subTitle = subItem.title;
+
+        if (subItem.resourceId) {
+          const subResource = getLinkedResource(subItem.resourceId);
+          if (subResource) {
+            subTitle = subResource.title;
+            const lyricsContent = subResource.contents?.find(c => c.type === 'lyrics');
+            if (lyricsContent?.content) {
+              subLyrics = lyricsContent.content;
+            }
+          }
+        }
+
+        // Split lyrics into pages
+        const lyricsPages = splitLyricsIntoPages(subLyrics);
+
+        if (lyricsPages.length === 0) {
+          // No lyrics - add single slide
+          slides.push({
+            type: ProgramItemType.SONG,
+            title: subTitle,
+            lyrics: '',
+            itemNumber: itemNumber,
+            isSubItem: true,
+            isLyricsSlide: true,
+            parentTitle: resourceTitle || item.title,
+            subItemIndex: subIndex + 1,
+            totalSubItems: sortedSubItems.length,
+            notes: subItem.notes
+          });
+        } else {
+          // Add a slide for each lyrics page
+          lyricsPages.forEach((page, pageIndex) => {
+            slides.push({
+              type: ProgramItemType.SONG,
+              title: subTitle,
+              lyrics: page,
+              lyricsPage: pageIndex + 1,
+              lyricsTotal: lyricsPages.length,
+              itemNumber: itemNumber,
+              isSubItem: true,
+              isLyricsSlide: true,
+              parentTitle: resourceTitle || item.title,
+              subItemIndex: subIndex + 1,
+              totalSubItems: sortedSubItems.length,
+              notes: pageIndex === 0 ? subItem.notes : undefined
+            });
+          });
+        }
+      });
+    } else {
+      // Regular item without sub-items
+      // For songs with lyrics, split into pages
+      if (item.type === ProgramItemType.SONG && lyrics) {
+        const lyricsPages = splitLyricsIntoPages(lyrics);
+
+        // First slide with song info
+        slides.push({
+          type: item.type,
+          title: resourceTitle || item.title,
+          subtitle: item.subtitle,
+          participant: participantName,
+          duration: item.duration,
+          notes: item.notes,
+          itemNumber: itemNumber,
+          isSection: false
+        });
+
+        // Then lyrics slides
+        lyricsPages.forEach((page, pageIndex) => {
+          slides.push({
+            type: item.type,
+            title: resourceTitle || item.title,
+            lyrics: page,
+            lyricsPage: pageIndex + 1,
+            lyricsTotal: lyricsPages.length,
+            itemNumber: itemNumber,
+            isLyricsSlide: true
+          });
+        });
+      } else if ((item.type === ProgramItemType.SCRIPTURE || item.type === ProgramItemType.SERMON) && item.scriptureText) {
+        // Scripture or sermon with scripture text - split into pages
+        const scripturePages = splitScriptureIntoPages(item.scriptureText, 4);
+
+        if (scripturePages.length > 1) {
+          // Multiple pages - create slides for each page
+          scripturePages.forEach((page, pageIndex) => {
+            slides.push({
+              type: item.type,
+              title: resourceTitle || item.title,
+              subtitle: item.subtitle,
+              participant: pageIndex === 0 ? participantName : undefined,
+              duration: pageIndex === 0 ? item.duration : undefined,
+              notes: pageIndex === 0 ? item.notes : undefined,
+              scriptureReference: item.scriptureReference,
+              scriptureText: page,
+              scripturePage: pageIndex + 1,
+              scriptureTotal: scripturePages.length,
+              isScriptureSlide: true,
+              itemNumber: isSection ? 0 : itemNumber,
+              isSection: isSection
+            });
+          });
+        } else {
+          // Single page - format the text with verse line breaks
+          slides.push({
+            type: item.type,
+            title: resourceTitle || item.title,
+            subtitle: item.subtitle,
+            participant: participantName,
+            duration: item.duration,
+            notes: item.notes,
+            scriptureReference: item.scriptureReference,
+            scriptureText: formatScriptureForPresentation(item.scriptureText),
+            isScriptureSlide: true,
+            itemNumber: isSection ? 0 : itemNumber,
+            isSection: isSection
+          });
+        }
+      } else {
+        // Non-song items or songs without lyrics
+        slides.push({
+          type: item.type,
+          title: resourceTitle || item.title,
+          subtitle: item.subtitle,
+          participant: participantName,
+          duration: item.duration,
+          notes: item.notes,
+          scriptureReference: item.scriptureReference,
+          scriptureText: item.scriptureText,
+          lyrics: lyrics,
+          itemNumber: isSection ? 0 : itemNumber,
+          isSection: isSection
+        });
+      }
+    }
+  }
+
+  return slides;
+};
+
+const showPresentation = () => {
+  presentationSlides.value = collectPresentationSlides();
+  currentSlideIndex.value = 0;
+  showPresentationModalState.value = true;
+};
+
+const closePresentation = () => {
+  showPresentationModalState.value = false;
+  currentSlideIndex.value = 0;
+};
+
+const nextSlide = () => {
+  if (currentSlideIndex.value < presentationSlides.value.length - 1) {
+    currentSlideIndex.value++;
+  }
+};
+
+const previousSlide = () => {
+  if (currentSlideIndex.value > 0) {
+    currentSlideIndex.value--;
+  }
+};
+
+const goToSlide = (index: number) => {
+  currentSlideIndex.value = index;
+};
+
+const handlePresentationTouchStart = (e: TouchEvent) => {
+  presentationTouchStartX.value = e.touches[0].clientX;
+  presentationTouchStartY.value = e.touches[0].clientY;
+};
+
+const handlePresentationTouchMove = (e: TouchEvent) => {
+  presentationTouchEndX.value = e.touches[0].clientX;
+  presentationTouchEndY.value = e.touches[0].clientY;
+};
+
+const handlePresentationTouchEnd = () => {
+  const deltaX = presentationTouchStartX.value - presentationTouchEndX.value;
+  const deltaY = Math.abs(presentationTouchStartY.value - presentationTouchEndY.value);
+
+  const minSwipeDistance = 50;
+
+  if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaX) > deltaY * 2) {
+    if (deltaX > 0) {
+      nextSlide();
+    } else {
+      previousSlide();
+    }
+  }
+
+  presentationTouchStartX.value = 0;
+  presentationTouchEndX.value = 0;
+  presentationTouchStartY.value = 0;
+  presentationTouchEndY.value = 0;
+};
+
+const getSlideTypeIcon = (type: ProgramItemType): string => {
+  switch (type) {
+    case ProgramItemType.SONG: return musicalNoteOutline;
+    case ProgramItemType.PRAYER: return handLeftOutline;
+    case ProgramItemType.SCRIPTURE: return libraryOutline;
+    case ProgramItemType.SERMON: return micOutline;
+    case ProgramItemType.SECTION: return bookOutline;
+    case ProgramItemType.TITLE: return bookOutline;
+    default: return documentTextOutline;
+  }
+};
+
+const getSlideTypeLabel = (type: ProgramItemType): string => {
+  switch (type) {
+    case ProgramItemType.SONG: return 'Chant';
+    case ProgramItemType.PRAYER: return 'Prière';
+    case ProgramItemType.SCRIPTURE: return 'Lecture biblique';
+    case ProgramItemType.SERMON: return 'Prédication';
+    case ProgramItemType.SECTION: return 'Section';
+    case ProgramItemType.TITLE: return 'Titre';
+    default: return type;
+  }
+};
 
 // Watch for resource selection to auto-populate title
 watch(() => itemForm.value.resourceId, async (newResourceId) => {
@@ -4309,8 +4946,34 @@ ion-reorder.item-handle-column:active {
   padding: 12px 16px;
 }
 
-.scripture-fetch-section ion-button {
+.scripture-input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
   margin-bottom: 12px;
+}
+
+.scripture-input-item {
+  flex: 1;
+  --padding-start: 0;
+  --inner-padding-end: 0;
+}
+
+.scripture-input-item ion-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.scripture-input-item ion-label ion-icon {
+  font-size: 1rem;
+  color: var(--ion-color-primary);
+}
+
+.scripture-search-btn {
+  --border-radius: 8px;
+  height: 42px;
+  margin-bottom: 8px;
 }
 
 .scripture-preview {
@@ -4525,5 +5188,804 @@ ion-reorder.item-handle-column:active {
   font-weight: 600;
   font-size: 0.9rem;
   border-radius: 50%;
+}
+
+/* Presentation Modal (Fullscreen 16:9) */
+.presentation-modal {
+  --width: 100%;
+  --height: 100%;
+  --border-radius: 0;
+}
+
+.presentation-content {
+  --background: #000;
+}
+
+.presentation-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background: #000;
+  position: relative;
+}
+
+/* Close Button */
+.presentation-close-btn {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 100;
+}
+
+.presentation-close-btn ion-button {
+  --color: rgba(255, 255, 255, 0.8);
+  font-size: 1.5rem;
+}
+
+.presentation-close-btn ion-button:hover {
+  --color: white;
+}
+
+.slide-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.slide-counter {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 600;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+}
+
+.slide-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Fullscreen Slide Container */
+.slide-fullscreen {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(145deg, #1a1a2e 0%, #16213e 100%);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.slide-fullscreen.is-section {
+  background: linear-gradient(145deg, var(--ion-color-primary) 0%, var(--ion-color-primary-shade) 100%);
+}
+
+/* Lyrics Mode Slide */
+.slide-fullscreen.slide-lyrics-mode {
+  background: linear-gradient(145deg, #0a0a15 0%, #1a1a2e 100%);
+}
+
+/* Scripture Mode Slide */
+.slide-fullscreen.slide-scripture-mode {
+  background: linear-gradient(145deg, #1a0a0a 0%, #2e1a1a 50%, #1a1a2e 100%);
+}
+
+.scripture-slide-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 3rem;
+  flex-shrink: 0;
+}
+
+.scripture-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1.25rem;
+  background: rgba(181, 18, 27, 0.9);
+  color: white;
+  border-radius: 30px;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.scripture-badge ion-icon {
+  font-size: 1.4rem;
+}
+
+.scripture-slide-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem 4rem;
+  text-align: center;
+}
+
+.sermon-title {
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: white;
+  margin-bottom: 1rem;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.scripture-reference-large {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #e8c4a0;
+  margin-bottom: 1.5rem;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+.scripture-divider {
+  width: 120px;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #e8c4a0, transparent);
+  margin-bottom: 2rem;
+}
+
+.scripture-text-large {
+  font-size: 1.8rem;
+  color: #f5f0e8;
+  line-height: 2;
+  max-width: 85%;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  text-align: justify;
+  text-align-last: center;
+}
+
+.scripture-no-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.scripture-no-text ion-icon {
+  font-size: 4rem;
+}
+
+.scripture-no-text span {
+  font-size: 1.25rem;
+}
+
+.scripture-slide-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 3rem;
+  font-size: 1.1rem;
+  color: rgba(255, 255, 255, 0.6);
+  flex-shrink: 0;
+}
+
+.scripture-header-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.scripture-page-indicator {
+  background: rgba(232, 196, 160, 0.2);
+  color: #e8c4a0;
+  padding: 0.4rem 0.9rem;
+  border-radius: 20px;
+  font-size: 1rem;
+  font-weight: 600;
+  border: 1px solid rgba(232, 196, 160, 0.3);
+}
+
+.scripture-text-formatted {
+  text-align: left;
+  text-align-last: left;
+}
+
+.scripture-text-formatted .verse-number {
+  display: inline-block;
+  color: #e8c4a0;
+  font-weight: 700;
+  font-size: 0.8em;
+  vertical-align: super;
+  margin-right: 0.2em;
+  font-style: normal;
+}
+
+/* Slide Header */
+.slide-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2rem;
+  background: rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+}
+
+.slide-header-compact {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  background: rgba(0, 0, 0, 0.4);
+  flex-shrink: 0;
+}
+
+.slide-parent-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.parent-title {
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+}
+
+.subitem-counter {
+  font-size: 0.9rem;
+  color: var(--ion-color-primary);
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+}
+
+.lyrics-page-indicator {
+  font-size: 1rem;
+  color: white;
+  font-weight: 700;
+  background: var(--ion-color-primary);
+  padding: 0.35rem 1rem;
+  border-radius: 20px;
+}
+
+.slide-notes-bottom {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 2rem;
+  background: rgba(0, 0, 0, 0.3);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.slide-notes-bottom ion-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.slide-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--ion-color-primary);
+  color: white;
+  border-radius: 25px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.slide-type-badge ion-icon {
+  font-size: 1.2rem;
+}
+
+.slide-number {
+  font-size: 2rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.slide-fullscreen.is-section .slide-header {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.slide-fullscreen.is-section .slide-type-badge {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Song Header for Lyrics Mode */
+.slide-song-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 1.5rem 2rem;
+  flex-shrink: 0;
+}
+
+.song-icon {
+  font-size: 2.5rem;
+  color: var(--ion-color-primary);
+}
+
+.slide-song-title {
+  margin: 0;
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: white;
+  text-align: center;
+}
+
+/* Slide Body */
+.slide-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem 4rem;
+  text-align: center;
+  overflow-y: auto;
+}
+
+.slide-title {
+  margin: 0;
+  font-size: 4rem;
+  font-weight: 700;
+  color: white;
+  line-height: 1.2;
+  max-width: 90%;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.slide-subtitle {
+  margin: 1rem 0 0 0;
+  font-size: 1.75rem;
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 500;
+}
+
+/* Scripture Display */
+.slide-scripture {
+  margin-top: 2rem;
+  padding: 2rem;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  max-width: 80%;
+  border-left: 4px solid var(--ion-color-primary);
+}
+
+.scripture-reference {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--ion-color-primary);
+  margin-bottom: 1rem;
+}
+
+.scripture-text {
+  font-size: 1.5rem;
+  color: white;
+  font-style: italic;
+  line-height: 1.8;
+  max-height: none;
+  overflow-y: visible;
+}
+
+/* Sub-items List */
+.slide-subitems {
+  margin-top: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  text-align: left;
+  max-width: 70%;
+}
+
+.subitem {
+  display: flex;
+  gap: 1rem;
+  font-size: 1.75rem;
+  color: white;
+  padding: 0.5rem 0;
+}
+
+.subitem-number {
+  font-weight: 700;
+  color: var(--ion-color-primary);
+  min-width: 2.5rem;
+}
+
+.subitem-title {
+  flex: 1;
+}
+
+/* Full Lyrics Display */
+.slide-lyrics-full {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  overflow-y: auto;
+  width: 100%;
+}
+
+.lyrics-text {
+  font-size: 2rem;
+  color: white;
+  white-space: pre-line;
+  line-height: 1.8;
+  text-align: center;
+  max-width: 90%;
+}
+
+.no-lyrics-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.no-lyrics-message ion-icon {
+  font-size: 4rem;
+}
+
+.no-lyrics-message span {
+  font-size: 1.5rem;
+}
+
+/* Notes */
+.slide-notes {
+  margin-top: 1.5rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  font-size: 1.2rem;
+  color: rgba(255, 255, 255, 0.7);
+  max-width: 70%;
+  text-align: left;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+}
+
+.slide-notes ion-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* Slide Footer */
+.slide-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  background: rgba(0, 0, 0, 0.3);
+  font-size: 1.1rem;
+  color: rgba(255, 255, 255, 0.7);
+  flex-shrink: 0;
+}
+
+.slide-fullscreen.is-section .slide-footer {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.slide-participant, .slide-duration {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.slide-participant ion-icon, .slide-duration ion-icon {
+  font-size: 1.2rem;
+}
+
+/* Presentation Controls */
+.presentation-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 2rem;
+  gap: 1rem;
+  background: rgba(0, 0, 0, 0.8);
+  flex-shrink: 0;
+}
+
+.presentation-controls .nav-button {
+  --border-radius: 8px;
+  --background: rgba(255, 255, 255, 0.15);
+  --color: white;
+  font-weight: 600;
+}
+
+.presentation-controls .nav-button:hover {
+  --background: rgba(255, 255, 255, 0.25);
+}
+
+.slide-progress-indicator {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding: 0.5rem 0;
+}
+
+.slide-progress-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.slide-progress-dot:hover {
+  background: rgba(255, 255, 255, 0.5);
+  transform: scale(1.2);
+}
+
+.slide-progress-dot.active {
+  background: var(--ion-color-primary);
+  width: 16px;
+  height: 16px;
+  box-shadow: 0 0 10px var(--ion-color-primary);
+}
+
+.slide-progress-dot.viewed {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.slide-progress-dot.is-section {
+  border-radius: 4px;
+  width: 18px;
+  height: 10px;
+}
+
+.slide-progress-dot.is-section.active {
+  width: 22px;
+  height: 12px;
+}
+
+.slide-progress-dot.is-subitem {
+  background: rgba(var(--ion-color-primary-rgb), 0.4);
+  width: 8px;
+  height: 8px;
+}
+
+.slide-progress-dot.is-subitem.active {
+  background: var(--ion-color-primary);
+  width: 12px;
+  height: 12px;
+}
+
+.slide-progress-dot.is-lyrics {
+  background: rgba(255, 255, 255, 0.25);
+  width: 6px;
+  height: 6px;
+}
+
+.slide-progress-dot.is-lyrics.active {
+  background: var(--ion-color-primary);
+  width: 10px;
+  height: 10px;
+}
+
+.slide-progress-dot.is-lyrics.viewed {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* No slides state */
+.no-slides {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.no-slides-icon {
+  font-size: 5rem;
+  margin-bottom: 1.5rem;
+}
+
+.no-slides p {
+  font-size: 1.5rem;
+  margin: 0;
+}
+
+/* Responsive adjustments for presentation */
+@media (max-width: 1024px) {
+  .slide-title {
+    font-size: 3rem;
+  }
+
+  .slide-song-title {
+    font-size: 2rem;
+  }
+
+  .lyrics-text {
+    font-size: 1.5rem;
+  }
+
+  .sermon-title {
+    font-size: 1.8rem;
+  }
+
+  .scripture-reference-large {
+    font-size: 2rem;
+  }
+
+  .scripture-text-large {
+    font-size: 1.5rem;
+    line-height: 1.8;
+  }
+
+  .subitem {
+    font-size: 1.5rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .slide-header {
+    padding: 1rem 1.5rem;
+  }
+
+  .slide-type-badge {
+    font-size: 0.85rem;
+    padding: 0.4rem 0.8rem;
+  }
+
+  .slide-number {
+    font-size: 1.5rem;
+  }
+
+  .slide-body {
+    padding: 1.5rem 2rem;
+  }
+
+  .slide-title {
+    font-size: 2rem;
+  }
+
+  .slide-subtitle {
+    font-size: 1.25rem;
+  }
+
+  .slide-song-title {
+    font-size: 1.5rem;
+  }
+
+  .song-icon {
+    font-size: 1.75rem;
+  }
+
+  .lyrics-text {
+    font-size: 1.2rem;
+    line-height: 1.6;
+  }
+
+  .scripture-slide-header {
+    padding: 1rem 1.5rem;
+  }
+
+  .scripture-badge {
+    font-size: 0.9rem;
+    padding: 0.4rem 0.8rem;
+  }
+
+  .scripture-slide-body {
+    padding: 1.5rem 2rem;
+  }
+
+  .sermon-title {
+    font-size: 1.4rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .scripture-reference-large {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .scripture-divider {
+    width: 80px;
+    margin-bottom: 1.5rem;
+  }
+
+  .scripture-text-large {
+    font-size: 1.2rem;
+    line-height: 1.7;
+    max-width: 95%;
+  }
+
+  .scripture-slide-footer {
+    padding: 0.75rem 1.5rem;
+    font-size: 0.95rem;
+  }
+
+  .subitem {
+    font-size: 1.2rem;
+  }
+
+  .slide-footer {
+    padding: 0.75rem 1.5rem;
+    font-size: 0.95rem;
+  }
+
+  .presentation-controls {
+    padding: 0.75rem 1rem;
+  }
+
+  .slide-progress-dot {
+    width: 10px;
+    height: 10px;
+  }
+
+  .slide-progress-dot.active {
+    width: 14px;
+    height: 14px;
+  }
+
+  .slide-counter {
+    font-size: 0.85rem;
+    top: 0.75rem;
+    left: 0.75rem;
+  }
+
+  .presentation-close-btn {
+    top: 0.5rem;
+    right: 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .slide-title {
+    font-size: 1.5rem;
+  }
+
+  .lyrics-text {
+    font-size: 1rem;
+  }
+
+  .slide-subitems {
+    max-width: 90%;
+  }
+
+  .subitem {
+    font-size: 1rem;
+    gap: 0.5rem;
+  }
+
+  .subitem-number {
+    min-width: 1.5rem;
+  }
+}
+
+/* Hide/Show mobile elements */
+@media (min-width: 769px) {
+  .presentation-controls .show-mobile {
+    display: none !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .presentation-controls .hide-mobile {
+    display: none !important;
+  }
 }
 </style>
