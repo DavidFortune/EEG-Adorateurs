@@ -2,6 +2,14 @@
 
 All notable changes to EEG Adorateurs will be documented in this file.
 
+## [1.14.3] - 2026-02-08
+
+### Fixed
+- **Lyrics Presentation Pagination**: Fixed lyrics overflowing in presentation mode
+  - Reduced max lines per page to 8 for better fit on screen
+  - Added handling for long paragraphs that exceed the limit
+  - Disabled vertical scrolling - content now properly paginated across slides
+
 ## [1.14.2] - 2026-02-08
 
 ### Enhanced

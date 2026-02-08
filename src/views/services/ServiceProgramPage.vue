@@ -3157,7 +3157,8 @@ watch(showYouTubePlaylistModalState, (isOpen) => {
 // Presentation Functions (PowerPoint-style 16:9)
 
 // Helper function to split lyrics into pages
-const splitLyricsIntoPages = (lyrics: string, maxLinesPerPage: number = 12): string[] => {
+// Max 8 lines per page to fit on presentation screen without scrolling
+const splitLyricsIntoPages = (lyrics: string, maxLinesPerPage: number = 8): string[] => {
   if (!lyrics || lyrics.trim() === '') return [];
 
   // Split by double newlines (paragraphs/verses) first
@@ -3170,6 +3171,22 @@ const splitLyricsIntoPages = (lyrics: string, maxLinesPerPage: number = 12): str
   for (const paragraph of paragraphs) {
     const paragraphLines = paragraph.split('\n').filter(l => l.trim());
     const paragraphLineCount = paragraphLines.length;
+
+    // If this single paragraph exceeds maxLines, split it further
+    if (paragraphLineCount > maxLinesPerPage) {
+      // First, push any accumulated content
+      if (currentPage.length > 0) {
+        pages.push(currentPage.join('\n\n'));
+        currentPage = [];
+        currentLineCount = 0;
+      }
+      // Split large paragraph into chunks
+      for (let i = 0; i < paragraphLines.length; i += maxLinesPerPage) {
+        const chunk = paragraphLines.slice(i, i + maxLinesPerPage).join('\n');
+        pages.push(chunk);
+      }
+      continue;
+    }
 
     // If adding this paragraph would exceed the limit, start a new page
     if (currentLineCount > 0 && currentLineCount + paragraphLineCount > maxLinesPerPage) {
@@ -6092,8 +6109,8 @@ ion-reorder.item-handle-column:active {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2rem;
-  overflow-y: auto;
+  padding: 1rem 2rem;
+  overflow: hidden;
   width: 100%;
 }
 
@@ -6101,7 +6118,7 @@ ion-reorder.item-handle-column:active {
   font-size: 2rem;
   color: white;
   white-space: pre-line;
-  line-height: 1.8;
+  line-height: 1.7;
   text-align: center;
   max-width: 90%;
 }
