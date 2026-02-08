@@ -856,12 +856,24 @@
                 </div>
               </div>
 
+              <!-- Scripture -->
+              <div v-if="subItem.scriptureText" class="scripture-content-display">
+                <div class="scripture-reference-header">
+                  <ion-icon :icon="bookOutline" />
+                  {{ subItem.scriptureReference }}
+                  <span class="scripture-version">{{ subItem.scriptureVersion || 'LSG' }}</span>
+                </div>
+                <div class="scripture-text" v-html="formatScriptureForDisplay(subItem.scriptureText)"></div>
+              </div>
+
               <!-- Lyrics -->
               <div v-if="getSubItemLyrics(subItem)" class="lyrics-content-display">
                 <pre>{{ getSubItemLyrics(subItem) }}</pre>
               </div>
-              <div v-else class="no-lyrics">
-                Aucune parole disponible
+
+              <!-- No content message -->
+              <div v-if="!subItem.scriptureText && !getSubItemLyrics(subItem)" class="no-lyrics">
+                Aucun contenu disponible
               </div>
             </div>
           </div>
@@ -1858,11 +1870,14 @@ const getSortedSubItems = (item: ProgramItem): ProgramSubItem[] => {
   return [...item.subItems].sort((a, b) => a.order - b.order);
 };
 
-// Check if item has lyrics in any sub-items
+// Check if item has lyrics or scripture in any sub-items
 const hasLyricsInSubItems = (item: ProgramItem): boolean => {
   if (!item.subItems || item.subItems.length === 0) return false;
 
   return item.subItems.some(subItem => {
+    // Check for scripture
+    if (subItem.scriptureText) return true;
+    // Check for lyrics from linked resource
     if (subItem.resourceId) {
       const resource = getLinkedResource(subItem.resourceId);
       return resource?.contents?.some(c => c.type === 'lyrics' && c.content);
@@ -4703,6 +4718,47 @@ ion-reorder.item-handle-column:active {
   color: var(--ion-color-medium);
   font-style: italic;
   line-height: 1.2;
+}
+
+.scripture-content-display {
+  background: var(--ion-color-primary-tint);
+  padding: 1rem;
+  border-radius: 12px;
+  margin-top: 0.5rem;
+  border-left: 3px solid var(--ion-color-primary);
+}
+
+.scripture-reference-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: var(--ion-color-primary);
+  margin-bottom: 0.75rem;
+  font-size: 0.95rem;
+}
+
+.scripture-reference-header ion-icon {
+  font-size: 1.1rem;
+}
+
+.scripture-reference-header .scripture-version {
+  font-weight: 400;
+  font-size: 0.85rem;
+  color: var(--ion-color-medium);
+  margin-left: auto;
+}
+
+.scripture-content-display .scripture-text {
+  font-size: 1.1rem;
+  line-height: 1.8;
+  color: var(--ion-color-dark);
+}
+
+.scripture-content-display .scripture-text .verse-number {
+  font-weight: 700;
+  color: var(--ion-color-primary);
+  margin-right: 0.25rem;
 }
 
 .lyrics-content-display {

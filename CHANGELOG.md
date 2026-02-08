@@ -2,6 +2,14 @@
 
 All notable changes to EEG Adorateurs will be documented in this file.
 
+## [1.14.2] - 2026-02-08
+
+### Enhanced
+- **Sub-item Lyrics Modal**: Now displays scripture passages alongside lyrics
+  - Scripture shown with reference header and version indicator (LSG)
+  - Verse numbers highlighted for easy reading
+  - Visual distinction with blue-tinted background and left border
+
 ## [1.14.1] - 2026-02-08
 
 ### Added
