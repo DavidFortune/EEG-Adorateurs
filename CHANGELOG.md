@@ -2,6 +2,32 @@
 
 All notable changes to EEG Adorateurs will be documented in this file.
 
+## [1.14.1] - 2026-02-08
+
+### Added
+- **Program Export to Text**: New button in program header to export lyrics and scripture to .txt file
+  - Exports all lyrics, scripture passages from main items and sub-items
+  - Formatted with visual separators and emojis for readability
+  - Filename includes service title and date
+
+- **Sub-item Scripture Support**: Sub-items can now have Bible passages
+  - Scripture reference input with search button in sub-item forms
+  - Scripture displayed in sub-item list and presentation mode
+  - Modal to view and copy sub-item scripture text
+
+### Enhanced
+- **Scripture Presentation**: One verse per slide for better readability
+  - Improved verse detection and splitting algorithm
+  - Larger, centered text optimized for projection
+  - Clean display without multi-column issues
+
+- **Sub-items for All Types**: Sub-items now allowed for all program item types except sections
+  - Previously limited to songs and prayers only
+
+### Fixed
+- **Bible Reference "Esaïe"**: Added missing variant "esaïe" (without accent on E) to book lookup table
+- **Resource Quick Add Removed**: Removed inline resource add button from edit mode to simplify UI
+
 ## [1.14.0] - 2026-01-31
 
 ### Enhanced

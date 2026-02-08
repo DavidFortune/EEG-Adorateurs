@@ -22,6 +22,10 @@ export interface ProgramSubItem {
   resourceId?: string; // Link to a resource (song, etc.)
   notes?: string;
   order: number;
+  // Scripture fields for sub-items
+  scriptureReference?: string; // Parsed reference (e.g., "Jean 3:16-18")
+  scriptureText?: string; // Fetched verse text from Bible API
+  scriptureVersion?: string; // Bible version used (default: "LSG")
 }
 
 export interface ProgramItem {

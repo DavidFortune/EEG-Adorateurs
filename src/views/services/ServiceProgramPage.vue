@@ -15,6 +15,9 @@
           <ion-button v-if="!isEditMode && program && program.items.length > 0" @click="showPresentation" fill="clear" color="primary">
             <ion-icon :icon="easelOutline" />
           </ion-button>
+          <ion-button v-if="!isEditMode && program && program.items.length > 0" @click="exportProgramText" fill="clear" color="medium">
+            <ion-icon :icon="downloadOutline" />
+          </ion-button>
           <ion-button v-if="!isEditMode && hasYouTubeVideos" @click="showYouTubePlaylist" fill="clear" color="danger">
             <ion-icon :icon="logoYoutube" />
           </ion-button>
@@ -247,18 +250,8 @@
                     </div>
 
                     <!-- Inline Resource Quick Add (Edit Mode) -->
-                    <ResourceQuickAdd
-                      v-if="isEditMode && !isSectionItem(item)"
-                      :resource="item.resourceId ? getLinkedResource(item.resourceId) ?? null : null"
-                      :collection="item.resourceId ? getResourceCollectionCached(item.resourceId) : null"
-                      :editable="true"
-                      @add="openInlineResourceSelector(item.id)"
-                      @remove="handleInlineResourceRemove(item.id)"
-                      @preview="(r) => showMediaContent(r.contents[0], r.title)"
-                    />
-
-                    <!-- Resource Links (View Mode - not in edit mode since ResourceQuickAdd handles it) -->
-                    <div v-if="!isEditMode && item.resourceId && getLinkedResource(item.resourceId)" class="item-resources">
+                    <!-- Resource Links -->
+                    <div v-if="item.resourceId && getLinkedResource(item.resourceId)" class="item-resources">
                       <div class="media-buttons">
                         <button
                           v-for="content in getLinkedResource(item.resourceId)?.contents"
@@ -339,7 +332,7 @@
                   <!-- Edit/Delete Actions (Edit Mode) -->
                   <div v-if="isEditMode" class="item-column item-actions-column">
                     <div class="item-actions">
-                      <ion-button v-if="item.type === 'Chant' || item.type === 'Prière'" @click="showAddSubItemModalForItem(item.id)" fill="clear" size="small" color="success">
+                      <ion-button v-if="item.type !== 'Titre' && item.type !== 'Section'" @click="showAddSubItemModalForItem(item.id)" fill="clear" size="small" color="success">
                         <ion-icon :icon="addOutline" slot="icon-only" />
                       </ion-button>
                       <ion-button @click="showEditItemModalForItem(item)" fill="clear" size="small" color="primary">
@@ -370,6 +363,12 @@
                           {{ subItem.resourceId && getLinkedResource(subItem.resourceId) ? getLinkedResource(subItem.resourceId)?.title : subItem.title }}
                         </span>
                         <span v-if="subItem.notes" class="sub-item-notes">{{ subItem.notes }}</span>
+
+                        <!-- Scripture Reference for Sub-Item -->
+                        <div v-if="subItem.scriptureReference" class="sub-item-scripture" @click="openSubItemScriptureModal(subItem)">
+                          <ion-icon :icon="bookOutline" />
+                          <span>{{ subItem.scriptureReference }}</span>
+                        </div>
 
                         <!-- Resource Links for Sub-Item -->
                         <div v-if="subItem.resourceId && getLinkedResource(subItem.resourceId)" class="sub-item-resources">
@@ -620,6 +619,41 @@
             <ion-textarea v-model="addSubItemForm.notes" :rows="3"></ion-textarea>
           </ion-item>
 
+          <!-- Scripture Section for Sub-Item -->
+          <div class="scripture-fetch-section">
+            <div class="scripture-input-row">
+              <ion-item class="scripture-input-item">
+                <ion-label position="stacked">
+                  <ion-icon :icon="bookOutline" /> Référence biblique (optionnel)
+                </ion-label>
+                <ion-input
+                  v-model="addSubItemForm.scriptureReference"
+                  placeholder="Ex: Jean 3:16 ou Psaume 23:1-6"
+                  @keyup.enter="handleFetchScriptureForAddSubItem"
+                ></ion-input>
+              </ion-item>
+              <ion-button
+                @click="handleFetchScriptureForAddSubItem"
+                :disabled="!addSubItemForm.scriptureReference || fetchingScripture"
+                fill="solid"
+                color="primary"
+                class="scripture-search-btn"
+              >
+                <ion-icon v-if="!fetchingScripture" :icon="searchOutline" slot="icon-only" />
+                <ion-spinner v-else name="crescent" slot="icon-only" />
+              </ion-button>
+            </div>
+            <div v-if="addSubItemForm.scriptureText" class="scripture-preview">
+              <div class="scripture-preview-header">
+                <span class="scripture-preview-ref">{{ addSubItemForm.scriptureReference }}</span>
+                <ion-button fill="clear" size="small" @click="clearAddSubItemScripture">
+                  <ion-icon :icon="closeOutline" slot="icon-only" />
+                </ion-button>
+              </div>
+              <p class="scripture-preview-text">{{ addSubItemForm.scriptureText }}</p>
+            </div>
+          </div>
+
           <ion-button
             @click="addSubItem"
             expand="block"
@@ -658,6 +692,41 @@
             <ion-label position="stacked">Notes (optionnel)</ion-label>
             <ion-textarea v-model="editSubItemForm.notes" :rows="3"></ion-textarea>
           </ion-item>
+
+          <!-- Scripture Section for Sub-Item -->
+          <div class="scripture-fetch-section">
+            <div class="scripture-input-row">
+              <ion-item class="scripture-input-item">
+                <ion-label position="stacked">
+                  <ion-icon :icon="bookOutline" /> Référence biblique (optionnel)
+                </ion-label>
+                <ion-input
+                  v-model="editSubItemForm.scriptureReference"
+                  placeholder="Ex: Jean 3:16 ou Psaume 23:1-6"
+                  @keyup.enter="handleFetchScriptureForEditSubItem"
+                ></ion-input>
+              </ion-item>
+              <ion-button
+                @click="handleFetchScriptureForEditSubItem"
+                :disabled="!editSubItemForm.scriptureReference || fetchingScripture"
+                fill="solid"
+                color="primary"
+                class="scripture-search-btn"
+              >
+                <ion-icon v-if="!fetchingScripture" :icon="searchOutline" slot="icon-only" />
+                <ion-spinner v-else name="crescent" slot="icon-only" />
+              </ion-button>
+            </div>
+            <div v-if="editSubItemForm.scriptureText" class="scripture-preview">
+              <div class="scripture-preview-header">
+                <span class="scripture-preview-ref">{{ editSubItemForm.scriptureReference }}</span>
+                <ion-button fill="clear" size="small" @click="clearEditSubItemScripture">
+                  <ion-icon :icon="closeOutline" slot="icon-only" />
+                </ion-button>
+              </div>
+              <p class="scripture-preview-text">{{ editSubItemForm.scriptureText }}</p>
+            </div>
+          </div>
 
           <ion-button
             @click="updateSubItem"
@@ -1147,6 +1216,35 @@
         </ion-content>
       </ion-modal>
 
+      <!-- Sub-Item Scripture Modal -->
+      <ion-modal :is-open="showSubItemScriptureModalState" @ionModalDidDismiss="closeSubItemScriptureModal" :initial-breakpoint="0.5" :breakpoints="[0, 0.5, 0.75, 1]">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>Lecture biblique</ion-title>
+            <ion-buttons slot="end">
+              <ion-button @click="closeSubItemScriptureModal">
+                <ion-icon :icon="closeOutline" />
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="ion-padding">
+          <div v-if="selectedSubItemScripture" class="scripture-modal-content">
+            <div class="scripture-modal-header">
+              <span class="scripture-modal-reference">{{ selectedSubItemScripture.scriptureReference }}</span>
+              <span class="scripture-modal-version">{{ selectedSubItemScripture.scriptureVersion }}</span>
+            </div>
+            <div class="scripture-modal-text" v-html="formatScriptureWithSuperscript(selectedSubItemScripture.scriptureText || '')"></div>
+            <div class="scripture-modal-actions">
+              <ion-button @click="copySubItemScriptureToClipboard" expand="block" fill="outline" color="primary">
+                <ion-icon :icon="copyOutline" slot="start" />
+                Copier les versets
+              </ion-button>
+            </div>
+          </div>
+        </ion-content>
+      </ion-modal>
+
       <!-- SMS Notification Modal -->
       <SendProgramSMSModal
         :is-open="showSMSModalState"
@@ -1340,7 +1438,7 @@ import {
   arrowBackOutline, logoYoutube, playBackOutline, playForwardOutline,
   removeOutline, bookOutline, copyOutline,
   lockClosedOutline, peopleOutline, checkmarkCircleOutline,
-  sparklesOutline, easelOutline, searchOutline
+  sparklesOutline, easelOutline, searchOutline, downloadOutline
 } from 'ionicons/icons';
 import ResourceSelector from '@/components/ResourceSelector.vue';
 import ResourceQuickAdd from '@/components/ResourceQuickAdd.vue';
@@ -1424,7 +1522,10 @@ const parentItemIdForSubItem = ref<string | null>(null);
 const addSubItemForm = ref({
   title: '',
   resourceId: null as string | null,
-  notes: ''
+  notes: '',
+  scriptureReference: '',
+  scriptureText: '',
+  scriptureVersion: 'LSG'
 });
 
 const showEditSubItemModalState = ref(false);
@@ -1433,7 +1534,10 @@ const editSubItemForm = ref({
   parentItemId: '',
   title: '',
   resourceId: null as string | null,
-  notes: ''
+  notes: '',
+  scriptureReference: '',
+  scriptureText: '',
+  scriptureVersion: 'LSG'
 });
 
 const expandedItems = ref<Set<string>>(new Set());
@@ -1453,6 +1557,10 @@ const selectedItemForLyrics = ref<ProgramItem | null>(null);
 // Scripture Modal
 const showScriptureModalState = ref(false);
 const selectedScriptureItem = ref<ProgramItem | null>(null);
+
+// Sub-Item Scripture Modal
+const showSubItemScriptureModalState = ref(false);
+const selectedSubItemScripture = ref<ProgramSubItem | null>(null);
 
 // YouTube Playlist Modal
 const showYouTubePlaylistModalState = ref(false);
@@ -2164,6 +2272,76 @@ const clearScripture = () => {
   itemForm.value.scriptureVersion = '';
 };
 
+// Fetch scripture for Add Sub-Item form
+const handleFetchScriptureForAddSubItem = async () => {
+  if (!addSubItemForm.value.scriptureReference) {
+    await showToast('Veuillez entrer une référence biblique', 'warning');
+    return;
+  }
+
+  fetchingScripture.value = true;
+  try {
+    const result = await bibleService.getScripture(addSubItemForm.value.scriptureReference);
+
+    if (!result) {
+      await showToast('Référence biblique non reconnue. Exemple: Jean 3:16 ou Psaume 23:1-6', 'warning');
+      return;
+    }
+
+    addSubItemForm.value.scriptureReference = result.reference;
+    addSubItemForm.value.scriptureText = result.text;
+    addSubItemForm.value.scriptureVersion = result.version;
+
+    await showToast('Versets récupérés avec succès', 'success');
+  } catch (error) {
+    console.error('Error fetching scripture:', error);
+    await showToast('Erreur lors de la récupération des versets', 'danger');
+  } finally {
+    fetchingScripture.value = false;
+  }
+};
+
+const clearAddSubItemScripture = () => {
+  addSubItemForm.value.scriptureReference = '';
+  addSubItemForm.value.scriptureText = '';
+  addSubItemForm.value.scriptureVersion = 'LSG';
+};
+
+// Fetch scripture for Edit Sub-Item form
+const handleFetchScriptureForEditSubItem = async () => {
+  if (!editSubItemForm.value.scriptureReference) {
+    await showToast('Veuillez entrer une référence biblique', 'warning');
+    return;
+  }
+
+  fetchingScripture.value = true;
+  try {
+    const result = await bibleService.getScripture(editSubItemForm.value.scriptureReference);
+
+    if (!result) {
+      await showToast('Référence biblique non reconnue. Exemple: Jean 3:16 ou Psaume 23:1-6', 'warning');
+      return;
+    }
+
+    editSubItemForm.value.scriptureReference = result.reference;
+    editSubItemForm.value.scriptureText = result.text;
+    editSubItemForm.value.scriptureVersion = result.version;
+
+    await showToast('Versets récupérés avec succès', 'success');
+  } catch (error) {
+    console.error('Error fetching scripture:', error);
+    await showToast('Erreur lors de la récupération des versets', 'danger');
+  } finally {
+    fetchingScripture.value = false;
+  }
+};
+
+const clearEditSubItemScripture = () => {
+  editSubItemForm.value.scriptureReference = '';
+  editSubItemForm.value.scriptureText = '';
+  editSubItemForm.value.scriptureVersion = 'LSG';
+};
+
 // Scripture Modal Functions
 const openScriptureModal = (item: ProgramItem) => {
   if (item.scriptureText) {
@@ -2182,6 +2360,32 @@ const copyScriptureToClipboard = async () => {
 
   try {
     const textToCopy = `${selectedScriptureItem.value.scriptureReference}\n\n${selectedScriptureItem.value.scriptureText}\n\n— ${selectedScriptureItem.value.scriptureVersion}`;
+    await navigator.clipboard.writeText(textToCopy);
+    await showToast('Versets copiés dans le presse-papiers', 'success');
+  } catch (error) {
+    console.error('Error copying to clipboard:', error);
+    await showToast('Erreur lors de la copie', 'danger');
+  }
+};
+
+// Sub-Item Scripture Modal Functions
+const openSubItemScriptureModal = (subItem: ProgramSubItem) => {
+  if (subItem.scriptureText) {
+    selectedSubItemScripture.value = subItem;
+    showSubItemScriptureModalState.value = true;
+  }
+};
+
+const closeSubItemScriptureModal = () => {
+  showSubItemScriptureModalState.value = false;
+  selectedSubItemScripture.value = null;
+};
+
+const copySubItemScriptureToClipboard = async () => {
+  if (!selectedSubItemScripture.value?.scriptureText) return;
+
+  try {
+    const textToCopy = `${selectedSubItemScripture.value.scriptureReference}\n\n${selectedSubItemScripture.value.scriptureText}\n\n— ${selectedSubItemScripture.value.scriptureVersion}`;
     await navigator.clipboard.writeText(textToCopy);
     await showToast('Versets copiés dans le presse-papiers', 'success');
   } catch (error) {
@@ -2554,7 +2758,10 @@ const showAddSubItemModalForItem = (itemId: string) => {
   addSubItemForm.value = {
     title: '',
     resourceId: null,
-    notes: ''
+    notes: '',
+    scriptureReference: '',
+    scriptureText: '',
+    scriptureVersion: 'LSG'
   };
   showAddSubItemModalState.value = true;
 };
@@ -2582,6 +2789,9 @@ const addSubItem = async () => {
     // Only add optional fields if they have values
     if (addSubItemForm.value.resourceId) newSubItem.resourceId = addSubItemForm.value.resourceId;
     if (addSubItemForm.value.notes) newSubItem.notes = addSubItemForm.value.notes;
+    if (addSubItemForm.value.scriptureReference) newSubItem.scriptureReference = addSubItemForm.value.scriptureReference;
+    if (addSubItemForm.value.scriptureText) newSubItem.scriptureText = addSubItemForm.value.scriptureText;
+    if (addSubItemForm.value.scriptureVersion) newSubItem.scriptureVersion = addSubItemForm.value.scriptureVersion;
 
     await addSubItemToItem(
       program.value.id,
@@ -2610,7 +2820,10 @@ const showEditSubItemModalForItem = (itemId: string, subItem: ProgramSubItem) =>
     parentItemId: itemId,
     title: subItem.title,
     resourceId: subItem.resourceId || null,
-    notes: subItem.notes || ''
+    notes: subItem.notes || '',
+    scriptureReference: subItem.scriptureReference || '',
+    scriptureText: subItem.scriptureText || '',
+    scriptureVersion: subItem.scriptureVersion || 'LSG'
   };
   showEditSubItemModalState.value = true;
 };
@@ -2634,6 +2847,10 @@ const updateSubItem = async () => {
     // Only add optional fields if they have values
     if (editSubItemForm.value.resourceId) updates.resourceId = editSubItemForm.value.resourceId;
     if (editSubItemForm.value.notes) updates.notes = editSubItemForm.value.notes;
+    // Scripture fields - include even if empty to allow clearing
+    updates.scriptureReference = editSubItemForm.value.scriptureReference || null;
+    updates.scriptureText = editSubItemForm.value.scriptureText || null;
+    updates.scriptureVersion = editSubItemForm.value.scriptureVersion || null;
 
     await updateSubItemInItem(
       program.value.id,
@@ -2958,65 +3175,73 @@ const splitLyricsIntoPages = (lyrics: string, maxLinesPerPage: number = 12): str
   return pages;
 };
 
-// Format scripture text with each verse on a new line
-const formatScriptureForPresentation = (text: string): string => {
-  if (!text) return '';
-
-  // Scripture text often has verse numbers like "16 Text... 17 Text..."
-  // We want to put each verse on its own line
-  // Pattern: number followed by space at the start or after a period/sentence
-  let formatted = text
-    // Add newline before verse numbers (except at the very start)
-    .replace(/(\S)\s+(\d{1,3})\s+/g, '$1\n\n$2 ')
-    // Clean up any double spaces
-    .replace(/\s{2,}/g, ' ')
-    // Ensure verse numbers at start are formatted correctly
-    .replace(/^(\d{1,3})\s+/, '$1 ')
-    .trim();
-
-  return formatted;
-};
-
-// Split scripture into pages (fewer verses per page for readability)
-const splitScriptureIntoPages = (text: string, maxVersesPerPage: number = 4): string[] => {
+// Split scripture text into individual verses
+// Detects verse patterns like "1 Text..." "2 Text..." etc.
+const splitScriptureIntoVerses = (text: string): string[] => {
   if (!text || text.trim() === '') return [];
 
-  // First format the text
-  const formatted = formatScriptureForPresentation(text);
+  // Split on verse number patterns (number at start or after space/punctuation followed by number and space)
+  // This regex looks for patterns where a number is followed by text
+  const versePattern = /(?:^|\s)(\d{1,3})\s+(?=[A-ZÀ-ÿa-z])/g;
 
-  // Split by double newlines (each verse)
-  const verses = formatted.split(/\n\n/).filter(v => v.trim());
+  const verses: string[] = [];
+  let lastIndex = 0;
+  let match;
+  const matches: { index: number; verseNum: string }[] = [];
 
-  if (verses.length === 0) return [formatted];
+  // Find all verse number positions
+  while ((match = versePattern.exec(text)) !== null) {
+    matches.push({
+      index: match.index === 0 ? 0 : match.index + 1, // +1 to skip the leading space
+      verseNum: match[1]
+    });
+  }
 
-  const pages: string[] = [];
-  let currentPage: string[] = [];
+  // If no verse numbers found, return the whole text as one verse
+  if (matches.length === 0) {
+    return [text.trim()];
+  }
 
-  for (const verse of verses) {
-    currentPage.push(verse);
-
-    if (currentPage.length >= maxVersesPerPage) {
-      pages.push(currentPage.join('\n\n'));
-      currentPage = [];
+  // Extract each verse
+  for (let i = 0; i < matches.length; i++) {
+    const start = matches[i].index;
+    const end = i < matches.length - 1 ? matches[i + 1].index : text.length;
+    const verseText = text.substring(start, end).trim();
+    if (verseText) {
+      verses.push(verseText);
     }
   }
 
-  // Don't forget the last page
-  if (currentPage.length > 0) {
-    pages.push(currentPage.join('\n\n'));
+  return verses;
+};
+
+// Split scripture into pages (1 verse per page by default)
+const splitScriptureIntoPages = (text: string, maxVersesPerPage: number = 1): string[] => {
+  const verses = splitScriptureIntoVerses(text);
+
+  if (verses.length === 0) return [text.trim()];
+
+  const pages: string[] = [];
+
+  for (let i = 0; i < verses.length; i += maxVersesPerPage) {
+    const pageVerses = verses.slice(i, i + maxVersesPerPage);
+    pages.push(pageVerses.join(' '));
   }
 
   return pages;
 };
 
-// Format scripture text for display with HTML line breaks
+// Format scripture for presentation - just clean up the text
+const formatScriptureForPresentation = (text: string): string => {
+  if (!text) return '';
+  return text.trim();
+};
+
+// Format scripture text for display - style the verse number
 const formatScriptureForDisplay = (text: string): string => {
   if (!text) return '';
-  // Convert double newlines to <br><br> for proper HTML rendering
-  // Also highlight verse numbers with styling
-  return text
-    .replace(/\n\n/g, '<br><br>')
-    .replace(/^(\d{1,3})\s/gm, '<span class="verse-number">$1</span> ');
+  // Style the verse number at the start
+  return text.replace(/^(\d{1,3})\s+/, '<span class="verse-number">$1</span> ');
 };
 
 const collectPresentationSlides = () => {
@@ -3077,7 +3302,7 @@ const collectPresentationSlides = () => {
         subItems: subItemsInfo
       });
 
-      // Then, create individual slides for each sub-item with lyrics
+      // Then, create individual slides for each sub-item with lyrics or scripture
       const sortedSubItems = [...item.subItems].sort((a, b) => a.order - b.order);
       sortedSubItems.forEach((subItem, subIndex) => {
         let subLyrics = '';
@@ -3094,41 +3319,83 @@ const collectPresentationSlides = () => {
           }
         }
 
-        // Split lyrics into pages
-        const lyricsPages = splitLyricsIntoPages(subLyrics);
+        // Check if sub-item has scripture
+        if (subItem.scriptureText && subItem.scriptureReference) {
+          // Create scripture slides for sub-item
+          const scripturePages = splitScriptureIntoPages(subItem.scriptureText, 1);
 
-        if (lyricsPages.length === 0) {
-          // No lyrics - add single slide
-          slides.push({
-            type: ProgramItemType.SONG,
-            title: subTitle,
-            lyrics: '',
-            itemNumber: itemNumber,
-            isSubItem: true,
-            isLyricsSlide: true,
-            parentTitle: resourceTitle || item.title,
-            subItemIndex: subIndex + 1,
-            totalSubItems: sortedSubItems.length,
-            notes: subItem.notes
-          });
-        } else {
-          // Add a slide for each lyrics page
-          lyricsPages.forEach((page, pageIndex) => {
+          if (scripturePages.length > 1) {
+            // Multiple pages
+            scripturePages.forEach((page, pageIndex) => {
+              slides.push({
+                type: item.type,
+                title: subTitle,
+                scriptureReference: subItem.scriptureReference,
+                scriptureText: page,
+                scripturePage: pageIndex + 1,
+                scriptureTotal: scripturePages.length,
+                isScriptureSlide: true,
+                itemNumber: itemNumber,
+                isSubItem: true,
+                parentTitle: resourceTitle || item.title,
+                subItemIndex: subIndex + 1,
+                totalSubItems: sortedSubItems.length,
+                notes: pageIndex === 0 ? subItem.notes : undefined
+              });
+            });
+          } else {
+            // Single page
             slides.push({
-              type: ProgramItemType.SONG,
+              type: item.type,
               title: subTitle,
-              lyrics: page,
-              lyricsPage: pageIndex + 1,
-              lyricsTotal: lyricsPages.length,
+              scriptureReference: subItem.scriptureReference,
+              scriptureText: formatScriptureForPresentation(subItem.scriptureText),
+              isScriptureSlide: true,
               itemNumber: itemNumber,
               isSubItem: true,
-              isLyricsSlide: true,
               parentTitle: resourceTitle || item.title,
               subItemIndex: subIndex + 1,
               totalSubItems: sortedSubItems.length,
-              notes: pageIndex === 0 ? subItem.notes : undefined
+              notes: subItem.notes
             });
-          });
+          }
+        } else {
+          // Handle lyrics or empty sub-item
+          const lyricsPages = splitLyricsIntoPages(subLyrics);
+
+          if (lyricsPages.length === 0) {
+            // No lyrics - add single slide
+            slides.push({
+              type: item.type,
+              title: subTitle,
+              lyrics: '',
+              itemNumber: itemNumber,
+              isSubItem: true,
+              isLyricsSlide: subLyrics !== '',
+              parentTitle: resourceTitle || item.title,
+              subItemIndex: subIndex + 1,
+              totalSubItems: sortedSubItems.length,
+              notes: subItem.notes
+            });
+          } else {
+            // Add a slide for each lyrics page
+            lyricsPages.forEach((page, pageIndex) => {
+              slides.push({
+                type: item.type,
+                title: subTitle,
+                lyrics: page,
+                lyricsPage: pageIndex + 1,
+                lyricsTotal: lyricsPages.length,
+                itemNumber: itemNumber,
+                isSubItem: true,
+                isLyricsSlide: true,
+                parentTitle: resourceTitle || item.title,
+                subItemIndex: subIndex + 1,
+                totalSubItems: sortedSubItems.length,
+                notes: pageIndex === 0 ? subItem.notes : undefined
+              });
+            });
+          }
         }
       });
     } else {
@@ -3163,7 +3430,7 @@ const collectPresentationSlides = () => {
         });
       } else if ((item.type === ProgramItemType.SCRIPTURE || item.type === ProgramItemType.SERMON) && item.scriptureText) {
         // Scripture or sermon with scripture text - split into pages
-        const scripturePages = splitScriptureIntoPages(item.scriptureText, 4);
+        const scripturePages = splitScriptureIntoPages(item.scriptureText, 1);
 
         if (scripturePages.length > 1) {
           // Multiple pages - create slides for each page
@@ -3226,6 +3493,138 @@ const showPresentation = () => {
   presentationSlides.value = collectPresentationSlides();
   currentSlideIndex.value = 0;
   showPresentationModalState.value = true;
+};
+
+// Export program lyrics and scripture to text file
+const exportProgramText = async () => {
+  if (!program.value || !service.value) return;
+
+  const lines: string[] = [];
+
+  // Header
+  lines.push('═'.repeat(50));
+  lines.push(service.value.title.toUpperCase());
+  lines.push(formatDateTime(service.value.date, service.value.time));
+  lines.push('═'.repeat(50));
+  lines.push('');
+
+  // Process each item
+  let itemNumber = 0;
+  for (const item of sortedItems.value) {
+    const isSection = item.type === ProgramItemType.SECTION || item.type === ProgramItemType.TITLE;
+
+    if (isSection) {
+      // Section header
+      lines.push('');
+      lines.push('─'.repeat(40));
+      lines.push(item.title.toUpperCase());
+      lines.push('─'.repeat(40));
+      lines.push('');
+    } else {
+      itemNumber++;
+
+      // Get resource info if available
+      let resourceTitle = '';
+      let lyrics = '';
+      if (item.resourceId) {
+        const resource = getLinkedResource(item.resourceId);
+        if (resource) {
+          resourceTitle = resource.title;
+          const lyricsContent = resource.contents?.find(c => c.type === 'lyrics');
+          if (lyricsContent?.content) {
+            lyrics = lyricsContent.content;
+          }
+        }
+      }
+
+      const title = resourceTitle || item.title;
+      const hasContent = lyrics || item.scriptureText || (item.subItems && item.subItems.length > 0);
+
+      if (hasContent) {
+        lines.push(`${itemNumber}. ${title}`);
+        if (item.subtitle) lines.push(`   ${item.subtitle}`);
+        lines.push('');
+
+        // Scripture passage
+        if (item.scriptureReference && item.scriptureText) {
+          lines.push(`   📖 ${item.scriptureReference}`);
+          lines.push('');
+          lines.push(item.scriptureText.split('\n').map(l => `   ${l}`).join('\n'));
+          lines.push('');
+        }
+
+        // Lyrics
+        if (lyrics) {
+          lines.push('   🎵 Paroles:');
+          lines.push('');
+          lines.push(lyrics.split('\n').map(l => `   ${l}`).join('\n'));
+          lines.push('');
+        }
+
+        // Sub-items
+        if (item.subItems && item.subItems.length > 0) {
+          const sortedSubs = [...item.subItems].sort((a, b) => a.order - b.order);
+          for (const subItem of sortedSubs) {
+            let subTitle = subItem.title;
+            let subLyrics = '';
+
+            if (subItem.resourceId) {
+              const subResource = getLinkedResource(subItem.resourceId);
+              if (subResource) {
+                subTitle = subResource.title;
+                const lyricsContent = subResource.contents?.find(c => c.type === 'lyrics');
+                if (lyricsContent?.content) {
+                  subLyrics = lyricsContent.content;
+                }
+              }
+            }
+
+            const hasSubContent = subLyrics || subItem.scriptureText;
+            if (hasSubContent) {
+              lines.push(`   • ${subTitle}`);
+              lines.push('');
+
+              // Sub-item scripture
+              if (subItem.scriptureReference && subItem.scriptureText) {
+                lines.push(`     📖 ${subItem.scriptureReference}`);
+                lines.push('');
+                lines.push(subItem.scriptureText.split('\n').map(l => `     ${l}`).join('\n'));
+                lines.push('');
+              }
+
+              // Sub-item lyrics
+              if (subLyrics) {
+                lines.push(subLyrics.split('\n').map(l => `     ${l}`).join('\n'));
+                lines.push('');
+              }
+            }
+          }
+        }
+
+        lines.push('');
+      }
+    }
+  }
+
+  // Create and download the file
+  const content = lines.join('\n');
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+
+  // Create filename from service title and date
+  const dateStr = service.value.date ? new Date(service.value.date).toISOString().split('T')[0] : 'programme';
+  const filename = `${service.value.title.replace(/[^a-zA-Z0-9À-ÿ]/g, '_')}_${dateStr}.txt`;
+
+  // Create download link and click it
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+
+  await showToast('Programme exporté', 'success');
 };
 
 const closePresentation = () => {
@@ -4116,6 +4515,27 @@ ion-reorder.item-handle-column:active {
   font-size: 0.85rem;
   color: var(--ion-color-medium);
   font-style: italic;
+}
+
+.sub-item-scripture {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.5rem;
+  background: rgba(var(--ion-color-tertiary-rgb), 0.12);
+  color: var(--ion-color-tertiary-shade);
+  border-radius: 12px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  margin-top: 0.25rem;
+}
+
+.sub-item-scripture ion-icon {
+  font-size: 0.85rem;
+}
+
+.sub-item-scripture:hover {
+  background: rgba(var(--ion-color-tertiary-rgb), 0.2);
 }
 
 .sub-item-resources {
@@ -5324,30 +5744,32 @@ ion-reorder.item-handle-column:active {
 }
 
 .scripture-reference-large {
-  font-size: 2.5rem;
+  font-size: 2rem;
   font-weight: 700;
   color: #e8c4a0;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   font-family: Georgia, 'Times New Roman', serif;
+  flex-shrink: 0;
 }
 
 .scripture-divider {
-  width: 120px;
-  height: 3px;
+  width: 80px;
+  height: 2px;
   background: linear-gradient(90deg, transparent, #e8c4a0, transparent);
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
+  flex-shrink: 0;
 }
 
 .scripture-text-large {
-  font-size: 1.8rem;
+  font-size: 2.8rem;
   color: #f5f0e8;
-  line-height: 2;
+  line-height: 1.6;
   max-width: 85%;
   font-family: Georgia, 'Times New Roman', serif;
   font-style: italic;
-  text-align: justify;
-  text-align-last: center;
+  text-align: center;
+  padding: 1rem 2rem;
 }
 
 .scripture-no-text {
@@ -5827,12 +6249,12 @@ ion-reorder.item-handle-column:active {
   }
 
   .scripture-reference-large {
-    font-size: 2rem;
+    font-size: 1.8rem;
   }
 
   .scripture-text-large {
-    font-size: 1.5rem;
-    line-height: 1.8;
+    font-size: 2.2rem;
+    line-height: 1.5;
   }
 
   .subitem {
@@ -5898,19 +6320,20 @@ ion-reorder.item-handle-column:active {
   }
 
   .scripture-reference-large {
-    font-size: 1.5rem;
-    margin-bottom: 1rem;
+    font-size: 1.4rem;
+    margin-bottom: 0.75rem;
   }
 
   .scripture-divider {
-    width: 80px;
-    margin-bottom: 1.5rem;
+    width: 60px;
+    margin-bottom: 1rem;
   }
 
   .scripture-text-large {
-    font-size: 1.2rem;
-    line-height: 1.7;
+    font-size: 1.5rem;
+    line-height: 1.5;
     max-width: 95%;
+    padding: 0.5rem 1rem;
   }
 
   .scripture-slide-footer {

@@ -37,7 +37,7 @@ const FRENCH_BOOKS: Record<string, number> = {
   'proverbes': 20, 'prov': 20, 'pr': 20,
   'ecclésiaste': 21, 'ecclesiaste': 21, 'ecc': 21, 'ec': 21, 'qo': 21,
   'cantique': 22, 'cantique des cantiques': 22, 'cant': 22, 'ct': 22, 'cc': 22,
-  'ésaïe': 23, 'esaie': 23, 'isaïe': 23, 'isaie': 23, 'es': 23, 'esa': 23, 'is': 23,
+  'ésaïe': 23, 'esaïe': 23, 'esaie': 23, 'isaïe': 23, 'isaie': 23, 'es': 23, 'esa': 23, 'is': 23,
   'jérémie': 24, 'jeremie': 24, 'jer': 24, 'jr': 24,
   'lamentations': 25, 'lam': 25, 'la': 25,
   'ézéchiel': 26, 'ezechiel': 26, 'ez': 26, 'ezk': 26,

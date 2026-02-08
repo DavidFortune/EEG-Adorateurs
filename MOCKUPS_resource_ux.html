@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resource UX Improvements - Mockups</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: #f5f5f5;
+      padding: 40px;
+      color: #333;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+      color: #1a1a1a;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #666;
+      margin-bottom: 40px;
+      font-size: 14px;
+    }
+
+    .page-break {
+      page-break-after: always;
+      margin-bottom: 60px;
+    }
+
+    .section-title {
+      font-size: 24px;
+      font-weight: 600;
+      margin: 40px 0 20px 0;
+      color: #1a1a1a;
+      border-bottom: 2px solid #3880ff;
+      padding-bottom: 10px;
+    }
+
+    .section-desc {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .mockups-row {
+      display: flex;
+      gap: 30px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 40px;
+    }
+
+    .mockup-container {
+      text-align: center;
+    }
+
+    .mockup-label {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 10px;
+      font-weight: 500;
+    }
+
+    .phone {
+      width: 320px;
+      height: 640px;
+      background: #fff;
+      border-radius: 40px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+      overflow: hidden;
+      border: 8px solid #1a1a1a;
+      position: relative;
+    }
+
+    .phone-notch {
+      width: 150px;
+      height: 30px;
+      background: #1a1a1a;
+      border-radius: 0 0 20px 20px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 10;
+    }
+
+    .phone-screen {
+      height: calc(100% - 30px);
+      overflow: hidden;
+      background: #f4f5f8;
+    }
+
+    .header {
+      background: #3880ff;
+      color: white;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-back {
+      font-size: 20px;
+    }
+
+    .header-title {
+      font-size: 17px;
+      font-weight: 600;
+    }
+
+    .content {
+      padding: 16px;
+    }
+
+    /* Insert Type Selection */
+    .insert-types {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      padding: 20px;
+    }
+
+    .insert-type-card {
+      background: white;
+      border-radius: 16px;
+      padding: 24px 16px;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    .insert-type-icon {
+      font-size: 32px;
+      margin-bottom: 12px;
+    }
+
+    .insert-type-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    /* Search Bar */
+    .search-bar {
+      background: white;
+      border-radius: 12px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .search-icon {
+      color: #999;
+      font-size: 16px;
+    }
+
+    .search-input {
+      flex: 1;
+      color: #999;
+      font-size: 15px;
+    }
+
+    .search-btn {
+      background: #3880ff;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    /* Section Label */
+    .section-label {
+      font-size: 12px;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+
+    /* Resource Item */
+    .resource-item {
+      background: white;
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+
+    .resource-icon {
+      width: 40px;
+      height: 40px;
+      background: #e8f0fe;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .resource-info {
+      flex: 1;
+    }
+
+    .resource-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .resource-subtitle {
+      font-size: 12px;
+      color: #999;
+      margin-top: 2px;
+    }
+
+    .resource-badge {
+      background: #e8f0fe;
+      color: #3880ff;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .resource-add {
+      width: 32px;
+      height: 32px;
+      background: #3880ff;
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    /* Collection Chips */
+    .collection-chips {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .chip {
+      padding: 8px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .chip-active {
+      background: #3880ff;
+      color: white;
+    }
+
+    .chip-inactive {
+      background: #e0e0e0;
+      color: #666;
+    }
+
+    /* YouTube Video Card */
+    .youtube-card {
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    .youtube-thumb {
+      height: 100px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 40px;
+    }
+
+    .youtube-info {
+      padding: 12px;
+    }
+
+    .youtube-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 4px;
+    }
+
+    .youtube-meta {
+      font-size: 12px;
+      color: #999;
+    }
+
+    .youtube-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .btn-outline {
+      padding: 8px 16px;
+      border: 1px solid #3880ff;
+      color: #3880ff;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .btn-primary {
+      padding: 8px 16px;
+      background: #3880ff;
+      color: white;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    /* URL Input */
+    .url-input-container {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .url-label {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 10px;
+    }
+
+    .url-input {
+      width: 100%;
+      padding: 14px;
+      background: #f4f5f8;
+      border-radius: 10px;
+      font-size: 14px;
+      color: #333;
+      margin-bottom: 12px;
+    }
+
+    .paste-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px;
+      background: #e8f0fe;
+      color: #3880ff;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    /* Preview Card */
+    .preview-card {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .preview-icon {
+      width: 50px;
+      height: 50px;
+      background: #ff0000;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 24px;
+    }
+
+    .preview-info {
+      flex: 1;
+    }
+
+    .preview-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .preview-meta {
+      font-size: 12px;
+      color: #999;
+      margin-top: 2px;
+    }
+
+    /* Bottom Actions */
+    .bottom-actions {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 16px;
+      background: white;
+      display: flex;
+      gap: 12px;
+      border-top: 1px solid #eee;
+    }
+
+    .btn-cancel {
+      flex: 1;
+      padding: 14px;
+      background: #f4f5f8;
+      color: #666;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    .btn-confirm {
+      flex: 1;
+      padding: 14px;
+      background: #3880ff;
+      color: white;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    /* Recent Searches */
+    .recent-searches {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .recent-chip {
+      background: #e8e8e8;
+      padding: 8px 12px;
+      border-radius: 16px;
+      font-size: 12px;
+      color: #666;
+    }
+
+    /* Program Item Card */
+    .program-item {
+      background: white;
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .program-item-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .item-number {
+      width: 28px;
+      height: 28px;
+      background: #3880ff;
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .item-content {
+      flex: 1;
+    }
+
+    .item-type-badge {
+      display: inline-block;
+      background: #e8f0fe;
+      color: #3880ff;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .item-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    /* Resource Chip */
+    .resource-chip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #f4f5f8;
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-top: 12px;
+    }
+
+    .resource-chip-icon {
+      font-size: 16px;
+    }
+
+    .resource-chip-info {
+      flex: 1;
+    }
+
+    .resource-chip-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .resource-chip-meta {
+      font-size: 11px;
+      color: #999;
+    }
+
+    .resource-chip-remove {
+      width: 24px;
+      height: 24px;
+      background: #ff4444;
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    /* Add Resource Button */
+    .add-resource-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: #e8f0fe;
+      color: #3880ff;
+      padding: 12px;
+      border-radius: 10px;
+      margin-top: 12px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    /* Bottom Sheet */
+    .bottom-sheet {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: white;
+      border-radius: 24px 24px 0 0;
+      padding-top: 12px;
+      box-shadow: 0 -10px 40px rgba(0,0,0,0.15);
+    }
+
+    .sheet-handle {
+      width: 40px;
+      height: 4px;
+      background: #ddd;
+      border-radius: 2px;
+      margin: 0 auto 16px auto;
+    }
+
+    .sheet-content {
+      padding: 0 20px 20px 20px;
+    }
+
+    /* Form */
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-label {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 8px;
+      display: block;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 14px;
+      background: #f4f5f8;
+      border-radius: 10px;
+      font-size: 15px;
+      color: #333;
+    }
+
+    .form-select {
+      width: 100%;
+      padding: 14px;
+      background: #f4f5f8;
+      border-radius: 10px;
+      font-size: 15px;
+      color: #333;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .radio-group {
+      display: flex;
+      gap: 12px;
+    }
+
+    .radio-option {
+      flex: 1;
+      padding: 12px;
+      background: #f4f5f8;
+      border-radius: 10px;
+      text-align: center;
+      font-size: 12px;
+      color: #666;
+    }
+
+    .radio-option.active {
+      background: #e8f0fe;
+      color: #3880ff;
+      font-weight: 600;
+    }
+
+    /* Comparison Table */
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-size: 14px;
+    }
+
+    .comparison-table th,
+    .comparison-table td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid #eee;
+    }
+
+    .comparison-table th {
+      background: #f4f5f8;
+      font-weight: 600;
+    }
+
+    .comparison-table td:first-child {
+      font-weight: 500;
+    }
+
+    .bad {
+      color: #ff4444;
+    }
+
+    .good {
+      color: #10dc60;
+    }
+
+    @media print {
+      body {
+        padding: 20px;
+      }
+
+      .phone {
+        box-shadow: 0 0 0 1px #ddd;
+      }
+
+      .page-break {
+        page-break-after: always;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Resource UX Improvements</h1>
+  <p class="subtitle">Mockups pour validation - EEG Adorateurs</p>
+
+  <!-- Page 1: Insert Type Selection -->
+  <div class="page-break">
+    <h2 class="section-title">1. Selection du type d'insertion</h2>
+    <p class="section-desc">
+      <strong>Probleme actuel:</strong> La recherche YouTube et le collage d'URL partagent le meme champ, causant confusion.<br>
+      <strong>Solution:</strong> 4 points d'entree distincts avec des experiences dediees.
+    </p>
+
+    <div class="mockups-row">
+      <div class="mockup-container">
+        <div class="mockup-label">Ecran de selection</div>
+        <div class="phone">
+          <div class="phone-notch"></div>
+          <div class="phone-screen">
+            <div class="header">
+              <span class="header-back">←</span>
+              <span class="header-title">Ajouter une ressource</span>
+            </div>
+            <div class="content">
+              <p style="text-align: center; color: #666; margin-bottom: 24px; font-size: 15px;">
+                Comment voulez-vous ajouter une ressource ?
+              </p>
+              <div class="insert-types">
+                <div class="insert-type-card">
+                  <div class="insert-type-icon">📚</div>
+                  <div class="insert-type-label">Existante</div>
+                </div>
+                <div class="insert-type-card">
+                  <div class="insert-type-icon">🔍</div>
+                  <div class="insert-type-label">YouTube</div>
+                </div>
+                <div class="insert-type-card">
+                  <div class="insert-type-icon">🔗</div>
+                  <div class="insert-type-label">Lien URL</div>
+                </div>
+                <div class="insert-type-card">
+                  <div class="insert-type-icon">✨</div>
+                  <div class="insert-type-label">Creer</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin-top: 30px; margin-bottom: 15px;">Avantages de la separation</h3>
+    <table class="comparison-table">
+      <tr>
+        <th>Aspect</th>
+        <th>Actuel (combine)</th>
+        <th>Propose (separe)</th>
+      </tr>
+      <tr>
+        <td>Clarte</td>
+        <td class="bad">Champ multi-usage confus</td>
+        <td class="good">Un but = une interface</td>
+      </tr>
+      <tr>
+        <td>Rapidite</td>
+        <td class="bad">API YouTube appele a chaque frappe</td>
+        <td class="good">Recherche uniquement quand voulu</td>
+      </tr>
+      <tr>
+        <td>UX Mobile</td>
+        <td class="bad">Difficile de changer de mode</td>
+        <td class="good">Tap sur le mode desire</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- Page 2: Existing Resources Flow -->
+  <div class="page-break">
+    <h2 class="section-title">2. Flux "Ressources Existantes"</h2>
+    <p class="section-desc">
+      Recherche rapide dans vos ressources avec filtres par collection. Pas de resultats YouTube melanges.
+    </p>
+
+    <div class="mockups-row">
+      <div class="mockup-container">
+        <div class="mockup-label">Recherche avec filtres collection</div>
+        <div class="phone">
+          <div class="phone-notch"></div>
+          <div class="phone-screen">
+            <div class="header">
+              <span class="header-back">←</span>
+              <span class="header-title">Ressources existantes</span>
+            </div>
+            <div class="content">
+              <div class="search-bar">
+                <span class="search-icon">🔍</span>
+                <span class="search-input">Rechercher dans vos ressources...</span>
+              </div>
+
+              <div class="section-label">Par collection</div>
+              <div class="collection-chips">
+                <span class="chip chip-active">Tous</span>
+                <span class="chip chip-inactive">CAI</span>
+                <span class="chip chip-inactive">AJC</span>
+                <span class="chip chip-inactive">Hymnes</span>
+              </div>
+
+              <div class="section-label">Recents</div>
+              <div class="resource-item">
+                <div class="resource-icon">🎵</div>
+                <div class="resource-info">
+                  <div class="resource-title">Grace Infinie</div>
+                  <div class="resource-subtitle">Paroles · YouTube</div>
+                </div>
+                <span class="resource-badge">CAI</span>
+                <div class="resource-add">+</div>
+              </div>
+              <div class="resource-item">
+                <div class="resource-icon">🎵</div>
+                <div class="resource-info">
+                  <div class="resource-title">Hosanna</div>
+                  <div class="resource-subtitle">Paroles</div>
+                </div>
+                <span class="resource-badge">AJC</span>
+                <div class="resource-add">+</div>
+              </div>
+
+              <div class="section-label" style="margin-top: 20px;">Toutes les ressources</div>
+              <div class="resource-item">
+                <div class="resource-icon">🎵</div>
+                <div class="resource-info">
+                  <div class="resource-title">A toi la gloire</div>
+                  <div class="resource-subtitle">Paroles</div>
+                </div>
+                <span class="resource-badge">HYM</span>
+                <div class="resource-add">+</div>
+              </div>
+              <div class="resource-item">
+                <div class="resource-icon">🎵</div>
+                <div class="resource-info">
+                  <div class="resource-title">Beni soit ton nom</div>
+                  <div class="resource-subtitle">Paroles · YouTube</div>
+                </div>
+                <span class="resource-badge">CAI</span>
+                <div class="resource-add">+</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Page 3: YouTube Search Flow -->
+  <div class="page-break">
+    <h2 class="section-title">3. Flux "Recherche YouTube"</h2>
+    <p class="section-desc">
+      Recherche dediee YouTube avec bouton explicite "Chercher", apercu video avec miniatures, et historique des recherches.
+    </p>
+
+    <div class="mockups-row">
+      <div class="mockup-container">
+        <div class="mockup-label">Recherche YouTube dediee</div>
+        <div class="phone">
+          <div class="phone-notch"></div>
+          <div class="phone-screen">
+            <div class="header">
+              <span class="header-back">←</span>
+              <span class="header-title">Recherche YouTube</span>
+            </div>
+            <div class="content">
+              <div class="search-bar">
+                <span class="search-icon">🔍</span>
+                <span class="search-input" style="color: #333;">amazing grace</span>
+                <span class="search-btn">Chercher</span>
+              </div>
+
+              <div class="section-label">Resultats</div>
+              <div class="youtube-card">
+                <div class="youtube-thumb">▶</div>
+                <div class="youtube-info">
+                  <div class="youtube-title">Amazing Grace - Hillsong Worship</div>
+                  <div class="youtube-meta">4:32 · 12M vues</div>
+                  <div class="youtube-actions">
+                    <span class="btn-outline">Apercu</span>
+                    <span class="btn-primary">Lier</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="youtube-card">
+                <div class="youtube-thumb" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">▶</div>
+                <div class="youtube-info">
+                  <div class="youtube-title">Grace - Laura Story</div>
+                  <div class="youtube-meta">5:18 · 8M vues</div>
+                  <div class="youtube-actions">
+                    <span class="btn-outline">Apercu</span>
+                    <span class="btn-primary">Lier</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="section-label" style="margin-top: 20px;">Recherches recentes</div>
+              <div class="recent-searches">
+                <span class="recent-chip">"hillsong worship"</span>
+                <span class="recent-chip">"louange francaise"</span>
+                <span class="recent-chip">"elevation"</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Page 4: URL Link Flow -->
+  <div class="page-break">
+    <h2 class="section-title">4. Flux "Coller un lien URL"</h2>
+    <p class="section-desc">
+      Interface dediee au collage d'URL avec bouton "Coller depuis presse-papiers", detection automatique du type, et apercu des metadonnees.
+    </p>
+
+    <div class="mockups-row">
+      <div class="mockup-container">
+        <div class="mockup-label">Collage URL avec apercu</div>
+        <div class="phone">
+          <div class="phone-notch"></div>
+          <div class="phone-screen">
+            <div class="header">
+              <span class="header-back">←</span>
+              <span class="header-title">Coller un lien</span>
+            </div>
+            <div class="content">
+              <div class="url-input-container">
+                <div class="url-label">Collez un lien YouTube, PDF, ou autre:</div>
+                <div class="url-input">https://youtube.com/watch?v=xyz123</div>
+                <div class="paste-btn">
+                  📋 Coller depuis presse-papiers
+                </div>
+              </div>
+
+              <div class="section-label">Apercu</div>
+              <div class="preview-card">
+                <div class="preview-icon">▶</div>
+                <div class="preview-info">
+                  <div class="preview-title">Amazing Grace - Hillsong</div>
+                  <div class="preview-meta">YouTube · 4:32</div>
+                </div>
+              </div>
+
+              <p style="text-align: center; color: #999; font-size: 12px; margin-top: 20px;">
+                Types supportes: YouTube, PDF, Images, Liens web
+              </p>
+            </div>
+
+            <div class="bottom-actions">
+              <div class="btn-cancel">Annuler</div>
+              <div class="btn-confirm">Lier cette URL</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Page 5: Create Resource Flow -->
+  <div class="page-break">
+    <h2 class="section-title">5. Flux "Creer une ressource"</h2>
+    <p class="section-desc">
+      Formulaire simplifie pour creer une nouvelle ressource et la lier directement a l'element du programme.
+    </p>
+
+    <div class="mockups-row">
+      <div class="mockup-container">
+        <div class="mockup-label">Creation rapide de ressource</div>
+        <div class="phone">
+          <div class="phone-notch"></div>
+          <div class="phone-screen">
+            <div class="header">
+              <span class="header-back">←</span>
+              <span class="header-title">Creer une ressource</span>
+            </div>
+            <div class="content">
+              <div class="form-group">
+                <span class="form-label">Titre</span>
+                <div class="form-input">Grace Infinie</div>
+              </div>
+
+              <div class="form-group">
+                <span class="form-label">Collection</span>
+                <div class="form-select">
+                  <span>CAI - Chants et Adorons l'Immortel</span>
+                  <span>▼</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <span class="form-label">Type de contenu</span>
+                <div class="radio-group">
+                  <div class="radio-option active">Paroles/Texte</div>
+                  <div class="radio-option">Lien YouTube</div>
+                  <div class="radio-option">PDF</div>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <span class="form-label">Paroles</span>
+                <div class="form-input" style="height: 120px; color: #999;">
+                  Entrez les paroles ici...
+                </div>
+              </div>
+            </div>
+
+            <div class="bottom-actions">
+              <div class="btn-cancel">Annuler</div>
+              <div class="btn-confirm">Creer et lier</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Page 6: Inline Resource Actions -->
+  <div class="page-break">
+    <h2 class="section-title">6. Actions inline sur les ressources</h2>
+    <p class="section-desc">
+      Ajout et suppression de ressources directement depuis la carte d'element du programme, sans ouvrir de modal.
+    </p>
+
+    <div class="mockups-row">
+      <div class="mockup-container">
+        <div class="mockup-label">Sans ressource liee</div>
+        <div class="phone">
+          <div class="phone-notch"></div>
+          <div class="phone-screen">
+            <div class="header">
+              <span class="header-back">←</span>
+              <span class="header-title">Programme du culte</span>
+            </div>
+            <div class="content">
+              <div class="program-item">
+                <div class="program-item-header">
+                  <div class="item-number">1</div>
+                  <div class="item-content">
+                    <span class="item-type-badge">Chant</span>
+                    <div class="item-title">Louange a Dieu</div>
+                    <div class="add-resource-btn">
+                      + Ajouter une ressource
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="program-item">
+                <div class="program-item-header">
+                  <div class="item-number">2</div>
+                  <div class="item-content">
+                    <span class="item-type-badge">Priere</span>
+                    <div class="item-title">Priere d'ouverture</div>
+                    <div class="add-resource-btn">
+                      + Ajouter une ressource
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mockup-container">
+        <div class="mockup-label">Avec ressource liee</div>
+        <div class="phone">
+          <div class="phone-notch"></div>
+          <div class="phone-screen">
+            <div class="header">
+              <span class="header-back">←</span>
+              <span class="header-title">Programme du culte</span>
+            </div>
+            <div class="content">
+              <div class="program-item">
+                <div class="program-item-header">
+                  <div class="item-number">1</div>
+                  <div class="item-content">
+                    <span class="item-type-badge">Chant</span>
+                    <div class="item-title">Louange a Dieu</div>
+                    <div class="resource-chip">
+                      <span class="resource-chip-icon">🎵</span>
+                      <div class="resource-chip-info">
+                        <div class="resource-chip-title">Grace Infinie [CAI]</div>
+                        <div class="resource-chip-meta">Paroles · YouTube</div>
+                      </div>
+                      <div class="resource-chip-remove">×</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="program-item">
+                <div class="program-item-header">
+                  <div class="item-number">2</div>
+                  <div class="item-content">
+                    <span class="item-type-badge">Priere</span>
+                    <div class="item-title">Priere d'ouverture</div>
+                    <div class="resource-chip">
+                      <span class="resource-chip-icon">📖</span>
+                      <div class="resource-chip-info">
+                        <div class="resource-chip-title">Psaume 100</div>
+                        <div class="resource-chip-meta">Lecture biblique</div>
+                      </div>
+                      <div class="resource-chip-remove">×</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin-top: 30px; margin-bottom: 15px;">Reduction du nombre de clics</h3>
+    <table class="comparison-table">
+      <tr>
+        <th>Action</th>
+        <th>Actuel</th>
+        <th>Propose</th>
+        <th>Gain</th>
+      </tr>
+      <tr>
+        <td>Ajouter ressource existante</td>
+        <td>5-7 clics</td>
+        <td class="good">2-3 clics</td>
+        <td class="good">50-60%</td>
+      </tr>
+      <tr>
+        <td>Ajouter depuis YouTube</td>
+        <td>6-8 clics</td>
+        <td class="good">3-4 clics</td>
+        <td class="good">50%</td>
+      </tr>
+      <tr>
+        <td>Supprimer ressource</td>
+        <td>3 clics</td>
+        <td class="good">1 clic</td>
+        <td class="good">66%</td>
+      </tr>
+      <tr>
+        <td>Remplacer ressource</td>
+        <td>5-7 clics</td>
+        <td class="good">2 clics</td>
+        <td class="good">60-70%</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- Page 7: Bottom Sheet -->
+  <div class="page-break">
+    <h2 class="section-title">7. Bottom Sheet (selecteur mobile)</h2>
+    <p class="section-desc">
+      Remplacement du modal plein ecran par un bottom sheet glissant, plus naturel sur mobile.
+    </p>
+
+    <div class="mockups-row">
+      <div class="mockup-container">
+        <div class="mockup-label">Bottom sheet 50% hauteur</div>
+        <div class="phone">
+          <div class="phone-notch"></div>
+          <div class="phone-screen" style="position: relative;">
+            <div class="header" style="background: #3880ff66;">
+              <span class="header-title" style="opacity: 0.5;">Programme du culte</span>
+            </div>
+            <div class="content" style="opacity: 0.3;">
+              <div class="program-item">
+                <div class="program-item-header">
+                  <div class="item-number">1</div>
+                  <div class="item-content">
+                    <span class="item-type-badge">Chant</span>
+                    <div class="item-title">Louange</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="bottom-sheet" style="height: 340px;">
+              <div class="sheet-handle"></div>
+              <div class="sheet-content">
+                <div class="search-bar" style="margin-bottom: 16px;">
+                  <span class="search-icon">🔍</span>
+                  <span class="search-input">Rechercher une ressource...</span>
+                </div>
+
+                <div class="section-label">Recents</div>
+                <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+                  <div style="flex: 1; background: #f4f5f8; padding: 10px; border-radius: 10px; text-align: center; font-size: 12px;">
+                    🎵 Grace Infinie
+                  </div>
+                  <div style="flex: 1; background: #f4f5f8; padding: 10px; border-radius: 10px; text-align: center; font-size: 12px;">
+                    🎵 Hosanna
+                  </div>
+                </div>
+
+                <div class="section-label">Suggestions</div>
+                <div class="resource-item" style="margin-bottom: 8px;">
+                  <div class="resource-icon">🎵</div>
+                  <div class="resource-info">
+                    <div class="resource-title">A toi la gloire</div>
+                  </div>
+                  <div class="resource-add">+</div>
+                </div>
+
+                <div style="text-align: center; margin-top: 16px;">
+                  <span style="color: #3880ff; font-size: 14px; font-weight: 500;">Voir toutes les ressources →</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin-top: 30px; margin-bottom: 15px;">Gestes supportes</h3>
+    <ul style="list-style: none; padding: 0;">
+      <li style="padding: 10px 0; border-bottom: 1px solid #eee;">👆 <strong>Glisser vers le haut</strong> - Agrandir en plein ecran</li>
+      <li style="padding: 10px 0; border-bottom: 1px solid #eee;">👇 <strong>Glisser vers le bas</strong> - Fermer le selecteur</li>
+      <li style="padding: 10px 0; border-bottom: 1px solid #eee;">👆 <strong>Tap a l'exterieur</strong> - Fermer le selecteur</li>
+    </ul>
+  </div>
+
+  <div style="text-align: center; margin-top: 60px; color: #999; font-size: 12px;">
+    <p>Document genere le 14 janvier 2025</p>
+    <p>EEG Adorateurs - Resource UX Improvements Plan</p>
+  </div>
+</body>
+</html>
