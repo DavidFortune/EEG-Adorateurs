@@ -367,9 +367,22 @@
                         </ion-reorder>
                         <div v-else class="sub-item-bullet">•</div>
                         <div class="sub-item-content">
-                        <span class="sub-item-title">
-                          {{ subItem.resourceId && getLinkedResource(subItem.resourceId) ? getLinkedResource(subItem.resourceId)?.title : subItem.title }}
-                        </span>
+                        <div class="sub-item-header-row">
+                          <ion-icon v-if="subItem.type" :icon="getItemIcon(subItem.type)" class="sub-item-type-icon" />
+                          <span class="sub-item-title">
+                            {{ subItem.resourceId && getLinkedResource(subItem.resourceId) ? getLinkedResource(subItem.resourceId)?.title : subItem.title }}
+                          </span>
+                          <span v-if="subItem.duration" class="sub-item-duration">
+                            <ion-icon :icon="timeOutline" />
+                            {{ subItem.duration }}min
+                          </span>
+                        </div>
+                        <div v-if="subItem.participants && subItem.participants.length > 0" class="sub-item-participants">
+                          <div v-for="participant in subItem.participants" :key="participant.id" class="sub-item-participant">
+                            <span class="participant-initials small">{{ getParticipantInitials(participant.name) }}</span>
+                            {{ participant.name }}
+                          </div>
+                        </div>
                         <span v-if="subItem.notes" class="sub-item-notes">{{ subItem.notes }}</span>
 
                         <!-- Scripture Reference for Sub-Item -->
@@ -649,19 +662,78 @@
       <ion-modal :is-open="showAddSubItemModalState" @ionModalDidDismiss="closeAddSubItemModal">
         <ion-header>
           <ion-toolbar>
+            <ion-buttons slot="start">
+              <ion-button @click="closeAddSubItemModal">
+                <ion-icon :icon="arrowBackOutline" />
+              </ion-button>
+            </ion-buttons>
             <ion-title>Ajouter un sous-élément</ion-title>
             <ion-buttons slot="end">
-              <ion-button @click="closeAddSubItemModal">
-                <ion-icon :icon="closeOutline" />
+              <ion-button
+                @click="addSubItem"
+                :disabled="!addSubItemForm.title"
+                :strong="true"
+              >
+                Ajouter
               </ion-button>
             </ion-buttons>
           </ion-toolbar>
         </ion-header>
         <ion-content class="ion-padding">
-          <ion-item>
-            <ion-label position="stacked">Titre *</ion-label>
-            <ion-input v-model="addSubItemForm.title" placeholder="Ex: Kache mwen anba zel ou"></ion-input>
-          </ion-item>
+          <!-- Type Selection -->
+          <div class="type-selection-section">
+            <ion-label class="type-label">Type</ion-label>
+            <div class="type-buttons-grid">
+              <button
+                v-for="type in subItemTypes"
+                :key="type"
+                @click="addSubItemForm.type = type"
+                :class="['type-button', { 'selected': addSubItemForm.type === type }]"
+                type="button"
+              >
+                <ion-icon :icon="getItemIcon(type)" class="type-icon" />
+                <span class="type-text">{{ type }}</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Title with Autocomplete -->
+          <div class="title-autocomplete-wrapper">
+            <ion-item class="title-field-with-button">
+              <ion-label position="stacked">Titre *</ion-label>
+              <ion-input
+                v-model="addSubItemForm.title"
+                placeholder="Ex: Kache mwen anba zel ou"
+                @ionInput="handleAddSubItemTitleInput"
+                @ionBlur="handleAddSubItemTitleBlur"
+                @ionFocus="handleAddSubItemTitleInput"
+              ></ion-input>
+            </ion-item>
+
+            <div v-if="showAddSubItemTitleSuggestions && addSubItemTitleSuggestions.length > 0" class="title-suggestions-dropdown">
+              <div class="suggestions-header">
+                <ion-icon :icon="sparklesOutline" color="primary" />
+                <span>Suggestions</span>
+              </div>
+              <div
+                v-for="resource in addSubItemTitleSuggestions"
+                :key="resource.id"
+                class="suggestion-item"
+                @click="selectAddSubItemTitleSuggestion(resource)"
+              >
+                <span class="suggestion-icon">{{ getResourceTypeIcon(resource) }}</span>
+                <div class="suggestion-info">
+                  <span class="suggestion-title">{{ resource.title }}</span>
+                  <span v-if="resource.collectionId" class="suggestion-badge">
+                    {{ getResourceCollectionSymbol(resource) }}
+                  </span>
+                </div>
+                <ion-button fill="solid" size="small" color="success" @click.stop="selectAddSubItemTitleSuggestion(resource)">
+                  Utiliser
+                </ion-button>
+              </div>
+            </div>
+          </div>
 
           <!-- Resource Section -->
           <div class="resource-link-section">
@@ -702,17 +774,12 @@
             @update:is-open="showAddSubItemResourceSelector = $event"
           />
 
-          <ion-item>
-            <ion-label position="stacked">Notes (optionnel)</ion-label>
-            <ion-textarea v-model="addSubItemForm.notes" :rows="3"></ion-textarea>
-          </ion-item>
-
-          <!-- Scripture Section for Sub-Item -->
-          <div class="scripture-fetch-section">
+          <!-- Scripture Reference (for "Lecture biblique" and "Prédication") -->
+          <div v-if="addSubItemForm.type === 'Lecture biblique' || addSubItemForm.type === 'Prédication'" class="scripture-fetch-section">
             <div class="scripture-input-row">
               <ion-item class="scripture-input-item">
                 <ion-label position="stacked">
-                  <ion-icon :icon="bookOutline" /> Référence biblique (optionnel)
+                  <ion-icon :icon="bookOutline" /> Référence biblique
                 </ion-label>
                 <ion-input
                   v-model="addSubItemForm.scriptureReference"
@@ -742,14 +809,74 @@
             </div>
           </div>
 
-          <ion-button
-            @click="addSubItem"
-            expand="block"
-            class="ion-margin-top"
-            :disabled="!addSubItemForm.title"
-          >
-            Ajouter
-          </ion-button>
+          <!-- Options avancées -->
+          <ion-accordion-group class="advanced-options-accordion">
+            <ion-accordion value="advanced">
+              <ion-item slot="header" color="light">
+                <ion-label>Options avancées</ion-label>
+              </ion-item>
+              <div slot="content" class="advanced-options-content">
+                <ion-item>
+                  <ion-label position="stacked">Sous-titre</ion-label>
+                  <ion-input v-model="addSubItemForm.subtitle"></ion-input>
+                </ion-item>
+
+                <ion-item lines="none">
+                  <ion-label position="stacked">Participants</ion-label>
+                  <ParticipantSelector
+                    v-model:participants="addSubItemForm.participants"
+                    :service-id="route.params.id as string"
+                    :multiple="true"
+                  />
+                </ion-item>
+
+                <ion-item>
+                  <ion-label position="stacked">Durée (minutes)</ion-label>
+                  <ion-input v-model.number="addSubItemForm.duration" type="number" min="0"></ion-input>
+                </ion-item>
+
+                <ion-item>
+                  <ion-label position="stacked">Notes</ion-label>
+                  <ion-textarea v-model="addSubItemForm.notes" :rows="3"></ion-textarea>
+                </ion-item>
+
+                <!-- Scripture Section (when type is not Lecture/Prédication) -->
+                <div v-if="addSubItemForm.type !== 'Lecture biblique' && addSubItemForm.type !== 'Prédication'" class="scripture-fetch-section">
+                  <div class="scripture-input-row">
+                    <ion-item class="scripture-input-item">
+                      <ion-label position="stacked">
+                        <ion-icon :icon="bookOutline" /> Référence biblique
+                      </ion-label>
+                      <ion-input
+                        v-model="addSubItemForm.scriptureReference"
+                        placeholder="Ex: Jean 3:16 ou Psaume 23:1-6"
+                        @keyup.enter="handleFetchScriptureForAddSubItem"
+                      ></ion-input>
+                    </ion-item>
+                    <ion-button
+                      @click="handleFetchScriptureForAddSubItem"
+                      :disabled="!addSubItemForm.scriptureReference || fetchingScripture"
+                      fill="solid"
+                      color="primary"
+                      class="scripture-search-btn"
+                    >
+                      <ion-icon v-if="!fetchingScripture" :icon="searchOutline" slot="icon-only" />
+                      <ion-spinner v-else name="crescent" slot="icon-only" />
+                    </ion-button>
+                  </div>
+                  <div v-if="addSubItemForm.scriptureText" class="scripture-preview">
+                    <div class="scripture-preview-header">
+                      <span class="scripture-preview-ref">{{ addSubItemForm.scriptureReference }}</span>
+                      <ion-button fill="clear" size="small" @click="clearAddSubItemScripture">
+                        <ion-icon :icon="closeOutline" slot="icon-only" />
+                      </ion-button>
+                    </div>
+                    <p class="scripture-preview-text">{{ addSubItemForm.scriptureText }}</p>
+                  </div>
+                </div>
+              </div>
+            </ion-accordion>
+          </ion-accordion-group>
         </ion-content>
       </ion-modal>
 
@@ -757,19 +884,77 @@
       <ion-modal :is-open="showEditSubItemModalState" @ionModalDidDismiss="closeEditSubItemModal">
         <ion-header>
           <ion-toolbar>
+            <ion-buttons slot="start">
+              <ion-button @click="closeEditSubItemModal">
+                <ion-icon :icon="arrowBackOutline" />
+              </ion-button>
+            </ion-buttons>
             <ion-title>Modifier le sous-élément</ion-title>
             <ion-buttons slot="end">
-              <ion-button @click="closeEditSubItemModal">
-                <ion-icon :icon="closeOutline" />
+              <ion-button
+                @click="updateSubItem"
+                :disabled="!editSubItemForm.title"
+                :strong="true"
+              >
+                Modifier
               </ion-button>
             </ion-buttons>
           </ion-toolbar>
         </ion-header>
         <ion-content class="ion-padding">
-          <ion-item>
-            <ion-label position="stacked">Titre *</ion-label>
-            <ion-input v-model="editSubItemForm.title"></ion-input>
-          </ion-item>
+          <!-- Type Selection -->
+          <div class="type-selection-section">
+            <ion-label class="type-label">Type</ion-label>
+            <div class="type-buttons-grid">
+              <button
+                v-for="type in subItemTypes"
+                :key="type"
+                @click="editSubItemForm.type = type"
+                :class="['type-button', { 'selected': editSubItemForm.type === type }]"
+                type="button"
+              >
+                <ion-icon :icon="getItemIcon(type)" class="type-icon" />
+                <span class="type-text">{{ type }}</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Title with Autocomplete -->
+          <div class="title-autocomplete-wrapper">
+            <ion-item class="title-field-with-button">
+              <ion-label position="stacked">Titre *</ion-label>
+              <ion-input
+                v-model="editSubItemForm.title"
+                @ionInput="handleEditSubItemTitleInput"
+                @ionBlur="handleEditSubItemTitleBlur"
+                @ionFocus="handleEditSubItemTitleInput"
+              ></ion-input>
+            </ion-item>
+
+            <div v-if="showEditSubItemTitleSuggestions && editSubItemTitleSuggestions.length > 0" class="title-suggestions-dropdown">
+              <div class="suggestions-header">
+                <ion-icon :icon="sparklesOutline" color="primary" />
+                <span>Suggestions</span>
+              </div>
+              <div
+                v-for="resource in editSubItemTitleSuggestions"
+                :key="resource.id"
+                class="suggestion-item"
+                @click="selectEditSubItemTitleSuggestion(resource)"
+              >
+                <span class="suggestion-icon">{{ getResourceTypeIcon(resource) }}</span>
+                <div class="suggestion-info">
+                  <span class="suggestion-title">{{ resource.title }}</span>
+                  <span v-if="resource.collectionId" class="suggestion-badge">
+                    {{ getResourceCollectionSymbol(resource) }}
+                  </span>
+                </div>
+                <ion-button fill="solid" size="small" color="success" @click.stop="selectEditSubItemTitleSuggestion(resource)">
+                  Utiliser
+                </ion-button>
+              </div>
+            </div>
+          </div>
 
           <!-- Resource Section -->
           <div class="resource-link-section">
@@ -810,17 +995,12 @@
             @update:is-open="showEditSubItemResourceSelector = $event"
           />
 
-          <ion-item>
-            <ion-label position="stacked">Notes (optionnel)</ion-label>
-            <ion-textarea v-model="editSubItemForm.notes" :rows="3"></ion-textarea>
-          </ion-item>
-
-          <!-- Scripture Section for Sub-Item -->
-          <div class="scripture-fetch-section">
+          <!-- Scripture Reference (for "Lecture biblique" and "Prédication") -->
+          <div v-if="editSubItemForm.type === 'Lecture biblique' || editSubItemForm.type === 'Prédication'" class="scripture-fetch-section">
             <div class="scripture-input-row">
               <ion-item class="scripture-input-item">
                 <ion-label position="stacked">
-                  <ion-icon :icon="bookOutline" /> Référence biblique (optionnel)
+                  <ion-icon :icon="bookOutline" /> Référence biblique
                 </ion-label>
                 <ion-input
                   v-model="editSubItemForm.scriptureReference"
@@ -850,14 +1030,74 @@
             </div>
           </div>
 
-          <ion-button
-            @click="updateSubItem"
-            expand="block"
-            class="ion-margin-top"
-            :disabled="!editSubItemForm.title"
-          >
-            Mettre à jour
-          </ion-button>
+          <!-- Options avancées -->
+          <ion-accordion-group class="advanced-options-accordion">
+            <ion-accordion value="advanced">
+              <ion-item slot="header" color="light">
+                <ion-label>Options avancées</ion-label>
+              </ion-item>
+              <div slot="content" class="advanced-options-content">
+                <ion-item>
+                  <ion-label position="stacked">Sous-titre</ion-label>
+                  <ion-input v-model="editSubItemForm.subtitle"></ion-input>
+                </ion-item>
+
+                <ion-item lines="none">
+                  <ion-label position="stacked">Participants</ion-label>
+                  <ParticipantSelector
+                    v-model:participants="editSubItemForm.participants"
+                    :service-id="route.params.id as string"
+                    :multiple="true"
+                  />
+                </ion-item>
+
+                <ion-item>
+                  <ion-label position="stacked">Durée (minutes)</ion-label>
+                  <ion-input v-model.number="editSubItemForm.duration" type="number" min="0"></ion-input>
+                </ion-item>
+
+                <ion-item>
+                  <ion-label position="stacked">Notes</ion-label>
+                  <ion-textarea v-model="editSubItemForm.notes" :rows="3"></ion-textarea>
+                </ion-item>
+
+                <!-- Scripture Section (when type is not Lecture/Prédication) -->
+                <div v-if="editSubItemForm.type !== 'Lecture biblique' && editSubItemForm.type !== 'Prédication'" class="scripture-fetch-section">
+                  <div class="scripture-input-row">
+                    <ion-item class="scripture-input-item">
+                      <ion-label position="stacked">
+                        <ion-icon :icon="bookOutline" /> Référence biblique
+                      </ion-label>
+                      <ion-input
+                        v-model="editSubItemForm.scriptureReference"
+                        placeholder="Ex: Jean 3:16 ou Psaume 23:1-6"
+                        @keyup.enter="handleFetchScriptureForEditSubItem"
+                      ></ion-input>
+                    </ion-item>
+                    <ion-button
+                      @click="handleFetchScriptureForEditSubItem"
+                      :disabled="!editSubItemForm.scriptureReference || fetchingScripture"
+                      fill="solid"
+                      color="primary"
+                      class="scripture-search-btn"
+                    >
+                      <ion-icon v-if="!fetchingScripture" :icon="searchOutline" slot="icon-only" />
+                      <ion-spinner v-else name="crescent" slot="icon-only" />
+                    </ion-button>
+                  </div>
+                  <div v-if="editSubItemForm.scriptureText" class="scripture-preview">
+                    <div class="scripture-preview-header">
+                      <span class="scripture-preview-ref">{{ editSubItemForm.scriptureReference }}</span>
+                      <ion-button fill="clear" size="small" @click="clearEditSubItemScripture">
+                        <ion-icon :icon="closeOutline" slot="icon-only" />
+                      </ion-button>
+                    </div>
+                    <p class="scripture-preview-text">{{ editSubItemForm.scriptureText }}</p>
+                  </div>
+                </div>
+              </div>
+            </ion-accordion>
+          </ion-accordion-group>
         </ion-content>
       </ion-modal>
 
@@ -1656,8 +1896,12 @@ const itemForm = ref({
 const showAddSubItemModalState = ref(false);
 const parentItemIdForSubItem = ref<string | null>(null);
 const addSubItemForm = ref({
+  type: '' as ProgramItemType | '',
   title: '',
+  subtitle: '',
   resourceId: null as string | null,
+  participants: [] as ProgramParticipant[],
+  duration: 0,
   notes: '',
   scriptureReference: '',
   scriptureText: '',
@@ -1668,8 +1912,12 @@ const showEditSubItemModalState = ref(false);
 const editSubItemForm = ref({
   id: '',
   parentItemId: '',
+  type: '' as ProgramItemType | '',
   title: '',
+  subtitle: '',
   resourceId: null as string | null,
+  participants: [] as ProgramParticipant[],
+  duration: 0,
   notes: '',
   scriptureReference: '',
   scriptureText: '',
@@ -1807,6 +2055,10 @@ const serviceId = computed(() => route.params.id as string);
 
 const programItemTypes = computed(() => Object.values(ProgramItemType));
 
+const subItemTypes = computed(() =>
+  Object.values(ProgramItemType).filter(t => t !== ProgramItemType.SECTION && t !== ProgramItemType.TITLE)
+);
+
 // Title autocomplete suggestions
 const titleSuggestions = computed(() => {
   if (!itemForm.value.title || itemForm.value.title.length < 2) return [];
@@ -1815,6 +2067,34 @@ const titleSuggestions = computed(() => {
   return getSmartSuggestions(
     itemForm.value.type,
     itemForm.value.title,
+    allResources.value,
+    [],
+    5
+  );
+});
+
+// Sub-item title autocomplete
+const showAddSubItemTitleSuggestions = ref(false);
+const showEditSubItemTitleSuggestions = ref(false);
+
+const addSubItemTitleSuggestions = computed(() => {
+  if (!addSubItemForm.value.title || addSubItemForm.value.title.length < 2) return [];
+  if (allResources.value.length === 0) return [];
+  return getSmartSuggestions(
+    addSubItemForm.value.type || '',
+    addSubItemForm.value.title,
+    allResources.value,
+    [],
+    5
+  );
+});
+
+const editSubItemTitleSuggestions = computed(() => {
+  if (!editSubItemForm.value.title || editSubItemForm.value.title.length < 2) return [];
+  if (allResources.value.length === 0) return [];
+  return getSmartSuggestions(
+    editSubItemForm.value.type || '',
+    editSubItemForm.value.title,
     allResources.value,
     [],
     5
@@ -2401,6 +2681,43 @@ const handleTitleBlur = () => {
   }, 200);
 };
 
+// Sub-item title autocomplete handlers
+const handleAddSubItemTitleInput = () => {
+  showAddSubItemTitleSuggestions.value = addSubItemForm.value.title.length >= 2;
+};
+
+const handleAddSubItemTitleBlur = () => {
+  setTimeout(() => {
+    showAddSubItemTitleSuggestions.value = false;
+  }, 200);
+};
+
+const selectAddSubItemTitleSuggestion = (resource: Resource) => {
+  addSubItemForm.value.title = resource.title;
+  addSubItemForm.value.resourceId = resource.id;
+  showAddSubItemTitleSuggestions.value = false;
+  linkedResources.value.set(resource.id, resource);
+  subscribeToLinkedResource(resource.id);
+};
+
+const handleEditSubItemTitleInput = () => {
+  showEditSubItemTitleSuggestions.value = editSubItemForm.value.title.length >= 2;
+};
+
+const handleEditSubItemTitleBlur = () => {
+  setTimeout(() => {
+    showEditSubItemTitleSuggestions.value = false;
+  }, 200);
+};
+
+const selectEditSubItemTitleSuggestion = (resource: Resource) => {
+  editSubItemForm.value.title = resource.title;
+  editSubItemForm.value.resourceId = resource.id;
+  showEditSubItemTitleSuggestions.value = false;
+  linkedResources.value.set(resource.id, resource);
+  subscribeToLinkedResource(resource.id);
+};
+
 const showEditItemModalForItem = (item: ProgramItem) => {
   editingItemId.value = item.id;
   // Handle migration from single participant to multiple participants
@@ -2951,14 +3268,23 @@ const handleSubItemReorder = async (event: CustomEvent, parentItemId: string) =>
 const showAddSubItemModalForItem = (itemId: string) => {
   parentItemIdForSubItem.value = itemId;
   addSubItemForm.value = {
+    type: '' as ProgramItemType | '',
     title: '',
+    subtitle: '',
     resourceId: null,
+    participants: [],
+    duration: 0,
     notes: '',
     scriptureReference: '',
     scriptureText: '',
     scriptureVersion: 'LSG'
   };
+  showAddSubItemTitleSuggestions.value = false;
   showAddSubItemModalState.value = true;
+  // Load resources for autocomplete if not already loaded
+  if (allResources.value.length === 0) {
+    loadResourcesForAutocomplete();
+  }
 };
 
 const closeAddSubItemModal = () => {
@@ -2982,7 +3308,11 @@ const addSubItem = async () => {
     };
 
     // Only add optional fields if they have values
+    if (addSubItemForm.value.type) newSubItem.type = addSubItemForm.value.type;
+    if (addSubItemForm.value.subtitle) newSubItem.subtitle = addSubItemForm.value.subtitle;
     if (addSubItemForm.value.resourceId) newSubItem.resourceId = addSubItemForm.value.resourceId;
+    if (addSubItemForm.value.participants && addSubItemForm.value.participants.length > 0) newSubItem.participants = addSubItemForm.value.participants;
+    if (addSubItemForm.value.duration) newSubItem.duration = addSubItemForm.value.duration;
     if (addSubItemForm.value.notes) newSubItem.notes = addSubItemForm.value.notes;
     if (addSubItemForm.value.scriptureReference) newSubItem.scriptureReference = addSubItemForm.value.scriptureReference;
     if (addSubItemForm.value.scriptureText) newSubItem.scriptureText = addSubItemForm.value.scriptureText;
@@ -3013,14 +3343,23 @@ const showEditSubItemModalForItem = (itemId: string, subItem: ProgramSubItem) =>
   editSubItemForm.value = {
     id: subItem.id,
     parentItemId: itemId,
+    type: subItem.type || '' as ProgramItemType | '',
     title: subItem.title,
+    subtitle: subItem.subtitle || '',
     resourceId: subItem.resourceId || null,
+    participants: subItem.participants || [],
+    duration: subItem.duration || 0,
     notes: subItem.notes || '',
     scriptureReference: subItem.scriptureReference || '',
     scriptureText: subItem.scriptureText || '',
     scriptureVersion: subItem.scriptureVersion || 'LSG'
   };
+  showEditSubItemTitleSuggestions.value = false;
   showEditSubItemModalState.value = true;
+  // Load resources for autocomplete if not already loaded
+  if (allResources.value.length === 0) {
+    loadResourcesForAutocomplete();
+  }
 };
 
 const closeEditSubItemModal = () => {
@@ -3040,7 +3379,11 @@ const updateSubItem = async () => {
     };
 
     // Only add optional fields if they have values
+    if (editSubItemForm.value.type) updates.type = editSubItemForm.value.type;
+    if (editSubItemForm.value.subtitle) updates.subtitle = editSubItemForm.value.subtitle;
     if (editSubItemForm.value.resourceId) updates.resourceId = editSubItemForm.value.resourceId;
+    if (editSubItemForm.value.participants && editSubItemForm.value.participants.length > 0) updates.participants = editSubItemForm.value.participants;
+    if (editSubItemForm.value.duration) updates.duration = editSubItemForm.value.duration;
     if (editSubItemForm.value.notes) updates.notes = editSubItemForm.value.notes;
     // Scripture fields - include even if empty to allow clearing
     updates.scriptureReference = editSubItemForm.value.scriptureReference || null;
@@ -4838,10 +5181,58 @@ ion-reorder.item-handle-column:active {
   gap: 0.25rem;
 }
 
+.sub-item-header-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.sub-item-type-icon {
+  font-size: 0.85rem;
+  color: var(--ion-color-primary);
+  flex-shrink: 0;
+}
+
 .sub-item-title {
   font-size: 0.95rem;
   color: var(--ion-color-dark);
   font-weight: 500;
+}
+
+.sub-item-duration {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  font-size: 0.75rem;
+  color: var(--ion-color-medium);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.sub-item-duration ion-icon {
+  font-size: 0.75rem;
+}
+
+.sub-item-participants {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.15rem;
+}
+
+.sub-item-participant {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--ion-color-medium);
+}
+
+.participant-initials.small {
+  font-size: 0.6rem;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
 }
 
 .sub-item-notes {

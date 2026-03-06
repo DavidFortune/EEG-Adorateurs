@@ -17,9 +17,9 @@
 
 ## 4. Verification
 
-- [ ] 4.1 Verify linking a resource from the new dedicated section works correctly *(manual)*
-- [ ] 4.2 Verify the inline resource card displays correct info (title, collection, media types, music props) *(manual)*
-- [ ] 4.3 Verify unlinking from the modal and from the program view both work *(manual)*
-- [ ] 4.4 Verify "Options avancées" accordion collapses/expands and all fields still save correctly *(manual)*
-- [ ] 4.5 Verify sub-item resource linking uses the new pattern *(manual)*
-- [ ] 4.6 Verify title suggestions + auto-link still work after the layout change *(manual)*
+- [x] 4.1 Verify linking a resource from the new dedicated section works correctly *(manual)*
+- [x] 4.2 Verify the inline resource card displays correct info (title, collection, media types, music props) *(manual)*
+- [x] 4.3 Verify unlinking from the modal and from the program view both work *(manual)*
+- [x] 4.4 Verify "Options avancées" accordion collapses/expands and all fields still save correctly *(manual)*
+- [x] 4.5 Verify sub-item resource linking uses the new pattern *(manual)*
+- [x] 4.6 Verify title suggestions + auto-link still work after the layout change *(manual)*

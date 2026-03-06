@@ -19,8 +19,12 @@ export interface ProgramParticipant {
 export interface ProgramSubItem {
   id: string;
   title: string;
+  type?: ProgramItemType;
+  subtitle?: string;
   resourceId?: string; // Link to a resource (song, etc.)
   notes?: string;
+  participants?: ProgramParticipant[];
+  duration?: number; // in minutes
   order: number;
   // Scripture fields for sub-items
   scriptureReference?: string; // Parsed reference (e.g., "Jean 3:16-18")
