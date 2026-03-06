@@ -205,6 +205,13 @@ const getTeamStatusColor = (team: TeamAssignmentGroup): string => {
   height: 44px;
 }
 
+.member-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
 .avatar-initials {
   width: 100%;
   height: 100%;

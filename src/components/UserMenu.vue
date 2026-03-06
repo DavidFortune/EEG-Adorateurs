@@ -134,6 +134,13 @@ const handleLogout = async () => {
   flex-shrink: 0;
 }
 
+.menu-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
 .menu-avatar .initials {
   background: var(--ion-color-primary);
   color: white;

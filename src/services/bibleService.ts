@@ -6,7 +6,6 @@
 import type { BibleReference, BibleVerse, BibleApiResponse } from '@/types/bible';
 
 const API_BASE = 'https://bolls.life';
-const CORS_PROXY = 'https://corsproxy.io/?';
 const TRANSLATION = 'FRLSG';
 
 /**
@@ -152,7 +151,7 @@ export async function fetchVerses(reference: BibleReference): Promise<BibleVerse
   try {
     // Fetch the entire chapter (works better with CORS proxy)
     const apiUrl = `${API_BASE}/get-text/${TRANSLATION}/${bookId}/${chapter}/`;
-    const response = await fetch(`${CORS_PROXY}${encodeURIComponent(apiUrl)}`);
+    const response = await fetch(apiUrl);
 
     if (!response.ok) {
       throw new Error(`API error: ${response.status}`);

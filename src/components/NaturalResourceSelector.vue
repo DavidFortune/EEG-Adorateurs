@@ -3,7 +3,7 @@
     <!-- Search Input -->
     <div class="search-field">
       <ion-item>
-        <ion-label position="stacked">Rechercher une chanson</ion-label>
+        <ion-label position="stacked">Insérer le lien ou rechercher une vidéo</ion-label>
         <ion-input
           v-model="searchQuery"
           placeholder="Ex: Amazing Grace"
@@ -147,7 +147,7 @@
       <ion-button @click="createAndLinkResource" expand="block" :disabled="creating">
         <ion-spinner v-if="creating" name="crescent" slot="start"></ion-spinner>
         <ion-icon v-else :icon="addOutline" slot="start" />
-        {{ creating ? 'Création en cours...' : 'Créer et lier la ressource' }}
+        {{ creating ? 'Création en cours...' : (selectOnly ? 'Ajouter' : 'Créer et lier la ressource') }}
       </ion-button>
     </div>
   </div>
@@ -177,15 +177,20 @@ interface YouTubeSearchResult {
 }
 
 interface Props {
-  modelValue: string | null;
+  modelValue?: string | null;
+  selectOnly?: boolean;
 }
 
 interface Emits {
   (event: 'update:modelValue', value: string | null): void;
   (event: 'resource-created', resource: Resource): void;
+  (event: 'video-selected', video: { videoId: string; title: string; thumbnail: string; channel: string; videoUrl: string; lyrics: string | null }): void;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  modelValue: null,
+  selectOnly: false
+});
 const emit = defineEmits<Emits>();
 
 // State
@@ -285,6 +290,26 @@ const fetchVideoMetadata = async () => {
 // Create resource and link it
 const createAndLinkResource = async () => {
   if (!selectedResult.value) return;
+
+  // Select-only mode: emit video details without creating a resource
+  if (props.selectOnly) {
+    emit('video-selected', {
+      videoId: selectedResult.value.id,
+      title: selectedResult.value.title,
+      thumbnail: selectedResult.value.thumbnail,
+      channel: selectedResult.value.channel,
+      videoUrl: selectedResult.value.videoUrl,
+      lyrics: lyrics.value || null
+    });
+
+    // Reset form
+    searchQuery.value = '';
+    searchResults.value = [];
+    selectedResult.value = null;
+    searchPerformed.value = false;
+    lyrics.value = '';
+    return;
+  }
 
   creating.value = true;
   errorMessage.value = '';

@@ -249,7 +249,6 @@
                       {{ item.notes }}
                     </div>
 
-                    <!-- Inline Resource Quick Add (Edit Mode) -->
                     <!-- Resource Links -->
                     <div v-if="item.resourceId && getLinkedResource(item.resourceId)" class="item-resources">
                       <div class="media-buttons">
@@ -261,6 +260,15 @@
                         >
                           <ion-icon :icon="getMediaTypeIcon(content.type)" />
                           <span>{{ formatMediaType(content.type) }}</span>
+                        </button>
+                        <!-- Quick Unlink (Edit Mode) -->
+                        <button
+                          v-if="isEditMode"
+                          @click.stop="quickUnlinkResource(item.id)"
+                          class="media-chip-button unlink-btn"
+                          title="Délier la ressource"
+                        >
+                          <ion-icon :icon="closeCircleOutline" />
                         </button>
                       </div>
                       <!-- Music Properties -->
@@ -496,9 +504,6 @@
                 @ionBlur="handleTitleBlur"
                 @ionFocus="handleTitleInput"
               ></ion-input>
-              <div slot="end" class="resource-selector-inline">
-                <ResourceSelector v-model="itemForm.resourceId" button-fill="solid" button-size="small" />
-              </div>
             </ion-item>
 
             <!-- Title Suggestions Dropdown -->
@@ -526,6 +531,45 @@
               </div>
             </div>
           </div>
+
+          <!-- Resource Section -->
+          <div class="resource-link-section">
+            <div v-if="itemForm.resourceId && getFormLinkedResource(itemForm.resourceId)" class="linked-resource-card">
+              <div class="linked-resource-info">
+                <span class="linked-resource-title">{{ getFormLinkedResource(itemForm.resourceId)?.title }}</span>
+                <div class="linked-resource-meta">
+                  <span v-if="getFormResourceCollection(itemForm.resourceId)" class="linked-resource-collection">{{ getFormResourceCollection(itemForm.resourceId) }}</span>
+                  <span
+                    v-for="content in getFormLinkedResource(itemForm.resourceId)?.contents"
+                    :key="content.type"
+                    class="linked-resource-media-chip"
+                  >
+                    <ion-icon :icon="getMediaTypeIcon(content.type)" />
+                    {{ formatMediaType(content.type) }}
+                  </span>
+                </div>
+                <div v-if="getResourceMusicProps(itemForm.resourceId)" class="linked-resource-music">
+                  <span v-for="prop in getResourceMusicProps(itemForm.resourceId)" :key="prop" class="music-prop small">{{ prop }}</span>
+                </div>
+              </div>
+              <div class="linked-resource-actions">
+                <ion-button fill="outline" size="small" @click="openItemResourceSelector">Changer</ion-button>
+                <ion-button fill="clear" size="small" color="danger" @click="itemForm.resourceId = null">
+                  <ion-icon :icon="closeOutline" slot="icon-only" />
+                </ion-button>
+              </div>
+            </div>
+            <ion-button v-else fill="outline" expand="block" @click="openItemResourceSelector">
+              <ion-icon :icon="addOutline" slot="start" />
+              Lier une ressource
+            </ion-button>
+          </div>
+          <ResourceSelector
+            v-model="itemForm.resourceId"
+            :modal-only="true"
+            :is-open="showItemResourceSelector"
+            @update:is-open="showItemResourceSelector = $event"
+          />
 
           <!-- Scripture Reference Field (for "Lecture biblique" and "Prédication") -->
           <div v-if="itemForm.type === 'Lecture biblique' || itemForm.type === 'Prédication'" class="scripture-fetch-section">
@@ -565,29 +609,39 @@
             </div>
           </div>
 
-          <ion-item>
-            <ion-label position="stacked">Sous-titre (optionnel)</ion-label>
-            <ion-input v-model="itemForm.subtitle"></ion-input>
-          </ion-item>
+          <!-- Options avancées -->
+          <ion-accordion-group class="advanced-options-accordion">
+            <ion-accordion value="advanced">
+              <ion-item slot="header" color="light">
+                <ion-label>Options avancées</ion-label>
+              </ion-item>
+              <div slot="content" class="advanced-options-content">
+                <ion-item>
+                  <ion-label position="stacked">Sous-titre</ion-label>
+                  <ion-input v-model="itemForm.subtitle"></ion-input>
+                </ion-item>
 
-          <ion-item lines="none">
-            <ion-label position="stacked">Participants (optionnel)</ion-label>
-            <ParticipantSelector
-              v-model:participants="itemForm.participants"
-              :service-id="route.params.id as string"
-              :multiple="true"
-            />
-          </ion-item>
+                <ion-item lines="none">
+                  <ion-label position="stacked">Participants</ion-label>
+                  <ParticipantSelector
+                    v-model:participants="itemForm.participants"
+                    :service-id="route.params.id as string"
+                    :multiple="true"
+                  />
+                </ion-item>
 
-          <ion-item>
-            <ion-label position="stacked">Durée (minutes)</ion-label>
-            <ion-input v-model.number="itemForm.duration" type="number" min="0"></ion-input>
-          </ion-item>
+                <ion-item>
+                  <ion-label position="stacked">Durée (minutes)</ion-label>
+                  <ion-input v-model.number="itemForm.duration" type="number" min="0"></ion-input>
+                </ion-item>
 
-          <ion-item>
-            <ion-label position="stacked">Notes (optionnel)</ion-label>
-            <ion-textarea v-model="itemForm.notes" :rows="3"></ion-textarea>
-          </ion-item>
+                <ion-item>
+                  <ion-label position="stacked">Notes</ion-label>
+                  <ion-textarea v-model="itemForm.notes" :rows="3"></ion-textarea>
+                </ion-item>
+              </div>
+            </ion-accordion>
+          </ion-accordion-group>
         </ion-content>
       </ion-modal>
 
@@ -609,10 +663,44 @@
             <ion-input v-model="addSubItemForm.title" placeholder="Ex: Kache mwen anba zel ou"></ion-input>
           </ion-item>
 
-          <ion-item>
-            <ion-label position="stacked">Lier à une ressource (optionnel)</ion-label>
-            <ResourceSelector v-model="addSubItemForm.resourceId" resource-type="song" />
-          </ion-item>
+          <!-- Resource Section -->
+          <div class="resource-link-section">
+            <div v-if="addSubItemForm.resourceId && getFormLinkedResource(addSubItemForm.resourceId)" class="linked-resource-card">
+              <div class="linked-resource-info">
+                <span class="linked-resource-title">{{ getFormLinkedResource(addSubItemForm.resourceId)?.title }}</span>
+                <div class="linked-resource-meta">
+                  <span v-if="getFormResourceCollection(addSubItemForm.resourceId)" class="linked-resource-collection">{{ getFormResourceCollection(addSubItemForm.resourceId) }}</span>
+                  <span
+                    v-for="content in getFormLinkedResource(addSubItemForm.resourceId)?.contents"
+                    :key="content.type"
+                    class="linked-resource-media-chip"
+                  >
+                    <ion-icon :icon="getMediaTypeIcon(content.type)" />
+                    {{ formatMediaType(content.type) }}
+                  </span>
+                </div>
+                <div v-if="getResourceMusicProps(addSubItemForm.resourceId)" class="linked-resource-music">
+                  <span v-for="prop in getResourceMusicProps(addSubItemForm.resourceId)" :key="prop" class="music-prop small">{{ prop }}</span>
+                </div>
+              </div>
+              <div class="linked-resource-actions">
+                <ion-button fill="outline" size="small" @click="showAddSubItemResourceSelector = true">Changer</ion-button>
+                <ion-button fill="clear" size="small" color="danger" @click="addSubItemForm.resourceId = null">
+                  <ion-icon :icon="closeOutline" slot="icon-only" />
+                </ion-button>
+              </div>
+            </div>
+            <ion-button v-else fill="outline" expand="block" @click="showAddSubItemResourceSelector = true">
+              <ion-icon :icon="addOutline" slot="start" />
+              Lier une ressource
+            </ion-button>
+          </div>
+          <ResourceSelector
+            v-model="addSubItemForm.resourceId"
+            :modal-only="true"
+            :is-open="showAddSubItemResourceSelector"
+            @update:is-open="showAddSubItemResourceSelector = $event"
+          />
 
           <ion-item>
             <ion-label position="stacked">Notes (optionnel)</ion-label>
@@ -683,10 +771,44 @@
             <ion-input v-model="editSubItemForm.title"></ion-input>
           </ion-item>
 
-          <ion-item>
-            <ion-label position="stacked">Lier à une ressource (optionnel)</ion-label>
-            <ResourceSelector v-model="editSubItemForm.resourceId" resource-type="song" />
-          </ion-item>
+          <!-- Resource Section -->
+          <div class="resource-link-section">
+            <div v-if="editSubItemForm.resourceId && getFormLinkedResource(editSubItemForm.resourceId)" class="linked-resource-card">
+              <div class="linked-resource-info">
+                <span class="linked-resource-title">{{ getFormLinkedResource(editSubItemForm.resourceId)?.title }}</span>
+                <div class="linked-resource-meta">
+                  <span v-if="getFormResourceCollection(editSubItemForm.resourceId)" class="linked-resource-collection">{{ getFormResourceCollection(editSubItemForm.resourceId) }}</span>
+                  <span
+                    v-for="content in getFormLinkedResource(editSubItemForm.resourceId)?.contents"
+                    :key="content.type"
+                    class="linked-resource-media-chip"
+                  >
+                    <ion-icon :icon="getMediaTypeIcon(content.type)" />
+                    {{ formatMediaType(content.type) }}
+                  </span>
+                </div>
+                <div v-if="getResourceMusicProps(editSubItemForm.resourceId)" class="linked-resource-music">
+                  <span v-for="prop in getResourceMusicProps(editSubItemForm.resourceId)" :key="prop" class="music-prop small">{{ prop }}</span>
+                </div>
+              </div>
+              <div class="linked-resource-actions">
+                <ion-button fill="outline" size="small" @click="showEditSubItemResourceSelector = true">Changer</ion-button>
+                <ion-button fill="clear" size="small" color="danger" @click="editSubItemForm.resourceId = null">
+                  <ion-icon :icon="closeOutline" slot="icon-only" />
+                </ion-button>
+              </div>
+            </div>
+            <ion-button v-else fill="outline" expand="block" @click="showEditSubItemResourceSelector = true">
+              <ion-icon :icon="addOutline" slot="start" />
+              Lier une ressource
+            </ion-button>
+          </div>
+          <ResourceSelector
+            v-model="editSubItemForm.resourceId"
+            :modal-only="true"
+            :is-open="showEditSubItemResourceSelector"
+            @update:is-open="showEditSubItemResourceSelector = $event"
+          />
 
           <ion-item>
             <ion-label position="stacked">Notes (optionnel)</ion-label>
@@ -1437,7 +1559,8 @@ import {
   IonButton, IonIcon, IonCard, IonCardContent, IonLoading, IonModal, IonAvatar,
   IonItem, IonLabel, IonInput, IonTextarea, IonSelect, IonSelectOption,
   IonSpinner, IonReorderGroup, IonReorder, toastController, alertController,
-  IonList, IonCheckbox, IonChip, IonSearchbar
+  IonList, IonCheckbox, IonChip, IonSearchbar,
+  IonAccordion, IonAccordionGroup
 } from '@ionic/vue';
 import {
   calendarOutline, createOutline, listOutline, timeOutline,
@@ -1450,7 +1573,8 @@ import {
   arrowBackOutline, logoYoutube, playBackOutline, playForwardOutline,
   removeOutline, bookOutline, copyOutline,
   lockClosedOutline, peopleOutline, checkmarkCircleOutline,
-  sparklesOutline, easelOutline, searchOutline, downloadOutline
+  sparklesOutline, easelOutline, searchOutline, downloadOutline,
+  closeCircleOutline
 } from 'ionicons/icons';
 import ResourceSelector from '@/components/ResourceSelector.vue';
 import ResourceQuickAdd from '@/components/ResourceQuickAdd.vue';
@@ -1660,6 +1784,11 @@ const allMembers = ref<Member[]>([]);
 const loadingMembers = ref(false);
 const draftViewerSearchQuery = ref('');
 
+// Item/Sub-Item Form Resource Selector State
+const showItemResourceSelector = ref(false);
+const showAddSubItemResourceSelector = ref(false);
+const showEditSubItemResourceSelector = ref(false);
+
 // Inline Resource Selector State
 const showInlineResourceSelector = ref(false);
 const showFullResourceSelector = ref(false);
@@ -1829,6 +1958,54 @@ const formatMediaType = (type: string): string => {
 
 const getLinkedResource = (resourceId: string): Resource | undefined => {
   return linkedResources.value.get(resourceId);
+};
+
+const getFormLinkedResource = (resourceId: string): Resource | undefined => {
+  return linkedResources.value.get(resourceId);
+};
+
+const getFormResourceCollection = (resourceId: string): string | null => {
+  const resource = linkedResources.value.get(resourceId);
+  if (!resource?.collectionId) return null;
+  const collection = resourceCollections.value.get(resource.collectionId);
+  if (!collection) {
+    // Trigger async load (will reactively update when loaded)
+    loadCollectionForResource(resource);
+    return null;
+  }
+  return collection.name || null;
+};
+
+const loadCollectionForResource = async (resource: Resource) => {
+  if (!resource.collectionId || resourceCollections.value.has(resource.collectionId)) return;
+  try {
+    const collection = await getResourceCollectionById(resource.collectionId);
+    if (collection) {
+      resourceCollections.value.set(resource.collectionId, collection);
+    }
+  } catch (error) {
+    console.error('Error loading collection:', error);
+  }
+};
+
+const openItemResourceSelector = () => {
+  showItemResourceSelector.value = true;
+};
+
+const quickUnlinkResource = async (itemId: string) => {
+  if (!program.value || !user.value) return;
+  try {
+    await updateItemInProgram(
+      program.value.id,
+      itemId,
+      { resourceId: deleteField() as unknown as string },
+      user.value.uid
+    );
+    await showToast('Ressource déliée', 'success');
+  } catch (error) {
+    console.error('Error unlinking resource:', error);
+    await showToast('Erreur lors de la suppression du lien', 'danger');
+  }
 };
 
 const hasSubItems = (item: ProgramItem): boolean => {
@@ -2207,6 +2384,9 @@ const selectTitleSuggestion = (resource: Resource) => {
   itemForm.value.title = resource.title;
   itemForm.value.resourceId = resource.id;
   showTitleSuggestions.value = false;
+  // Add to linkedResources so the inline resource card shows immediately
+  linkedResources.value.set(resource.id, resource);
+  subscribeToLinkedResource(resource.id);
 };
 
 const handleTitleInput = () => {
@@ -3736,23 +3916,54 @@ const getSlideTypeLabel = (type: ProgramItemType): string => {
 
 // Watch for resource selection to auto-populate title
 watch(() => itemForm.value.resourceId, async (newResourceId) => {
-  if (newResourceId && !itemForm.value.title) {
-    const resource = getLinkedResource(newResourceId);
-    if (resource) {
+  if (!newResourceId) return;
+  const resource = getLinkedResource(newResourceId);
+  if (resource) {
+    if (!itemForm.value.title) {
       itemForm.value.title = resource.title;
-    } else {
-      // If resource not yet loaded, load it
-      try {
-        const resource = await getResourceById(newResourceId);
-        if (resource && !itemForm.value.title) {
-          itemForm.value.title = resource.title;
-          linkedResources.value.set(newResourceId, resource);
+    }
+  } else {
+    // If resource not yet loaded, load it
+    try {
+      const loaded = await getResourceById(newResourceId);
+      if (loaded) {
+        linkedResources.value.set(newResourceId, loaded);
+        if (!itemForm.value.title) {
+          itemForm.value.title = loaded.title;
         }
-      } catch (error) {
-        console.error('Error loading resource:', error);
       }
+    } catch (error) {
+      console.error('Error loading resource:', error);
     }
   }
+  subscribeToLinkedResource(newResourceId);
+});
+
+// Ensure sub-item linked resources are loaded for inline card display
+watch(() => addSubItemForm.value.resourceId, async (newResourceId) => {
+  if (!newResourceId) return;
+  if (!getLinkedResource(newResourceId)) {
+    try {
+      const loaded = await getResourceById(newResourceId);
+      if (loaded) linkedResources.value.set(newResourceId, loaded);
+    } catch (error) {
+      console.error('Error loading resource:', error);
+    }
+  }
+  subscribeToLinkedResource(newResourceId);
+});
+
+watch(() => editSubItemForm.value.resourceId, async (newResourceId) => {
+  if (!newResourceId) return;
+  if (!getLinkedResource(newResourceId)) {
+    try {
+      const loaded = await getResourceById(newResourceId);
+      if (loaded) linkedResources.value.set(newResourceId, loaded);
+    } catch (error) {
+      console.error('Error loading resource:', error);
+    }
+  }
+  subscribeToLinkedResource(newResourceId);
 });
 
 // Load music options
@@ -4431,6 +4642,96 @@ ion-reorder.item-handle-column:active {
 
 .music-props-form ion-item {
   margin-bottom: 0.5rem;
+}
+
+/* Resource Link Section (Modals) */
+.resource-link-section {
+  padding: 0.75rem 1rem;
+}
+
+.linked-resource-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: var(--ion-color-light);
+  border-radius: 8px;
+  border: 1px solid var(--ion-color-light-shade);
+}
+
+.linked-resource-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.linked-resource-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.linked-resource-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+  margin-bottom: 0.25rem;
+}
+
+.linked-resource-collection {
+  font-size: 0.75rem;
+  background: var(--ion-color-primary-tint);
+  color: var(--ion-color-primary-shade);
+  padding: 0.1rem 0.5rem;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.linked-resource-media-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.75rem;
+  color: var(--ion-color-medium);
+}
+
+.linked-resource-media-chip ion-icon {
+  font-size: 0.85rem;
+}
+
+.linked-resource-music {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+.linked-resource-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+/* Advanced Options Accordion */
+.advanced-options-accordion {
+  margin-top: 0.5rem;
+}
+
+.advanced-options-content {
+  padding: 0;
+}
+
+/* Quick Unlink Button */
+.media-chip-button.unlink-btn {
+  color: var(--ion-color-danger);
+  opacity: 0.7;
+}
+
+.media-chip-button.unlink-btn:hover {
+  opacity: 1;
+  background: rgba(var(--ion-color-danger-rgb), 0.1);
 }
 
 .sub-item-resources {
@@ -5220,6 +5521,7 @@ ion-reorder.item-handle-column:active {
 /* Title Autocomplete */
 .title-autocomplete-wrapper {
   position: relative;
+  z-index: 10;
 }
 
 .title-suggestions-dropdown {
@@ -6059,14 +6361,14 @@ ion-reorder.item-handle-column:active {
   border-left: 4px solid var(--ion-color-primary);
 }
 
-.scripture-reference {
+.slide-scripture .scripture-reference {
   font-size: 1.5rem;
   font-weight: 700;
   color: var(--ion-color-primary);
   margin-bottom: 1rem;
 }
 
-.scripture-text {
+.slide-scripture .scripture-text {
   font-size: 1.5rem;
   color: white;
   font-style: italic;

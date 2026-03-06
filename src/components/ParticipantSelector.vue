@@ -377,6 +377,13 @@ watch(activeTab, (newTab) => {
   flex-shrink: 0;
 }
 
+.participant-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
 .participant-avatar .initials {
   display: flex;
   align-items: center;
@@ -449,6 +456,13 @@ watch(activeTab, (newTab) => {
 .member-avatar {
   width: 40px;
   height: 40px;
+}
+
+.member-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .member-avatar .initials {

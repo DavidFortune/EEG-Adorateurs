@@ -89,6 +89,10 @@
               <ion-icon :icon="linkOutline" slot="start" />
               Lien URL
             </ion-button>
+            <ion-button fill="outline" size="small" @click="addMediaFromYouTube">
+              <ion-icon :icon="logoYoutube" slot="start" />
+              YouTube
+            </ion-button>
             <ion-button fill="outline" size="small" @click="addMediaFromFile">
               <ion-icon :icon="cloudUploadOutline" slot="start" />
               Téléverser
@@ -488,24 +492,11 @@
               <ion-icon :icon="closeOutline" />
             </ion-button>
           </ion-buttons>
-          <ion-title>Ajouter un média</ion-title>
+          <ion-title>Ajouter un lien URL</ion-title>
         </ion-toolbar>
       </ion-header>
       <ion-content class="ion-padding">
-        <!-- Mode Selector -->
-        <ion-segment :value="addMediaMode" @ionChange="(e: CustomEvent) => addMediaMode = e.detail.value">
-          <ion-segment-button value="url">
-            <ion-icon :icon="linkOutline" />
-            <ion-label>Lien URL</ion-label>
-          </ion-segment-button>
-          <ion-segment-button value="youtube">
-            <ion-icon :icon="logoYoutube" />
-            <ion-label>YouTube</ion-label>
-          </ion-segment-button>
-        </ion-segment>
-
-        <!-- URL Mode -->
-        <div v-if="addMediaMode === 'url'" class="add-media-form">
+        <div class="add-media-form">
           <ion-item>
             <ion-label position="stacked">URL</ion-label>
             <ion-input
@@ -528,125 +519,24 @@
           </ion-button>
         </div>
 
-        <!-- YouTube Mode -->
-        <div v-if="addMediaMode === 'youtube'" class="youtube-search-form">
-          <ion-item>
-            <ion-label position="stacked">Rechercher sur YouTube</ion-label>
-            <ion-input
-              v-model="youtubeSearchQuery"
-              type="text"
-              placeholder="Ex: Amazing Grace worship"
-              @keyup.enter="searchYouTube"
-            ></ion-input>
-            <ion-button slot="end" @click="searchYouTube" :disabled="!youtubeSearchQuery.trim() || youtubeSearchLoading" fill="clear">
-              <ion-icon :icon="searchOutline" v-if="!youtubeSearchLoading" />
-              <ion-spinner v-if="youtubeSearchLoading" name="crescent" />
-            </ion-button>
-          </ion-item>
-
-          <!-- YouTube Results -->
-          <div v-if="youtubeSearchResults.length > 0" class="youtube-results">
-            <div
-              v-for="result in youtubeSearchResults"
-              :key="result.id"
-              class="youtube-result-item"
-              :class="{ selected: selectedYouTubeResult?.id === result.id }"
-              @click="selectYouTubeResult(result)"
-            >
-              <div class="result-thumbnail">
-                <img :src="result.thumbnail" :alt="result.title" />
-                <div class="play-overlay">
-                  <ion-icon :icon="playCircleOutline" />
-                </div>
-              </div>
-              <div class="result-info">
-                <span class="result-title">{{ result.title }}</span>
-                <span class="result-channel">{{ result.channel }}</span>
-              </div>
-              <div class="result-actions">
-                <ion-button
-                  @click.stop="previewYouTubeResult(result)"
-                  fill="clear"
-                  size="small"
-                  color="danger"
-                >
-                  <ion-icon :icon="playCircleOutline" slot="icon-only" />
-                </ion-button>
-                <ion-icon
-                  v-if="selectedYouTubeResult?.id === result.id"
-                  :icon="checkmarkCircle"
-                  color="primary"
-                  class="selection-icon"
-                />
-              </div>
-            </div>
-          </div>
-
-          <!-- No Results -->
-          <div v-if="youtubeSearchPerformed && youtubeSearchResults.length === 0 && !youtubeSearchLoading" class="no-results">
-            <ion-icon :icon="searchOutline" />
-            <p>Aucun résultat trouvé</p>
-          </div>
-
-          <!-- Selected Video Actions -->
-          <div v-if="selectedYouTubeResult" class="youtube-selected-section">
-            <ion-item>
-              <ion-label position="stacked">Nom (optionnel)</ion-label>
-              <ion-input
-                v-model="mediaNameInput"
-                type="text"
-                :placeholder="selectedYouTubeResult.title"
-              ></ion-input>
-            </ion-item>
-            <ion-button expand="block" @click="addSelectedYouTubeVideo" color="primary" class="ion-margin-top">
-              <ion-icon :icon="checkmarkCircle" slot="start" />
-              Ajouter cette vidéo
-            </ion-button>
-          </div>
-        </div>
       </ion-content>
     </ion-modal>
 
-    <!-- YouTube Preview Modal -->
-    <ion-modal :is-open="showYouTubePreviewModal" @will-dismiss="closeYouTubePreview">
+    <!-- Add YouTube Modal (dedicated) -->
+    <ion-modal :is-open="showAddYouTubeModal" @didDismiss="closeAddYouTubeModal">
       <ion-header>
         <ion-toolbar>
-          <ion-title>Aperçu vidéo</ion-title>
-          <ion-buttons slot="end">
-            <ion-button @click="closeYouTubePreview">
+          <ion-buttons slot="start">
+            <ion-button @click="closeAddYouTubeModal">
               <ion-icon :icon="closeOutline" />
             </ion-button>
           </ion-buttons>
+          <ion-title>Ajouter une vidéo YouTube</ion-title>
         </ion-toolbar>
       </ion-header>
-      <ion-content>
-        <div class="youtube-preview-container" v-if="previewingYouTubeVideo">
-          <iframe
-            :src="`https://www.youtube.com/embed/${previewingYouTubeVideo.id}`"
-            frameborder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowfullscreen
-            class="youtube-preview-iframe"
-          ></iframe>
-          <div class="youtube-preview-info">
-            <h3>{{ previewingYouTubeVideo.title }}</h3>
-            <p class="channel-name">{{ previewingYouTubeVideo.channel }}</p>
-          </div>
-        </div>
+      <ion-content class="ion-padding">
+        <NaturalResourceSelector :select-only="true" @video-selected="handleYouTubeVideoSelected" />
       </ion-content>
-      <ion-footer>
-        <ion-toolbar>
-          <div class="youtube-preview-actions">
-            <ion-button @click="closeYouTubePreview" fill="outline" color="medium">
-              Fermer
-            </ion-button>
-            <ion-button @click="selectAndClosePreview">
-              <ion-icon :icon="checkmarkCircle" slot="start" />
-              Sélectionner
-            </ion-button>
-          </div>
-        </ion-toolbar>
-      </ion-footer>
     </ion-modal>
 
     <!-- Upload File Modal -->
@@ -800,23 +690,21 @@ import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonBackButton,
   IonButton, IonIcon, IonChip, IonLabel, IonLoading, IonModal, IonInput, IonSpinner,
   IonCard, IonCardHeader, IonCardSubtitle, IonCardContent, IonItem,
-  IonSegment, IonSegmentButton,
   alertController, toastController
 } from '@ionic/vue';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { app } from '@/firebase/config';
 import PdfViewer from '@/components/PdfViewer.vue';
 import AudioRecorderModal from '@/components/AudioRecorderModal.vue';
 import AudioPlayerModal from '@/components/AudioPlayerModal.vue';
 import VideoRecorderModal from '@/components/VideoRecorderModal.vue';
 import VideoPlayerModal from '@/components/VideoPlayerModal.vue';
+import NaturalResourceSelector from '@/components/NaturalResourceSelector.vue';
 import {
   pencilOutline, folderOutline, calendarOutline, eyeOutline,
   downloadOutline, trashOutline, alertCircleOutline,
   musicalNotesOutline, linkOutline, cloudUploadOutline, micOutline, videocamOutline,
   playCircleOutline, filmOutline, closeOutline, documentTextOutline, documentOutline,
-  globeOutline, openOutline, searchOutline, logoYoutube, checkmarkCircle, addOutline
+  globeOutline, openOutline, logoYoutube, addOutline
 } from 'ionicons/icons';
 import { formatFileSize, isYouTubeUrl, getYouTubeEmbedUrl, isPdfFile, getSpotifyEmbedUrl, detectMediaTypeFromUrl, getSuggestedNameFromUrl, getContentLabel } from '@/utils/resource-utils';
 import { Resource, ResourceCollection, ResourceType, ResourceMedia, ResourceOption } from '@/types/resource';
@@ -858,27 +746,12 @@ const currentYouTubeTitle = ref('');
 
 // Add media URL modal state
 const showAddMediaModal = ref(false);
-const addMediaMode = ref<'url' | 'youtube'>('url');
 const mediaUrlInput = ref('');
 const mediaNameInput = ref('');
 
-// YouTube search state
-interface YouTubeSearchResult {
-  id: string;
-  title: string;
-  channel: string;
-  thumbnail: string;
-  videoUrl: string;
-}
-const youtubeSearchQuery = ref('');
-const youtubeSearchResults = ref<YouTubeSearchResult[]>([]);
-const youtubeSearchLoading = ref(false);
-const youtubeSearchPerformed = ref(false);
-const selectedYouTubeResult = ref<YouTubeSearchResult | null>(null);
+// Add YouTube modal state (dedicated)
+const showAddYouTubeModal = ref(false);
 
-// YouTube preview state
-const showYouTubePreviewModal = ref(false);
-const previewingYouTubeVideo = ref<YouTubeSearchResult | null>(null);
 
 // File upload modal state
 const showUploadModal = ref(false);
@@ -1064,15 +937,25 @@ const getMusicOptionName = (optionId: string | undefined, options: ResourceOptio
 
 // Add media from URL - opens modal
 const addMediaFromUrl = () => {
-  // Reset modal state
-  addMediaMode.value = 'url';
   mediaUrlInput.value = '';
   mediaNameInput.value = '';
-  youtubeSearchQuery.value = '';
-  youtubeSearchResults.value = [];
-  youtubeSearchPerformed.value = false;
-  selectedYouTubeResult.value = null;
   showAddMediaModal.value = true;
+};
+
+// Add media from YouTube - opens dedicated YouTube modal
+const addMediaFromYouTube = () => {
+  showAddYouTubeModal.value = true;
+};
+
+// Close YouTube modal
+const closeAddYouTubeModal = () => {
+  showAddYouTubeModal.value = false;
+};
+
+// Handle video selected from NaturalResourceSelector
+const handleYouTubeVideoSelected = async (video: { videoId: string; title: string; thumbnail: string; channel: string; videoUrl: string; lyrics: string | null }) => {
+  await saveMediaFromUrl(video.videoUrl, ResourceType.YOUTUBE, video.title);
+  closeAddYouTubeModal();
 };
 
 // Close add media modal
@@ -1118,70 +1001,6 @@ const handleUrlSubmit = async () => {
   closeAddMediaModal();
 };
 
-// YouTube search function
-const searchYouTube = async () => {
-  if (!youtubeSearchQuery.value.trim()) return;
-
-  youtubeSearchLoading.value = true;
-  youtubeSearchPerformed.value = true;
-
-  try {
-    const functions = getFunctions(app);
-    const searchYouTubeFn = httpsCallable(functions, 'searchYouTube');
-    const result = await searchYouTubeFn({ query: youtubeSearchQuery.value });
-    const data = result.data as { results: YouTubeSearchResult[] };
-    youtubeSearchResults.value = data.results || [];
-  } catch (error) {
-    console.error('Error searching YouTube:', error);
-    const toast = await toastController.create({
-      message: 'Erreur lors de la recherche YouTube',
-      duration: 3000,
-      color: 'danger'
-    });
-    await toast.present();
-    youtubeSearchResults.value = [];
-  } finally {
-    youtubeSearchLoading.value = false;
-  }
-};
-
-// Select YouTube result
-const selectYouTubeResult = (result: YouTubeSearchResult) => {
-  if (selectedYouTubeResult.value?.id === result.id) {
-    selectedYouTubeResult.value = null;
-  } else {
-    selectedYouTubeResult.value = result;
-  }
-};
-
-// Preview YouTube video
-const previewYouTubeResult = (result: YouTubeSearchResult) => {
-  previewingYouTubeVideo.value = result;
-  showYouTubePreviewModal.value = true;
-};
-
-const closeYouTubePreview = () => {
-  showYouTubePreviewModal.value = false;
-  previewingYouTubeVideo.value = null;
-};
-
-const selectAndClosePreview = () => {
-  if (previewingYouTubeVideo.value) {
-    selectedYouTubeResult.value = previewingYouTubeVideo.value;
-    closeYouTubePreview();
-  }
-};
-
-// Add selected YouTube video
-const addSelectedYouTubeVideo = async () => {
-  if (!selectedYouTubeResult.value) return;
-
-  const video = selectedYouTubeResult.value;
-  const name = mediaNameInput.value.trim() || video.title;
-
-  await saveMediaFromUrl(video.videoUrl, ResourceType.YOUTUBE, name);
-  closeAddMediaModal();
-};
 
 // Save media from URL to resource
 const saveMediaFromUrl = async (url: string, type: ResourceType, name: string) => {
