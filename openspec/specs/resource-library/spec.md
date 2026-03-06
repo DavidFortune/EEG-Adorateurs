@@ -275,29 +275,63 @@ The system MUST provide a built-in PDF viewer for displaying score (partition) r
 ---
 
 ### Requirement: Quick selection SHALL provide a bottom sheet with tabbed navigation
-The system MUST offer a quick selection interface presented as a bottom sheet overlay. The bottom sheet SHALL contain the following tabs: recent (recents), existing (existants), YouTube, URL, and quick create (creation rapide). Each tab MUST provide a focused workflow for adding or linking resources efficiently.
+The ResourceSelector component MUST present a single-view modal for resource selection. The default view (browse mode) SHALL display a search bar, a collection dropdown filter, and the full resource list. A "Créer une ressource" button SHALL be displayed below the resource list to allow inline creation. No segment tabs SHALL be used to switch between selection and creation views.
 
-#### Scenario: User opens the quick selection bottom sheet
-- **WHEN** a user triggers the quick selection action (e.g., adding a resource to a program element)
-- **THEN** a bottom sheet SHALL appear with tabs for recent, existing, YouTube, URL, and quick create
+#### Scenario: User opens the resource selector modal
+- **WHEN** the user opens the ResourceSelector modal
+- **THEN** the modal SHALL display the browse view directly with a search bar, a collection dropdown, and the list of existing resources
+- **AND** no segment tabs (Existantes, YouTube, Créer) SHALL be shown
 
-#### Scenario: User selects a resource from the recent tab
-- **WHEN** a user opens the quick selection bottom sheet and navigates to the recent tab
-- **THEN** the system SHALL display the most recently used resources
-- **AND** the user SHALL be able to select one to attach it immediately
+#### Scenario: User filters resources by collection using dropdown
+- **WHEN** the user taps the collection dropdown in the browse view
+- **THEN** an `ion-select` dropdown SHALL display all available collections by full name
+- **AND** a "Toutes les collections" option SHALL be listed as the default selection
+- **AND** selecting a collection SHALL filter the resource list to show only resources from that collection
 
-#### Scenario: User searches existing resources from the bottom sheet
-- **WHEN** a user opens the quick selection bottom sheet and navigates to the existing tab
-- **THEN** the system SHALL allow the user to search through all available resources in the library
+#### Scenario: User searches for a resource
+- **WHEN** the user types in the search bar in the browse view
+- **THEN** the resource list SHALL filter to show only resources matching the search query
+- **AND** results SHALL update as the user types
 
-#### Scenario: User adds a YouTube video via the quick selection bottom sheet
-- **WHEN** a user opens the quick selection bottom sheet and navigates to the YouTube tab
-- **THEN** the system SHALL present the YouTube search interface for finding and linking videos
+#### Scenario: User selects an existing resource
+- **WHEN** the user taps a resource in the browse view
+- **THEN** the resource SHALL be marked as selected
+- **AND** the user SHALL be able to confirm the selection
 
-#### Scenario: User adds a URL via the quick selection bottom sheet
-- **WHEN** a user opens the quick selection bottom sheet and navigates to the URL tab
-- **THEN** the system SHALL allow the user to paste a URL to create a URL-type resource
+#### Scenario: User initiates inline resource creation
+- **WHEN** the user taps the "Créer une ressource" button in the browse view
+- **THEN** the modal content SHALL swap to the creation form view
+- **AND** a back arrow SHALL be displayed in the header to return to the browse view
 
-#### Scenario: User quick-creates a resource from the bottom sheet
-- **WHEN** a user opens the quick selection bottom sheet and navigates to the quick create tab
-- **THEN** the system SHALL present a minimal form to create a new resource inline without leaving the current context
+---
+
+### Requirement: Inline resource creation SHALL provide the same fields as the Resources section
+When the user switches to the creation view within the ResourceSelector modal, the form SHALL include: title, collection selector (ion-select dropdown), reference, music properties (key, beat, tempo, style) in a collapsible section, and a content section with action buttons for adding lyrics, YouTube video, audio, or URL. After saving, the new resource SHALL be auto-selected and the view SHALL swap back to the browse list.
+
+#### Scenario: User creates a resource inline with title and collection
+- **WHEN** the user fills in the title and selects a collection in the inline creation form
+- **THEN** the user SHALL be able to save the resource
+- **AND** the newly created resource SHALL be automatically selected in the browse view
+- **AND** the modal SHALL swap back to the browse view showing the selection
+
+#### Scenario: User adds music properties during inline creation
+- **WHEN** the user expands the music properties section in the inline creation form
+- **THEN** the form SHALL display fields for key, beat, tempo, and style
+- **AND** these fields SHALL use `ion-select` dropdowns matching the ResourceFormPage behavior
+
+#### Scenario: User adds content during inline creation
+- **WHEN** the user taps "Ajouter du contenu" in the inline creation form
+- **THEN** the form SHALL present content type options (lyrics, YouTube, audio, URL)
+- **AND** selecting YouTube SHALL display the NaturalResourceSelector in select-only mode
+- **AND** the content SHALL be included in the resource when saved
+
+#### Scenario: User cancels inline creation
+- **WHEN** the user taps the back arrow during inline creation
+- **THEN** the modal SHALL swap back to the browse view
+- **AND** any unsaved form data SHALL be discarded
+
+#### Scenario: Inline creation auto-selects and stays in modal
+- **WHEN** the user saves a new resource via the inline creation form
+- **THEN** the system SHALL NOT navigate to the resource detail page
+- **AND** the new resource SHALL appear in the browse list and be auto-selected
+- **AND** the user SHALL remain in the ResourceSelector modal to confirm the selection

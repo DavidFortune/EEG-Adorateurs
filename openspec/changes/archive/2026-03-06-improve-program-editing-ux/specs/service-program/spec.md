@@ -1,3 +1,5 @@
+## MODIFIED Requirements
+
 ### Requirement: Program items SHALL support multiple types with configurable details
 The service program SHALL allow creating items of the following types: chant (song), prière (prayer), lecture biblique (bible reading), prédication (sermon), titre de section (section title), annonce (announcement), offrande (offering), bénédiction (blessing), and additional custom types. Each program item MUST support the following configurable details: assigned participant, duration, lyrics/notes content, sub-items, linked resources, and bible reference. The system SHALL persist all item details in Firestore and synchronize them in real time across connected clients.
 
@@ -15,11 +17,11 @@ The title field autocomplete MUST use debounced input (300ms) instead of a setTi
 
 The form MUST hide the resource link section when the selected type is Titre, as section titles do not have linked resources.
 
-Admins SHALL NOT need to toggle an edit mode to access editing capabilities. All editing interactions (action menus, inline edits, add buttons, quick-unlink) SHALL be always available to admins. Non-admin users SHALL see the read-only view.
+Admins SHALL NOT need to toggle an edit mode to access editing capabilities. All editing interactions (swipe actions, inline edits, add buttons, quick-unlink) SHALL be always available to admins. Non-admin users SHALL see the read-only view.
 
-Program item actions (edit, delete, add sub-item) SHALL be accessed via a 3-dot menu button (`ellipsisVertical` icon) placed in the `slot="end"` of the `ion-item`, consistently right-aligned across all items. Tapping the button SHALL open a popover menu presenting labeled actions with colored icons and text. The 3-dot button SHALL only be visible to admins. The 3-dot button SHALL be hidden during reorder mode. The "Ajouter un sous-élément" action SHALL be available for all program item types.
+Program item actions (edit, delete, add sub-item) SHALL be accessed by swiping left on the item card, revealing action buttons on the end side. The fixed action column SHALL be removed. Swipe actions SHALL be disabled during reorder mode.
 
-A dedicated reorder mode SHALL be toggled via a "Réorganiser" button placed alongside the "Ajouter un élément" and "Section" buttons in the add-item row. When reorder mode is active, the add/section/reorder buttons SHALL be replaced by a "Terminer" button. Drag handles SHALL appear on all items and swipe actions SHALL be disabled.
+A dedicated reorder mode SHALL be toggled via a "Réorganiser" toolbar button. When active, drag handles SHALL appear and swipe actions SHALL be disabled. A checkmark button SHALL allow exiting reorder mode.
 
 Admins SHALL be able to edit an item's title inline by tapping the title text on the item card. The title text SHALL be replaced by an input field, and saving SHALL occur on blur or Enter. Escape SHALL cancel the edit.
 
@@ -99,24 +101,19 @@ Section items SHALL be created via a dedicated "Ajouter une section" button alon
 
 #### Scenario: Editing capabilities always available for admins
 - **WHEN** an admin views the program page
-- **THEN** all editing interactions (action menus, inline edits, add buttons) SHALL be available without toggling an edit mode
+- **THEN** all editing interactions (swipe actions, inline edits, add buttons) SHALL be available without toggling an edit mode
 - **AND** there SHALL be no edit mode toggle button
 
-#### Scenario: Program item actions via 3-dot menu
-- **WHEN** an admin taps the 3-dot menu button on a program item
-- **THEN** a popover menu SHALL appear with labeled actions (colored icon + text): "Modifier", "Ajouter un sous-élément", and "Supprimer"
-- **AND** the "Ajouter un sous-élément" action SHALL be available for all item types
-- **AND** for section items, "Modifier" SHALL activate inline title editing
+#### Scenario: Program item actions via swipe
+- **WHEN** an admin swipes left on a program item card
+- **THEN** action buttons (edit, delete, add sub-item) SHALL be revealed on the end side
+- **AND** the fixed action column SHALL NOT be displayed
 
-#### Scenario: 3-dot menu hidden during reorder mode
-- **WHEN** reorder mode is active
-- **THEN** the 3-dot menu buttons SHALL be hidden on all items and sub-items
-
-#### Scenario: Reorder mode toggled from add-item row
-- **WHEN** an admin taps the "Réorganiser" button in the add-item row
-- **THEN** reorder mode SHALL activate with drag handles visible
-- **AND** the add/section/reorder buttons SHALL be replaced by a "Terminer" button
-- **AND** the toolbar SHALL NOT contain a reorder toggle
+#### Scenario: Reorder mode shows drag handles
+- **WHEN** an admin taps the "Réorganiser" toolbar button
+- **THEN** drag handles SHALL appear on all items
+- **AND** swipe actions SHALL be disabled
+- **AND** a checkmark button SHALL allow exiting reorder mode
 
 #### Scenario: Inline title editing
 - **WHEN** an admin taps the title of a program item
@@ -135,8 +132,8 @@ Section items SHALL be created via a dedicated "Ajouter une section" button alon
 - **THEN** a popover SHALL appear with the ParticipantSelector
 - **AND** changes SHALL save on popover dismiss
 
-#### Scenario: Section edit via action menu activates inline editing
-- **WHEN** an admin taps the 3-dot menu on a section item and selects "Modifier"
+#### Scenario: Section edit via swipe activates inline editing
+- **WHEN** an admin swipes left on a section item and taps "Edit"
 - **THEN** inline title editing SHALL activate on the section
 - **AND** the form modal SHALL NOT open
 
@@ -151,7 +148,7 @@ When a sub-item type is set, the sub-item display in the program view SHALL show
 
 All new sub-item fields (type, subtitle, participants, duration) SHALL be optional to maintain backward compatibility with existing sub-items.
 
-Sub-item actions (edit, delete) SHALL be accessed via a 3-dot menu button at the end of the sub-item row. Tapping the button SHALL open a popover menu with labeled actions (colored icon + text): "Modifier" and "Supprimer". The 3-dot button SHALL be hidden during reorder mode.
+Sub-item actions (edit, delete) SHALL be accessed by swiping left on the sub-item row, replacing the fixed action buttons. Swipe actions SHALL be disabled during reorder mode.
 
 #### Scenario: Creating a song medley with sub-items
 - **WHEN** an admin creates a program item of type "chant" titled "Medley de louange" and adds three sub-items, each with individual song lyrics and durations
@@ -185,104 +182,7 @@ Sub-item actions (edit, delete) SHALL be accessed via a 3-dot menu button at the
 - **WHEN** a sub-item was created before the enhancement and lacks type, subtitle, participants, or duration
 - **THEN** the sub-item SHALL display without errors, showing only the fields that are set
 
-#### Scenario: Sub-item actions via 3-dot menu
-- **WHEN** an admin taps the 3-dot menu button on a sub-item
-- **THEN** a popover menu SHALL appear with labeled actions: "Modifier" (edit) and "Supprimer" (delete)
-- **AND** the 3-dot button SHALL be hidden during reorder mode
-
----
-
-### Requirement: Draft mode SHALL allow private preparation with authorized viewers and a publish workflow
-The service program MUST support a draft mode that keeps the program private and invisible to general members until explicitly published. While in draft mode, administrators SHALL be able to add authorized viewers who can preview the program before publication. Publishing the program SHALL make it visible to all members with appropriate permissions. Only administrators SHALL be able to manage draft programs.
-
-#### Scenario: Creating a program in draft mode
-- **WHEN** an admin creates a new service program and begins adding items
-- **THEN** the program SHALL be in draft status by default and SHALL NOT be visible to regular members or guests
-
-#### Scenario: Adding authorized viewers to a draft program
-- **WHEN** an admin adds two team leaders as authorized viewers to a draft program
-- **THEN** those two team leaders SHALL be able to view the draft program, while other non-admin members SHALL still not see it
-
-#### Scenario: Publishing a draft program
-- **WHEN** an admin clicks the publish action on a draft program
-- **THEN** the program status SHALL change from draft to published, and it SHALL become visible to all members and guests with view permissions
-
-#### Scenario: Unauthorized member cannot see draft program
-- **WHEN** a regular member navigates to the service detail page for a service whose program is in draft status and the member is not an authorized viewer
-- **THEN** the program content SHALL NOT be displayed and the member SHALL see an indication that the program is not yet available
-
----
-
-### Requirement: Worship leader assignment SHALL display the conductor in the program header
-The service program MUST allow assigning a worship leader (chef de culte / conducteur) to the program. The assigned conductor's name and avatar SHALL be prominently displayed in the program header. If the conductor has an uploaded avatar, it SHALL render as a circular image; if not, initials fallback SHALL be used.
-
-#### Scenario: Assigning a worship leader to the program
-- **WHEN** an admin selects a member as the worship leader for a service program
-- **THEN** the selected member's name and avatar SHALL appear in the program header area
-
-#### Scenario: Worship leader with uploaded avatar
-- **WHEN** the assigned worship leader has an uploaded avatar photo
-- **THEN** the avatar SHALL render as a circular cover-fit image in the program header
-
-#### Scenario: Worship leader without avatar
-- **WHEN** the assigned worship leader does not have an uploaded avatar photo
-- **THEN** the program header SHALL display the conductor's colored initials fallback in place of the avatar
-
----
-
-### Requirement: Total program duration SHALL be calculated automatically
-The system SHALL automatically compute and display the total duration of the service program by summing the durations of all program items. When an item contains sub-items with individual durations, the system SHALL use the sub-item durations to compute the parent item's effective duration. The total duration MUST update in real time as items are added, removed, or modified.
-
-#### Scenario: Total duration reflects all items
-- **WHEN** a program contains three items with durations of 5 minutes, 10 minutes, and 15 minutes
-- **THEN** the displayed total program duration SHALL be 30 minutes
-
-#### Scenario: Duration updates when an item is removed
-- **WHEN** an admin removes the 10-minute item from the program described above
-- **THEN** the total program duration SHALL immediately update to 20 minutes
-
-#### Scenario: Duration accounts for sub-item durations
-- **WHEN** a parent item has no explicit duration but contains two sub-items with durations of 4 minutes and 6 minutes
-- **THEN** the parent item's effective duration SHALL be 10 minutes and SHALL be included in the total program duration calculation
-
-#### Scenario: Duration updates when an item's duration is modified
-- **WHEN** an admin changes the duration of a 5-minute item to 8 minutes
-- **THEN** the total program duration SHALL immediately recalculate to reflect the 3-minute increase
-
----
-
-### Requirement: Text export SHALL produce a complete textual representation of the program
-The system SHALL provide a text export function that generates a complete, human-readable textual representation of the entire service program. The export MUST include all item types, titles, assigned participants, durations, lyrics/notes content, bible references, and sub-items. The exported text SHALL be suitable for sharing via messaging applications or printing.
-
-#### Scenario: Exporting a full program as text
-- **WHEN** an admin triggers the text export action on a program containing songs with lyrics, a bible reading with a reference, and a sermon with an assigned preacher
-- **THEN** the system SHALL generate a text document listing all items in order with their details, including participant names, durations, lyrics content, and bible references
-
-#### Scenario: Exported text includes sub-items
-- **WHEN** the program contains a parent item with three sub-items, each having individual lyrics
-- **THEN** the exported text SHALL include the parent item followed by each sub-item's content, clearly indicating the hierarchical structure
-
-#### Scenario: Sharing the exported text
-- **WHEN** the text export is generated
-- **THEN** the user SHALL be able to copy the text to the clipboard or share it via the native share sheet (WhatsApp, SMS, courriel)
-
----
-
-### Requirement: YouTube playlist SHALL be auto-generated from program songs
-The system SHALL automatically generate a YouTube playlist from all song items in the program that have linked YouTube resources. The playlist SHALL present the videos in program order, allowing worship team members to preview or rehearse the music. The playlist MUST update dynamically as song items are added, removed, or reordered in the program.
-
-#### Scenario: Generating a playlist from songs with YouTube links
-- **WHEN** a program contains four song items, three of which have linked YouTube videos
-- **THEN** the system SHALL generate a playlist containing those three YouTube videos in program order
-
-#### Scenario: Song without YouTube link is excluded
-- **WHEN** a program contains a song item that does not have a linked YouTube resource
-- **THEN** that song SHALL be excluded from the generated YouTube playlist without causing an error
-
-#### Scenario: Playlist order reflects program order
-- **WHEN** an admin reorders the song items in the program
-- **THEN** the generated YouTube playlist SHALL update to reflect the new order of songs
-
-#### Scenario: Playlist updates when a song is removed
-- **WHEN** an admin removes a song item that had a linked YouTube video from the program
-- **THEN** the corresponding video SHALL be removed from the generated playlist
+#### Scenario: Sub-item actions via swipe
+- **WHEN** an admin swipes left on a sub-item row
+- **THEN** edit and delete action buttons SHALL be revealed
+- **AND** the fixed action buttons SHALL NOT be displayed

@@ -241,6 +241,24 @@ class UpdateService {
   async getReleaseNotes(): Promise<ReleaseNote[]> {
     return [
       {
+        version: '1.15.0',
+        date: '2026-03-06',
+        title: 'UX programme améliorée et édition en ligne',
+        description: 'Refonte de l\'expérience d\'édition du programme de service : suppression du mode édition, édition en ligne directe pour les admins, et optimisation du sélecteur de ressources',
+        features: [
+          'Édition en ligne du programme — plus besoin d\'activer un mode édition séparé',
+          'Boutons d\'ajout d\'élément et de section toujours visibles pour les admins',
+          'Mode réorganisation dédié avec bouton Terminer',
+          'Boutons d\'action rapide (présentation, export, YouTube, SMS) toujours accessibles dans la barre d\'outils'
+        ],
+        fixes: [],
+        improvements: [
+          'Suppression du toggle mode édition pour une expérience plus fluide',
+          'Optimisation du sélecteur de ressources',
+          'Interface simplifiée avec moins de clics pour les actions courantes'
+        ]
+      },
+      {
         version: '1.13.1',
         date: '2025-01-15',
         title: 'Améliorations UX des ressources',

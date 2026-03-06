@@ -5,33 +5,30 @@
         <ion-buttons slot="start">
           <ion-back-button :default-href="`/service-detail/${route.params.id}`"></ion-back-button>
         </ion-buttons>
-        <ion-title>{{ isEditMode ? 'Édition du programme' : 'Programme' }}</ion-title>
+        <ion-title>Programme</ion-title>
         <!-- Draft Status Badge -->
         <ion-chip v-if="program && isDraft" color="warning" slot="end" class="draft-badge">
           <ion-icon :icon="lockClosedOutline" />
           <ion-label>Brouillon</ion-label>
         </ion-chip>
         <ion-buttons slot="end">
-          <ion-button v-if="!isEditMode && program && program.items.length > 0" @click="showPresentation" fill="clear" color="primary">
-            <ion-icon :icon="easelOutline" />
-          </ion-button>
-          <ion-button v-if="!isEditMode && program && program.items.length > 0" @click="exportProgramText" fill="clear" color="medium">
-            <ion-icon :icon="downloadOutline" />
-          </ion-button>
-          <ion-button v-if="!isEditMode && hasYouTubeVideos" @click="showYouTubePlaylist" fill="clear" color="danger">
-            <ion-icon :icon="logoYoutube" />
-          </ion-button>
-          <ion-button v-if="isAdmin && !isEditMode" @click="showSMSModal" fill="clear" color="primary">
-            <ion-icon :icon="chatboxEllipsesOutline" />
-          </ion-button>
-          <ion-button v-if="isAdmin" @click="toggleEditMode" fill="clear" :color="isEditMode ? 'primary' : undefined">
-            <ion-icon :icon="isEditMode ? checkmarkOutline : createOutline" />
-          </ion-button>
+            <ion-button v-if="program && program.items.length > 0" @click="showPresentation" fill="clear" color="primary">
+              <ion-icon :icon="easelOutline" />
+            </ion-button>
+            <ion-button v-if="program && program.items.length > 0" @click="exportProgramText" fill="clear" color="medium">
+              <ion-icon :icon="downloadOutline" />
+            </ion-button>
+            <ion-button v-if="hasYouTubeVideos" @click="showYouTubePlaylist" fill="clear" color="danger">
+              <ion-icon :icon="logoYoutube" />
+            </ion-button>
+            <ion-button v-if="isAdmin" @click="showSMSModal" fill="clear" color="primary">
+              <ion-icon :icon="chatboxEllipsesOutline" />
+            </ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
 
-    <ion-content :fullscreen="true" :class="{ 'edit-mode': isEditMode }">
+    <ion-content :fullscreen="true">
       <ion-loading :is-open="loading" message="Chargement..."></ion-loading>
 
       <!-- Service Header -->
@@ -86,7 +83,7 @@
       </div>
 
       <!-- YouTube Playlist Feature Notice -->
-      <div v-if="!isEditMode && hasYouTubeVideos" class="youtube-feature-notice">
+      <div v-if="hasYouTubeVideos" class="youtube-feature-notice">
         <div class="notice-content">
           <ion-icon :icon="logoYoutube" class="notice-icon" />
           <div class="notice-text">
@@ -161,28 +158,44 @@
           </ion-card>
         </div>
 
-        <!-- Add Item Button (Top) -->
-        <div v-if="isEditMode && program" class="add-item-container">
-          <ion-button @click="showAddItemModal()" fill="outline" size="default" class="add-item-button">
-            <ion-icon :icon="addOutline" slot="start" />
-            Ajouter un élément
-          </ion-button>
+        <!-- Add Item Buttons (Top) -->
+        <div v-if="isAdmin && program" class="add-item-container">
+          <div class="add-item-row">
+            <template v-if="!isReorderMode">
+              <ion-button @click="openAddItemModal()" fill="outline" size="default" class="add-item-button">
+                <ion-icon :icon="addOutline" slot="start" />
+                Ajouter un élément
+              </ion-button>
+              <ion-button @click="handleAddSectionInline()" fill="outline" size="default" color="medium" class="add-section-button">
+                <ion-icon :icon="removeOutline" slot="start" />
+                Section
+              </ion-button>
+              <ion-button v-if="program.items.length > 0" @click="isReorderMode = true" fill="outline" size="default" color="medium" class="reorder-button">
+                <ion-icon :icon="reorderThreeOutline" slot="start" />
+                Réorganiser
+              </ion-button>
+            </template>
+            <ion-button v-else @click="isReorderMode = false" fill="solid" size="default" color="primary" class="done-reorder-button">
+              <ion-icon :icon="checkmarkOutline" slot="start" />
+              Terminer
+            </ion-button>
+          </div>
 
           <!-- Quick-Add Type Buttons -->
           <div class="quick-add-buttons">
-            <ion-button fill="clear" size="small" @click="showAddItemModal(ProgramItemType.SONG)">
+            <ion-button fill="clear" size="small" @click="openAddItemModal(ProgramItemType.SONG)">
               <ion-icon :icon="musicalNoteOutline" slot="start" />
               Chant
             </ion-button>
-            <ion-button fill="clear" size="small" @click="showAddItemModal(ProgramItemType.PRAYER)">
+            <ion-button fill="clear" size="small" @click="openAddItemModal(ProgramItemType.PRAYER)">
               <ion-icon :icon="handLeftOutline" slot="start" />
               Prière
             </ion-button>
-            <ion-button fill="clear" size="small" @click="showAddItemModal(ProgramItemType.SCRIPTURE)">
+            <ion-button fill="clear" size="small" @click="openAddItemModal(ProgramItemType.SCRIPTURE)">
               <ion-icon :icon="libraryOutline" slot="start" />
               Lecture
             </ion-button>
-            <ion-button fill="clear" size="small" @click="showAddItemModal(ProgramItemType.SERMON)">
+            <ion-button fill="clear" size="small" @click="openAddItemModal(ProgramItemType.SERMON)">
               <ion-icon :icon="micOutline" slot="start" />
               Prédication
             </ion-button>
@@ -192,10 +205,11 @@
         <!-- Program Items (Flat List) -->
         <div v-if="program && program.items.length > 0" class="program-content">
           <div class="flat-items-view">
-            <ion-reorder-group :disabled="!isEditMode" @ionItemReorder="handleItemReorder">
-              <div
+            <ion-reorder-group :disabled="!isReorderMode" @ionItemReorder="handleItemReorder">
+              <ion-item
                 v-for="(item, index) in sortedItems"
                 :key="item.id"
+                lines="none"
                 class="program-item-wrapper"
                 :class="{ 'has-subitems': hasSubItems(item), 'expanded': isItemExpanded(item.id), 'is-section': isSectionItem(item) }"
               >
@@ -204,8 +218,8 @@
                 :class="`item-${item.type.toLowerCase().replace(/\s+/g, '-')}`"
               >
                 <div class="item-layout">
-                  <!-- Drag Handle (Edit Mode) -->
-                  <ion-reorder v-if="isEditMode" class="item-column item-handle-column">
+                  <!-- Drag Handle (Reorder Mode) -->
+                  <ion-reorder v-if="isReorderMode" class="item-column item-handle-column">
                     <ion-icon :icon="reorderThreeOutline" class="drag-handle-icon" />
                   </ion-reorder>
 
@@ -237,7 +251,21 @@
                       </ion-button>
                     </div>
 
-                    <h4 class="item-title">
+                    <ion-input
+                      v-if="editingTitleItemId === item.id"
+                      :value="item.title"
+                      class="inline-title-input"
+                      autofocus
+                      @ionBlur="inlineUpdateTitle(item.id, ($event.target as HTMLIonInputElement).value as string || item.title)"
+                      @keydown.enter="inlineUpdateTitle(item.id, ($event.target as HTMLIonInputElement).value as string || item.title)"
+                      @keydown.escape="cancelInlineTitleEdit"
+                    />
+                    <h4
+                      v-else
+                      class="item-title"
+                      :class="{ 'editable': isAdmin }"
+                      @click="isAdmin && startInlineTitleEdit(item.id)"
+                    >
                       {{ item.resourceId && getLinkedResource(item.resourceId) ? getLinkedResource(item.resourceId)?.title : item.title }}
                     </h4>
                     <p v-if="item.subtitle" class="item-subtitle">{{ item.subtitle }}</p>
@@ -263,7 +291,7 @@
                         </button>
                         <!-- Quick Unlink (Edit Mode) -->
                         <button
-                          v-if="isEditMode"
+                          v-if="isAdmin"
                           @click.stop="quickUnlinkResource(item.id)"
                           class="media-chip-button unlink-btn"
                           title="Délier la ressource"
@@ -311,12 +339,24 @@
 
                   <!-- Duration and Participant -->
                   <div class="item-column item-meta-column">
-                    <div v-if="item.duration" class="item-duration">
+                    <div
+                      v-if="item.duration"
+                      class="item-duration"
+                      :class="{ 'interactive': isAdmin }"
+                      :id="`duration-${item.id}`"
+                      @click="isAdmin && openDurationPopover($event, item)"
+                    >
                       <ion-icon :icon="timeOutline" />
                       {{ item.duration }}min
                     </div>
                     <!-- Multiple participants -->
-                    <div v-if="item.participants && item.participants.length > 0" class="item-participants">
+                    <div
+                      v-if="item.participants && item.participants.length > 0"
+                      class="item-participants"
+                      :class="{ 'interactive': isAdmin }"
+                      :id="`participants-${item.id}`"
+                      @click="isAdmin && openParticipantsPopover($event, item)"
+                    >
                       <div v-for="participant in item.participants" :key="participant.id" class="item-participant">
                         <ion-avatar v-if="participant.avatar" class="participant-avatar">
                           <img :src="participant.avatar" :alt="participant.name" />
@@ -337,109 +377,187 @@
                     </div>
                   </div>
 
-                  <!-- Edit/Delete Actions (Edit Mode) -->
-                  <div v-if="isEditMode" class="item-column item-actions-column">
-                    <div class="item-actions">
-                      <ion-button v-if="item.type !== 'Titre' && item.type !== 'Section'" @click="showAddSubItemModalForItem(item.id)" fill="clear" size="small" color="success">
-                        <ion-icon :icon="addOutline" slot="icon-only" />
-                      </ion-button>
-                      <ion-button @click="showEditItemModalForItem(item)" fill="clear" size="small" color="primary">
-                        <ion-icon :icon="createOutline" slot="icon-only" />
-                      </ion-button>
-                      <ion-button @click="deleteItem(item.id)" fill="clear" size="small" color="danger">
-                        <ion-icon :icon="trashOutline" slot="icon-only" />
-                      </ion-button>
-                    </div>
-                  </div>
                 </div>
 
                 <!-- Sub-Items (Expanded) -->
                 <div v-if="hasSubItems(item) && isItemExpanded(item.id)" class="sub-items-container">
-                  <ion-reorder-group :disabled="!isEditMode" @ionItemReorder="(e) => handleSubItemReorder(e, item.id)">
+                  <ion-reorder-group :disabled="!isReorderMode" @ionItemReorder="(e) => handleSubItemReorder(e, item.id)">
                     <div
                       v-for="subItem in getSortedSubItems(item)"
                       :key="subItem.id"
                       class="sub-item"
                     >
                       <div class="sub-item-layout">
-                        <ion-reorder v-if="isEditMode" class="sub-item-handle">
+                        <ion-reorder v-if="isReorderMode" class="sub-item-handle">
                           <ion-icon :icon="reorderTwoOutline" />
                         </ion-reorder>
                         <div v-else class="sub-item-bullet">•</div>
                         <div class="sub-item-content">
-                        <div class="sub-item-header-row">
-                          <ion-icon v-if="subItem.type" :icon="getItemIcon(subItem.type)" class="sub-item-type-icon" />
-                          <span class="sub-item-title">
-                            {{ subItem.resourceId && getLinkedResource(subItem.resourceId) ? getLinkedResource(subItem.resourceId)?.title : subItem.title }}
-                          </span>
-                          <span v-if="subItem.duration" class="sub-item-duration">
-                            <ion-icon :icon="timeOutline" />
-                            {{ subItem.duration }}min
-                          </span>
-                        </div>
-                        <div v-if="subItem.participants && subItem.participants.length > 0" class="sub-item-participants">
-                          <div v-for="participant in subItem.participants" :key="participant.id" class="sub-item-participant">
-                            <span class="participant-initials small">{{ getParticipantInitials(participant.name) }}</span>
-                            {{ participant.name }}
+                          <div class="sub-item-header-row">
+                            <ion-icon v-if="subItem.type" :icon="getItemIcon(subItem.type)" class="sub-item-type-icon" />
+                            <span class="sub-item-title">
+                              {{ subItem.resourceId && getLinkedResource(subItem.resourceId) ? getLinkedResource(subItem.resourceId)?.title : subItem.title }}
+                            </span>
+                            <span v-if="subItem.duration" class="sub-item-duration">
+                              <ion-icon :icon="timeOutline" />
+                              {{ subItem.duration }}min
+                            </span>
+                          </div>
+                          <div v-if="subItem.participants && subItem.participants.length > 0" class="sub-item-participants">
+                            <div v-for="participant in subItem.participants" :key="participant.id" class="sub-item-participant">
+                              <span class="participant-initials small">{{ getParticipantInitials(participant.name) }}</span>
+                              {{ participant.name }}
+                            </div>
+                          </div>
+                          <span v-if="subItem.notes" class="sub-item-notes">{{ subItem.notes }}</span>
+
+                          <!-- Scripture Reference for Sub-Item -->
+                          <div v-if="subItem.scriptureReference" class="sub-item-scripture" @click="openSubItemScriptureModal(subItem)">
+                            <ion-icon :icon="bookOutline" />
+                            <span>{{ subItem.scriptureReference }}</span>
+                          </div>
+
+                          <!-- Resource Links for Sub-Item -->
+                          <div v-if="subItem.resourceId && getLinkedResource(subItem.resourceId)" class="sub-item-resources">
+                            <button
+                              v-for="content in getLinkedResource(subItem.resourceId)?.contents"
+                              :key="content.type"
+                              @click="showMediaContent(content, getLinkedResource(subItem.resourceId)?.title || '')"
+                              class="media-chip-button small"
+                            >
+                              <ion-icon :icon="getMediaTypeIcon(content.type)" />
+                            </button>
+                            <!-- Music Properties for Sub-Item -->
+                            <span v-for="prop in getResourceMusicProps(subItem.resourceId)" :key="prop" class="music-prop small">{{ prop }}</span>
+                            <button
+                              v-if="isAdmin"
+                              @click.stop="openMusicPropsModal(subItem.resourceId!)"
+                              class="music-props-edit-btn small"
+                            >
+                              <ion-icon :icon="createOutline" />
+                            </button>
                           </div>
                         </div>
-                        <span v-if="subItem.notes" class="sub-item-notes">{{ subItem.notes }}</span>
 
-                        <!-- Scripture Reference for Sub-Item -->
-                        <div v-if="subItem.scriptureReference" class="sub-item-scripture" @click="openSubItemScriptureModal(subItem)">
-                          <ion-icon :icon="bookOutline" />
-                          <span>{{ subItem.scriptureReference }}</span>
-                        </div>
-
-                        <!-- Resource Links for Sub-Item -->
-                        <div v-if="subItem.resourceId && getLinkedResource(subItem.resourceId)" class="sub-item-resources">
-                          <button
-                            v-for="content in getLinkedResource(subItem.resourceId)?.contents"
-                            :key="content.type"
-                            @click="showMediaContent(content, getLinkedResource(subItem.resourceId)?.title || '')"
-                            class="media-chip-button small"
-                          >
-                            <ion-icon :icon="getMediaTypeIcon(content.type)" />
-                          </button>
-                          <!-- Music Properties for Sub-Item -->
-                          <span v-for="prop in getResourceMusicProps(subItem.resourceId)" :key="prop" class="music-prop small">{{ prop }}</span>
-                          <button
-                            v-if="isAdmin"
-                            @click.stop="openMusicPropsModal(subItem.resourceId!)"
-                            class="music-props-edit-btn small"
-                          >
-                            <ion-icon :icon="createOutline" />
-                          </button>
-                        </div>
-                      </div>
-
-                      <!-- Sub-Item Actions (Edit Mode) -->
-                      <div v-if="isEditMode" class="sub-item-actions">
-                        <ion-button @click="showEditSubItemModalForItem(item.id, subItem)" fill="clear" size="small" color="primary">
-                          <ion-icon :icon="createOutline" slot="icon-only" />
-                        </ion-button>
-                        <ion-button @click="deleteSubItem(item.id, subItem.id)" fill="clear" size="small" color="danger">
-                          <ion-icon :icon="trashOutline" slot="icon-only" />
+                        <!-- 3-dot Action Menu for Sub-Item -->
+                        <ion-button
+                          v-if="isAdmin && !isReorderMode"
+                          fill="clear"
+                          size="small"
+                          class="sub-item-action-menu-btn"
+                          @click.stop="openSubItemActionPopover($event, item.id, subItem)"
+                        >
+                          <ion-icon :icon="ellipsisVertical" slot="icon-only" />
                         </ion-button>
                       </div>
                     </div>
-                  </div>
                   </ion-reorder-group>
                 </div>
               </div>
-            </div>
+              <!-- 3-dot Action Menu (slot="end" for consistent right-alignment) -->
+              <ion-button
+                v-if="isAdmin && !isReorderMode"
+                slot="end"
+                fill="clear"
+                size="small"
+                class="item-action-menu-btn"
+                @click.stop="openItemActionPopover($event, item)"
+              >
+                <ion-icon :icon="ellipsisVertical" slot="icon-only" />
+              </ion-button>
+              </ion-item>
             </ion-reorder-group>
           </div>
 
           <!-- Add Item Button (Bottom) -->
-          <div v-if="isEditMode" class="add-item-container add-item-bottom">
-            <ion-button @click="showAddItemModal()" fill="outline" size="default" class="add-item-button">
-              <ion-icon :icon="addOutline" slot="start" />
-              Ajouter un élément
-            </ion-button>
+          <div v-if="isAdmin" class="add-item-container add-item-bottom">
+            <div class="add-item-row">
+              <template v-if="!isReorderMode">
+                <ion-button @click="openAddItemModal()" fill="outline" size="default" class="add-item-button">
+                  <ion-icon :icon="addOutline" slot="start" />
+                  Ajouter un élément
+                </ion-button>
+                <ion-button @click="handleAddSectionInline()" fill="outline" size="default" color="medium" class="add-section-button">
+                  <ion-icon :icon="removeOutline" slot="start" />
+                  Section
+                </ion-button>
+                <ion-button v-if="program && program.items.length > 0" @click="isReorderMode = true" fill="outline" size="default" color="medium" class="reorder-button">
+                  <ion-icon :icon="reorderThreeOutline" slot="start" />
+                  Réorganiser
+                </ion-button>
+              </template>
+              <ion-button v-else @click="isReorderMode = false" fill="solid" size="default" color="primary" class="done-reorder-button">
+                <ion-icon :icon="checkmarkOutline" slot="start" />
+                Terminer
+              </ion-button>
+            </div>
           </div>
         </div>
       </div>
+
+      <!-- Action Popover (3-dot menu) -->
+      <ion-popover
+        :is-open="actionPopoverOpen"
+        :event="actionPopoverEvent"
+        @didDismiss="closeActionPopover"
+        class="action-popover"
+      >
+        <!-- Item Actions -->
+        <ion-list v-if="actionPopoverItem" lines="none">
+          <ion-item button @click="handleItemAction('edit')">
+            <ion-icon :icon="createOutline" slot="start" color="primary" />
+            <ion-label>Modifier</ion-label>
+          </ion-item>
+          <ion-item button @click="handleItemAction('add-sub')">
+            <ion-icon :icon="addOutline" slot="start" color="success" />
+            <ion-label>Ajouter un sous-élément</ion-label>
+          </ion-item>
+          <ion-item button @click="handleItemAction('delete')">
+            <ion-icon :icon="trashOutline" slot="start" color="danger" />
+            <ion-label color="danger">Supprimer</ion-label>
+          </ion-item>
+        </ion-list>
+        <!-- Sub-Item Actions -->
+        <ion-list v-else-if="actionPopoverSubItem" lines="none">
+          <ion-item button @click="handleSubItemAction('edit')">
+            <ion-icon :icon="createOutline" slot="start" color="primary" />
+            <ion-label>Modifier</ion-label>
+          </ion-item>
+          <ion-item button @click="handleSubItemAction('delete')">
+            <ion-icon :icon="trashOutline" slot="start" color="danger" />
+            <ion-label color="danger">Supprimer</ion-label>
+          </ion-item>
+        </ion-list>
+      </ion-popover>
+
+      <!-- Duration Popover -->
+      <ion-popover
+        :is-open="durationPopoverOpen"
+        :event="durationPopoverEvent"
+        @didDismiss="durationPopoverOpen = false"
+      >
+        <DurationStepper
+          :model-value="durationPopoverValue"
+          @update:model-value="handleDurationChange"
+        />
+      </ion-popover>
+
+      <!-- Participants Popover -->
+      <ion-popover
+        :is-open="participantsPopoverOpen"
+        :event="participantsPopoverEvent"
+        @didDismiss="handleParticipantsPopoverDismiss"
+        class="participants-popover"
+      >
+        <div class="popover-participants-content">
+          <ParticipantSelector
+            :participants="participantsPopoverValue"
+            @update:participants="participantsPopoverValue = $event"
+            :service-id="serviceId"
+            :multiple="true"
+          />
+        </div>
+      </ion-popover>
 
       <!-- Edit Program Modal -->
       <ion-modal :is-open="showEditProgramModalState" @ionModalDidDismiss="closeEditProgramModal">
@@ -468,639 +586,24 @@
         </ion-content>
       </ion-modal>
 
-      <!-- Add/Edit Item Modal -->
-      <ion-modal :is-open="showItemFormModal" @ionModalDidDismiss="closeItemFormModal">
-        <ion-header>
-          <ion-toolbar>
-            <ion-buttons slot="start">
-              <ion-button @click="closeItemFormModal">
-                <ion-icon :icon="arrowBackOutline" />
-              </ion-button>
-            </ion-buttons>
-            <ion-title>{{ editingItemId ? 'Modifier l\'élément' : 'Ajouter un élément' }}</ion-title>
-            <ion-buttons slot="end">
-              <ion-button
-                @click="editingItemId ? updateItem() : addItem()"
-                :disabled="!itemForm.type || !itemForm.title"
-                :strong="true"
-              >
-                {{ editingItemId ? 'Modifier' : 'Ajouter' }}
-              </ion-button>
-            </ion-buttons>
-          </ion-toolbar>
-        </ion-header>
-        <ion-content class="ion-padding">
-          <!-- Type Selection with Icon Buttons -->
-          <div class="type-selection-section">
-            <ion-label class="type-label">Type *</ion-label>
-            <div class="type-buttons-grid">
-              <button
-                v-for="type in programItemTypes"
-                :key="type"
-                @click="itemForm.type = type"
-                :class="['type-button', { 'selected': itemForm.type === type }]"
-                type="button"
-              >
-                <ion-icon :icon="getItemIcon(type)" class="type-icon" />
-                <span class="type-text">{{ type }}</span>
-              </button>
-            </div>
-          </div>
-
-          <div class="title-autocomplete-wrapper">
-            <ion-item class="title-field-with-button">
-              <ion-label position="stacked">Titre *</ion-label>
-              <ion-input
-                v-model="itemForm.title"
-                :placeholder="itemForm.type === 'Lecture biblique' ? 'Ex: Jean 3:16-18' : 'Ex: Moment d\'adoration'"
-                @ionInput="handleTitleInput"
-                @ionBlur="handleTitleBlur"
-                @ionFocus="handleTitleInput"
-              ></ion-input>
-            </ion-item>
-
-            <!-- Title Suggestions Dropdown -->
-            <div v-if="showTitleSuggestions && titleSuggestions.length > 0" class="title-suggestions-dropdown">
-              <div class="suggestions-header">
-                <ion-icon :icon="sparklesOutline" color="primary" />
-                <span>Suggestions</span>
-              </div>
-              <div
-                v-for="resource in titleSuggestions"
-                :key="resource.id"
-                class="suggestion-item"
-                @click="selectTitleSuggestion(resource)"
-              >
-                <span class="suggestion-icon">{{ getResourceTypeIcon(resource) }}</span>
-                <div class="suggestion-info">
-                  <span class="suggestion-title">{{ resource.title }}</span>
-                  <span v-if="resource.collectionId" class="suggestion-badge">
-                    {{ getResourceCollectionSymbol(resource) }}
-                  </span>
-                </div>
-                <ion-button fill="solid" size="small" color="success" @click.stop="selectTitleSuggestion(resource)">
-                  Utiliser
-                </ion-button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Resource Section -->
-          <div class="resource-link-section">
-            <div v-if="itemForm.resourceId && getFormLinkedResource(itemForm.resourceId)" class="linked-resource-card">
-              <div class="linked-resource-info">
-                <span class="linked-resource-title">{{ getFormLinkedResource(itemForm.resourceId)?.title }}</span>
-                <div class="linked-resource-meta">
-                  <span v-if="getFormResourceCollection(itemForm.resourceId)" class="linked-resource-collection">{{ getFormResourceCollection(itemForm.resourceId) }}</span>
-                  <span
-                    v-for="content in getFormLinkedResource(itemForm.resourceId)?.contents"
-                    :key="content.type"
-                    class="linked-resource-media-chip"
-                  >
-                    <ion-icon :icon="getMediaTypeIcon(content.type)" />
-                    {{ formatMediaType(content.type) }}
-                  </span>
-                </div>
-                <div v-if="getResourceMusicProps(itemForm.resourceId)" class="linked-resource-music">
-                  <span v-for="prop in getResourceMusicProps(itemForm.resourceId)" :key="prop" class="music-prop small">{{ prop }}</span>
-                </div>
-              </div>
-              <div class="linked-resource-actions">
-                <ion-button fill="outline" size="small" @click="openItemResourceSelector">Changer</ion-button>
-                <ion-button fill="clear" size="small" color="danger" @click="itemForm.resourceId = null">
-                  <ion-icon :icon="closeOutline" slot="icon-only" />
-                </ion-button>
-              </div>
-            </div>
-            <ion-button v-else fill="outline" expand="block" @click="openItemResourceSelector">
-              <ion-icon :icon="addOutline" slot="start" />
-              Lier une ressource
-            </ion-button>
-          </div>
-          <ResourceSelector
-            v-model="itemForm.resourceId"
-            :modal-only="true"
-            :is-open="showItemResourceSelector"
-            @update:is-open="showItemResourceSelector = $event"
-          />
-
-          <!-- Scripture Reference Field (for "Lecture biblique" and "Prédication") -->
-          <div v-if="itemForm.type === 'Lecture biblique' || itemForm.type === 'Prédication'" class="scripture-fetch-section">
-            <div class="scripture-input-row">
-              <ion-item class="scripture-input-item">
-                <ion-label position="stacked">
-                  <ion-icon :icon="bookOutline" /> Référence biblique
-                </ion-label>
-                <ion-input
-                  v-model="itemForm.scriptureReference"
-                  placeholder="Ex: Jean 3:16 ou Psaume 23:1-6"
-                  @keyup.enter="handleFetchScripture"
-                ></ion-input>
-              </ion-item>
-              <ion-button
-                @click="handleFetchScripture"
-                :disabled="!itemForm.scriptureReference || fetchingScripture"
-                fill="solid"
-                color="primary"
-                class="scripture-search-btn"
-              >
-                <ion-icon v-if="!fetchingScripture" :icon="searchOutline" slot="icon-only" />
-                <ion-spinner v-else name="crescent" slot="icon-only" />
-              </ion-button>
-            </div>
-
-            <!-- Scripture Preview -->
-            <div v-if="itemForm.scriptureText" class="scripture-preview">
-              <div class="scripture-header">
-                <span class="scripture-reference">{{ itemForm.scriptureReference }}</span>
-                <span class="scripture-version">{{ itemForm.scriptureVersion }}</span>
-                <ion-button fill="clear" size="small" color="medium" @click="clearScripture">
-                  <ion-icon :icon="closeOutline" slot="icon-only" />
-                </ion-button>
-              </div>
-              <div class="scripture-text" v-html="formatScriptureWithSuperscript(itemForm.scriptureText)"></div>
-            </div>
-          </div>
-
-          <!-- Options avancées -->
-          <ion-accordion-group class="advanced-options-accordion">
-            <ion-accordion value="advanced">
-              <ion-item slot="header" color="light">
-                <ion-label>Options avancées</ion-label>
-              </ion-item>
-              <div slot="content" class="advanced-options-content">
-                <ion-item>
-                  <ion-label position="stacked">Sous-titre</ion-label>
-                  <ion-input v-model="itemForm.subtitle"></ion-input>
-                </ion-item>
-
-                <ion-item lines="none">
-                  <ion-label position="stacked">Participants</ion-label>
-                  <ParticipantSelector
-                    v-model:participants="itemForm.participants"
-                    :service-id="route.params.id as string"
-                    :multiple="true"
-                  />
-                </ion-item>
-
-                <ion-item>
-                  <ion-label position="stacked">Durée (minutes)</ion-label>
-                  <ion-input v-model.number="itemForm.duration" type="number" min="0"></ion-input>
-                </ion-item>
-
-                <ion-item>
-                  <ion-label position="stacked">Notes</ion-label>
-                  <ion-textarea v-model="itemForm.notes" :rows="3"></ion-textarea>
-                </ion-item>
-              </div>
-            </ion-accordion>
-          </ion-accordion-group>
-        </ion-content>
-      </ion-modal>
-
-      <!-- Add Sub-Item Modal -->
-      <ion-modal :is-open="showAddSubItemModalState" @ionModalDidDismiss="closeAddSubItemModal">
-        <ion-header>
-          <ion-toolbar>
-            <ion-buttons slot="start">
-              <ion-button @click="closeAddSubItemModal">
-                <ion-icon :icon="arrowBackOutline" />
-              </ion-button>
-            </ion-buttons>
-            <ion-title>Ajouter un sous-élément</ion-title>
-            <ion-buttons slot="end">
-              <ion-button
-                @click="addSubItem"
-                :disabled="!addSubItemForm.title"
-                :strong="true"
-              >
-                Ajouter
-              </ion-button>
-            </ion-buttons>
-          </ion-toolbar>
-        </ion-header>
-        <ion-content class="ion-padding">
-          <!-- Type Selection -->
-          <div class="type-selection-section">
-            <ion-label class="type-label">Type</ion-label>
-            <div class="type-buttons-grid">
-              <button
-                v-for="type in subItemTypes"
-                :key="type"
-                @click="addSubItemForm.type = type"
-                :class="['type-button', { 'selected': addSubItemForm.type === type }]"
-                type="button"
-              >
-                <ion-icon :icon="getItemIcon(type)" class="type-icon" />
-                <span class="type-text">{{ type }}</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Title with Autocomplete -->
-          <div class="title-autocomplete-wrapper">
-            <ion-item class="title-field-with-button">
-              <ion-label position="stacked">Titre *</ion-label>
-              <ion-input
-                v-model="addSubItemForm.title"
-                placeholder="Ex: Kache mwen anba zel ou"
-                @ionInput="handleAddSubItemTitleInput"
-                @ionBlur="handleAddSubItemTitleBlur"
-                @ionFocus="handleAddSubItemTitleInput"
-              ></ion-input>
-            </ion-item>
-
-            <div v-if="showAddSubItemTitleSuggestions && addSubItemTitleSuggestions.length > 0" class="title-suggestions-dropdown">
-              <div class="suggestions-header">
-                <ion-icon :icon="sparklesOutline" color="primary" />
-                <span>Suggestions</span>
-              </div>
-              <div
-                v-for="resource in addSubItemTitleSuggestions"
-                :key="resource.id"
-                class="suggestion-item"
-                @click="selectAddSubItemTitleSuggestion(resource)"
-              >
-                <span class="suggestion-icon">{{ getResourceTypeIcon(resource) }}</span>
-                <div class="suggestion-info">
-                  <span class="suggestion-title">{{ resource.title }}</span>
-                  <span v-if="resource.collectionId" class="suggestion-badge">
-                    {{ getResourceCollectionSymbol(resource) }}
-                  </span>
-                </div>
-                <ion-button fill="solid" size="small" color="success" @click.stop="selectAddSubItemTitleSuggestion(resource)">
-                  Utiliser
-                </ion-button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Resource Section -->
-          <div class="resource-link-section">
-            <div v-if="addSubItemForm.resourceId && getFormLinkedResource(addSubItemForm.resourceId)" class="linked-resource-card">
-              <div class="linked-resource-info">
-                <span class="linked-resource-title">{{ getFormLinkedResource(addSubItemForm.resourceId)?.title }}</span>
-                <div class="linked-resource-meta">
-                  <span v-if="getFormResourceCollection(addSubItemForm.resourceId)" class="linked-resource-collection">{{ getFormResourceCollection(addSubItemForm.resourceId) }}</span>
-                  <span
-                    v-for="content in getFormLinkedResource(addSubItemForm.resourceId)?.contents"
-                    :key="content.type"
-                    class="linked-resource-media-chip"
-                  >
-                    <ion-icon :icon="getMediaTypeIcon(content.type)" />
-                    {{ formatMediaType(content.type) }}
-                  </span>
-                </div>
-                <div v-if="getResourceMusicProps(addSubItemForm.resourceId)" class="linked-resource-music">
-                  <span v-for="prop in getResourceMusicProps(addSubItemForm.resourceId)" :key="prop" class="music-prop small">{{ prop }}</span>
-                </div>
-              </div>
-              <div class="linked-resource-actions">
-                <ion-button fill="outline" size="small" @click="showAddSubItemResourceSelector = true">Changer</ion-button>
-                <ion-button fill="clear" size="small" color="danger" @click="addSubItemForm.resourceId = null">
-                  <ion-icon :icon="closeOutline" slot="icon-only" />
-                </ion-button>
-              </div>
-            </div>
-            <ion-button v-else fill="outline" expand="block" @click="showAddSubItemResourceSelector = true">
-              <ion-icon :icon="addOutline" slot="start" />
-              Lier une ressource
-            </ion-button>
-          </div>
-          <ResourceSelector
-            v-model="addSubItemForm.resourceId"
-            :modal-only="true"
-            :is-open="showAddSubItemResourceSelector"
-            @update:is-open="showAddSubItemResourceSelector = $event"
-          />
-
-          <!-- Scripture Reference (for "Lecture biblique" and "Prédication") -->
-          <div v-if="addSubItemForm.type === 'Lecture biblique' || addSubItemForm.type === 'Prédication'" class="scripture-fetch-section">
-            <div class="scripture-input-row">
-              <ion-item class="scripture-input-item">
-                <ion-label position="stacked">
-                  <ion-icon :icon="bookOutline" /> Référence biblique
-                </ion-label>
-                <ion-input
-                  v-model="addSubItemForm.scriptureReference"
-                  placeholder="Ex: Jean 3:16 ou Psaume 23:1-6"
-                  @keyup.enter="handleFetchScriptureForAddSubItem"
-                ></ion-input>
-              </ion-item>
-              <ion-button
-                @click="handleFetchScriptureForAddSubItem"
-                :disabled="!addSubItemForm.scriptureReference || fetchingScripture"
-                fill="solid"
-                color="primary"
-                class="scripture-search-btn"
-              >
-                <ion-icon v-if="!fetchingScripture" :icon="searchOutline" slot="icon-only" />
-                <ion-spinner v-else name="crescent" slot="icon-only" />
-              </ion-button>
-            </div>
-            <div v-if="addSubItemForm.scriptureText" class="scripture-preview">
-              <div class="scripture-preview-header">
-                <span class="scripture-preview-ref">{{ addSubItemForm.scriptureReference }}</span>
-                <ion-button fill="clear" size="small" @click="clearAddSubItemScripture">
-                  <ion-icon :icon="closeOutline" slot="icon-only" />
-                </ion-button>
-              </div>
-              <p class="scripture-preview-text">{{ addSubItemForm.scriptureText }}</p>
-            </div>
-          </div>
-
-          <!-- Options avancées -->
-          <ion-accordion-group class="advanced-options-accordion">
-            <ion-accordion value="advanced">
-              <ion-item slot="header" color="light">
-                <ion-label>Options avancées</ion-label>
-              </ion-item>
-              <div slot="content" class="advanced-options-content">
-                <ion-item>
-                  <ion-label position="stacked">Sous-titre</ion-label>
-                  <ion-input v-model="addSubItemForm.subtitle"></ion-input>
-                </ion-item>
-
-                <ion-item lines="none">
-                  <ion-label position="stacked">Participants</ion-label>
-                  <ParticipantSelector
-                    v-model:participants="addSubItemForm.participants"
-                    :service-id="route.params.id as string"
-                    :multiple="true"
-                  />
-                </ion-item>
-
-                <ion-item>
-                  <ion-label position="stacked">Durée (minutes)</ion-label>
-                  <ion-input v-model.number="addSubItemForm.duration" type="number" min="0"></ion-input>
-                </ion-item>
-
-                <ion-item>
-                  <ion-label position="stacked">Notes</ion-label>
-                  <ion-textarea v-model="addSubItemForm.notes" :rows="3"></ion-textarea>
-                </ion-item>
-
-                <!-- Scripture Section (when type is not Lecture/Prédication) -->
-                <div v-if="addSubItemForm.type !== 'Lecture biblique' && addSubItemForm.type !== 'Prédication'" class="scripture-fetch-section">
-                  <div class="scripture-input-row">
-                    <ion-item class="scripture-input-item">
-                      <ion-label position="stacked">
-                        <ion-icon :icon="bookOutline" /> Référence biblique
-                      </ion-label>
-                      <ion-input
-                        v-model="addSubItemForm.scriptureReference"
-                        placeholder="Ex: Jean 3:16 ou Psaume 23:1-6"
-                        @keyup.enter="handleFetchScriptureForAddSubItem"
-                      ></ion-input>
-                    </ion-item>
-                    <ion-button
-                      @click="handleFetchScriptureForAddSubItem"
-                      :disabled="!addSubItemForm.scriptureReference || fetchingScripture"
-                      fill="solid"
-                      color="primary"
-                      class="scripture-search-btn"
-                    >
-                      <ion-icon v-if="!fetchingScripture" :icon="searchOutline" slot="icon-only" />
-                      <ion-spinner v-else name="crescent" slot="icon-only" />
-                    </ion-button>
-                  </div>
-                  <div v-if="addSubItemForm.scriptureText" class="scripture-preview">
-                    <div class="scripture-preview-header">
-                      <span class="scripture-preview-ref">{{ addSubItemForm.scriptureReference }}</span>
-                      <ion-button fill="clear" size="small" @click="clearAddSubItemScripture">
-                        <ion-icon :icon="closeOutline" slot="icon-only" />
-                      </ion-button>
-                    </div>
-                    <p class="scripture-preview-text">{{ addSubItemForm.scriptureText }}</p>
-                  </div>
-                </div>
-              </div>
-            </ion-accordion>
-          </ion-accordion-group>
-        </ion-content>
-      </ion-modal>
-
-      <!-- Edit Sub-Item Modal -->
-      <ion-modal :is-open="showEditSubItemModalState" @ionModalDidDismiss="closeEditSubItemModal">
-        <ion-header>
-          <ion-toolbar>
-            <ion-buttons slot="start">
-              <ion-button @click="closeEditSubItemModal">
-                <ion-icon :icon="arrowBackOutline" />
-              </ion-button>
-            </ion-buttons>
-            <ion-title>Modifier le sous-élément</ion-title>
-            <ion-buttons slot="end">
-              <ion-button
-                @click="updateSubItem"
-                :disabled="!editSubItemForm.title"
-                :strong="true"
-              >
-                Modifier
-              </ion-button>
-            </ion-buttons>
-          </ion-toolbar>
-        </ion-header>
-        <ion-content class="ion-padding">
-          <!-- Type Selection -->
-          <div class="type-selection-section">
-            <ion-label class="type-label">Type</ion-label>
-            <div class="type-buttons-grid">
-              <button
-                v-for="type in subItemTypes"
-                :key="type"
-                @click="editSubItemForm.type = type"
-                :class="['type-button', { 'selected': editSubItemForm.type === type }]"
-                type="button"
-              >
-                <ion-icon :icon="getItemIcon(type)" class="type-icon" />
-                <span class="type-text">{{ type }}</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Title with Autocomplete -->
-          <div class="title-autocomplete-wrapper">
-            <ion-item class="title-field-with-button">
-              <ion-label position="stacked">Titre *</ion-label>
-              <ion-input
-                v-model="editSubItemForm.title"
-                @ionInput="handleEditSubItemTitleInput"
-                @ionBlur="handleEditSubItemTitleBlur"
-                @ionFocus="handleEditSubItemTitleInput"
-              ></ion-input>
-            </ion-item>
-
-            <div v-if="showEditSubItemTitleSuggestions && editSubItemTitleSuggestions.length > 0" class="title-suggestions-dropdown">
-              <div class="suggestions-header">
-                <ion-icon :icon="sparklesOutline" color="primary" />
-                <span>Suggestions</span>
-              </div>
-              <div
-                v-for="resource in editSubItemTitleSuggestions"
-                :key="resource.id"
-                class="suggestion-item"
-                @click="selectEditSubItemTitleSuggestion(resource)"
-              >
-                <span class="suggestion-icon">{{ getResourceTypeIcon(resource) }}</span>
-                <div class="suggestion-info">
-                  <span class="suggestion-title">{{ resource.title }}</span>
-                  <span v-if="resource.collectionId" class="suggestion-badge">
-                    {{ getResourceCollectionSymbol(resource) }}
-                  </span>
-                </div>
-                <ion-button fill="solid" size="small" color="success" @click.stop="selectEditSubItemTitleSuggestion(resource)">
-                  Utiliser
-                </ion-button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Resource Section -->
-          <div class="resource-link-section">
-            <div v-if="editSubItemForm.resourceId && getFormLinkedResource(editSubItemForm.resourceId)" class="linked-resource-card">
-              <div class="linked-resource-info">
-                <span class="linked-resource-title">{{ getFormLinkedResource(editSubItemForm.resourceId)?.title }}</span>
-                <div class="linked-resource-meta">
-                  <span v-if="getFormResourceCollection(editSubItemForm.resourceId)" class="linked-resource-collection">{{ getFormResourceCollection(editSubItemForm.resourceId) }}</span>
-                  <span
-                    v-for="content in getFormLinkedResource(editSubItemForm.resourceId)?.contents"
-                    :key="content.type"
-                    class="linked-resource-media-chip"
-                  >
-                    <ion-icon :icon="getMediaTypeIcon(content.type)" />
-                    {{ formatMediaType(content.type) }}
-                  </span>
-                </div>
-                <div v-if="getResourceMusicProps(editSubItemForm.resourceId)" class="linked-resource-music">
-                  <span v-for="prop in getResourceMusicProps(editSubItemForm.resourceId)" :key="prop" class="music-prop small">{{ prop }}</span>
-                </div>
-              </div>
-              <div class="linked-resource-actions">
-                <ion-button fill="outline" size="small" @click="showEditSubItemResourceSelector = true">Changer</ion-button>
-                <ion-button fill="clear" size="small" color="danger" @click="editSubItemForm.resourceId = null">
-                  <ion-icon :icon="closeOutline" slot="icon-only" />
-                </ion-button>
-              </div>
-            </div>
-            <ion-button v-else fill="outline" expand="block" @click="showEditSubItemResourceSelector = true">
-              <ion-icon :icon="addOutline" slot="start" />
-              Lier une ressource
-            </ion-button>
-          </div>
-          <ResourceSelector
-            v-model="editSubItemForm.resourceId"
-            :modal-only="true"
-            :is-open="showEditSubItemResourceSelector"
-            @update:is-open="showEditSubItemResourceSelector = $event"
-          />
-
-          <!-- Scripture Reference (for "Lecture biblique" and "Prédication") -->
-          <div v-if="editSubItemForm.type === 'Lecture biblique' || editSubItemForm.type === 'Prédication'" class="scripture-fetch-section">
-            <div class="scripture-input-row">
-              <ion-item class="scripture-input-item">
-                <ion-label position="stacked">
-                  <ion-icon :icon="bookOutline" /> Référence biblique
-                </ion-label>
-                <ion-input
-                  v-model="editSubItemForm.scriptureReference"
-                  placeholder="Ex: Jean 3:16 ou Psaume 23:1-6"
-                  @keyup.enter="handleFetchScriptureForEditSubItem"
-                ></ion-input>
-              </ion-item>
-              <ion-button
-                @click="handleFetchScriptureForEditSubItem"
-                :disabled="!editSubItemForm.scriptureReference || fetchingScripture"
-                fill="solid"
-                color="primary"
-                class="scripture-search-btn"
-              >
-                <ion-icon v-if="!fetchingScripture" :icon="searchOutline" slot="icon-only" />
-                <ion-spinner v-else name="crescent" slot="icon-only" />
-              </ion-button>
-            </div>
-            <div v-if="editSubItemForm.scriptureText" class="scripture-preview">
-              <div class="scripture-preview-header">
-                <span class="scripture-preview-ref">{{ editSubItemForm.scriptureReference }}</span>
-                <ion-button fill="clear" size="small" @click="clearEditSubItemScripture">
-                  <ion-icon :icon="closeOutline" slot="icon-only" />
-                </ion-button>
-              </div>
-              <p class="scripture-preview-text">{{ editSubItemForm.scriptureText }}</p>
-            </div>
-          </div>
-
-          <!-- Options avancées -->
-          <ion-accordion-group class="advanced-options-accordion">
-            <ion-accordion value="advanced">
-              <ion-item slot="header" color="light">
-                <ion-label>Options avancées</ion-label>
-              </ion-item>
-              <div slot="content" class="advanced-options-content">
-                <ion-item>
-                  <ion-label position="stacked">Sous-titre</ion-label>
-                  <ion-input v-model="editSubItemForm.subtitle"></ion-input>
-                </ion-item>
-
-                <ion-item lines="none">
-                  <ion-label position="stacked">Participants</ion-label>
-                  <ParticipantSelector
-                    v-model:participants="editSubItemForm.participants"
-                    :service-id="route.params.id as string"
-                    :multiple="true"
-                  />
-                </ion-item>
-
-                <ion-item>
-                  <ion-label position="stacked">Durée (minutes)</ion-label>
-                  <ion-input v-model.number="editSubItemForm.duration" type="number" min="0"></ion-input>
-                </ion-item>
-
-                <ion-item>
-                  <ion-label position="stacked">Notes</ion-label>
-                  <ion-textarea v-model="editSubItemForm.notes" :rows="3"></ion-textarea>
-                </ion-item>
-
-                <!-- Scripture Section (when type is not Lecture/Prédication) -->
-                <div v-if="editSubItemForm.type !== 'Lecture biblique' && editSubItemForm.type !== 'Prédication'" class="scripture-fetch-section">
-                  <div class="scripture-input-row">
-                    <ion-item class="scripture-input-item">
-                      <ion-label position="stacked">
-                        <ion-icon :icon="bookOutline" /> Référence biblique
-                      </ion-label>
-                      <ion-input
-                        v-model="editSubItemForm.scriptureReference"
-                        placeholder="Ex: Jean 3:16 ou Psaume 23:1-6"
-                        @keyup.enter="handleFetchScriptureForEditSubItem"
-                      ></ion-input>
-                    </ion-item>
-                    <ion-button
-                      @click="handleFetchScriptureForEditSubItem"
-                      :disabled="!editSubItemForm.scriptureReference || fetchingScripture"
-                      fill="solid"
-                      color="primary"
-                      class="scripture-search-btn"
-                    >
-                      <ion-icon v-if="!fetchingScripture" :icon="searchOutline" slot="icon-only" />
-                      <ion-spinner v-else name="crescent" slot="icon-only" />
-                    </ion-button>
-                  </div>
-                  <div v-if="editSubItemForm.scriptureText" class="scripture-preview">
-                    <div class="scripture-preview-header">
-                      <span class="scripture-preview-ref">{{ editSubItemForm.scriptureReference }}</span>
-                      <ion-button fill="clear" size="small" @click="clearEditSubItemScripture">
-                        <ion-icon :icon="closeOutline" slot="icon-only" />
-                      </ion-button>
-                    </div>
-                    <p class="scripture-preview-text">{{ editSubItemForm.scriptureText }}</p>
-                  </div>
-                </div>
-              </div>
-            </ion-accordion>
-          </ion-accordion-group>
-        </ion-content>
-      </ion-modal>
-
+      <!-- Unified Program Item Form -->
+      <ProgramItemForm
+        :is-open="showFormModal"
+        :mode="formMode"
+        :types="formMode.includes('sub') ? subItemTypes : programItemTypes"
+        :type-required="!formMode.includes('sub')"
+        :initial-data="formInitialData"
+        :service-id="serviceId"
+        :all-resources="allResources"
+        :linked-resources="linkedResources"
+        :resource-collections="resourceCollections"
+        :music-keys="musicKeys"
+        :music-beats="musicBeats"
+        :music-tempos="musicTempos"
+        :music-styles="musicStyles"
+        @submit="handleFormSubmit"
+        @cancel="closeFormModal"
+      />
       <!-- Media Modal (for displaying lyrics, videos, etc.) -->
       <ion-modal :is-open="showMediaModalState" @ionModalDidDismiss="closeMediaModal" class="media-modal fullscreen-modal">
         <ion-header>
@@ -1800,7 +1303,8 @@ import {
   IonItem, IonLabel, IonInput, IonTextarea, IonSelect, IonSelectOption,
   IonSpinner, IonReorderGroup, IonReorder, toastController, alertController,
   IonList, IonCheckbox, IonChip, IonSearchbar,
-  IonAccordion, IonAccordionGroup
+  IonAccordion, IonAccordionGroup,
+  IonPopover
 } from '@ionic/vue';
 import {
   calendarOutline, createOutline, listOutline, timeOutline,
@@ -1810,17 +1314,20 @@ import {
   checkmarkOutline, reorderThreeOutline, reorderTwoOutline, addOutline, trashOutline,
   playCircleOutline, volumeHighOutline, documentOutline,
   chatboxEllipsesOutline, chevronDownOutline, chevronForwardOutline,
-  arrowBackOutline, logoYoutube, playBackOutline, playForwardOutline,
+  logoYoutube, playBackOutline, playForwardOutline,
   removeOutline, bookOutline, copyOutline,
   lockClosedOutline, peopleOutline, checkmarkCircleOutline,
-  sparklesOutline, easelOutline, searchOutline, downloadOutline,
-  closeCircleOutline
+  sparklesOutline, easelOutline, downloadOutline,
+  closeCircleOutline,
+  ellipsisVertical
 } from 'ionicons/icons';
 import ResourceSelector from '@/components/ResourceSelector.vue';
-import ResourceQuickAdd from '@/components/ResourceQuickAdd.vue';
 import ResourceBottomSheet from '@/components/ResourceBottomSheet.vue';
 import ParticipantSelector from '@/components/ParticipantSelector.vue';
 import SendProgramSMSModal from '@/components/SendProgramSMSModal.vue';
+import ProgramItemForm from '@/components/ProgramItemForm.vue';
+import DurationStepper from '@/components/DurationStepper.vue';
+import { useProgramItems } from '@/composables/useProgramItems';
 import { serviceService } from '@/services/serviceService';
 import { timezoneUtils } from '@/utils/timezone';
 import { useUser } from '@/composables/useUser';
@@ -1829,13 +1336,7 @@ import {
   subscribeToProgramByServiceId,
   createProgram,
   updateProgram,
-  addItemToProgram,
   updateItemInProgram,
-  deleteItemFromProgram,
-  addSubItemToItem,
-  updateSubItemInItem,
-  deleteSubItemFromItem,
-  updateProgramOrder,
   publishProgram,
   updateDraftViewers,
   canUserViewProgram
@@ -1850,8 +1351,6 @@ import { getResourceById, getAllResourceOptions, updateResource, subscribeToReso
 import type { ResourceCollection } from '@/types/resource';
 import { deleteField, type Unsubscribe } from 'firebase/firestore';
 import { isYouTubeUrl, getYouTubeEmbedUrl, getSpotifyEmbedUrl } from '@/utils/resource-utils';
-import { getSuggestionsByTitle, getSmartSuggestions, getResourceTypeIcon } from '@/utils/resource-suggestions';
-import { bibleService } from '@/services/bibleService';
 
 const route = useRoute();
 const { user, isAdmin } = useUser();
@@ -1861,8 +1360,7 @@ const loading = ref(true);
 const service = ref<Service | null>(null);
 const program = ref<ServiceProgram | null>(null);
 const linkedResources = ref<Map<string, Resource>>(new Map());
-const isEditMode = ref(false);
-
+const isReorderMode = ref(false);
 // Music options
 const musicKeys = ref<ResourceOption[]>([]);
 const musicBeats = ref<ResourceOption[]>([]);
@@ -1875,56 +1373,28 @@ const editProgramForm = ref({
   conductor: null as ProgramParticipant | null
 });
 
-// Item Form Modal
-const showItemFormModal = ref(false);
-const editingItemId = ref<string | null>(null);
-const fetchingScripture = ref(false);
-const itemForm = ref({
-  type: '' as ProgramItemType,
-  title: '',
-  subtitle: '',
-  participants: [] as ProgramParticipant[],
-  duration: 0,
-  notes: '',
-  resourceId: null as string | null,
-  scriptureReference: '',
-  scriptureText: '',
-  scriptureVersion: ''
-});
-
-// Sub-item state
-const showAddSubItemModalState = ref(false);
-const parentItemIdForSubItem = ref<string | null>(null);
-const addSubItemForm = ref({
-  type: '' as ProgramItemType | '',
-  title: '',
-  subtitle: '',
-  resourceId: null as string | null,
-  participants: [] as ProgramParticipant[],
-  duration: 0,
-  notes: '',
-  scriptureReference: '',
-  scriptureText: '',
-  scriptureVersion: 'LSG'
-});
-
-const showEditSubItemModalState = ref(false);
-const editSubItemForm = ref({
-  id: '',
-  parentItemId: '',
-  type: '' as ProgramItemType | '',
-  title: '',
-  subtitle: '',
-  resourceId: null as string | null,
-  participants: [] as ProgramParticipant[],
-  duration: 0,
-  notes: '',
-  scriptureReference: '',
-  scriptureText: '',
-  scriptureVersion: 'LSG'
-});
-
 const expandedItems = ref<Set<string>>(new Set());
+
+// Title Autocomplete State (needed by composable)
+const allResources = ref<Resource[]>([]);
+const loadingResources = ref(false);
+
+// Program Items composable (unified form modal + CRUD + reorder)
+const {
+  showFormModal, formMode, formInitialData,
+  openAddItemModal, openEditItemModal, openAddSubItemModal, openEditSubItemModal, closeFormModal,
+  handleFormSubmit,
+  deleteItem, deleteSubItem,
+  handleItemReorder, handleSubItemReorder,
+  editingTitleItemId, startInlineTitleEdit, cancelInlineTitleEdit, inlineUpdateTitle,
+  inlineUpdateDuration, inlineUpdateParticipants, addSectionInline,
+  quickUnlinkResource
+} = useProgramItems({
+  program, linkedResources, user, expandedItems, loading,
+  loadProgram: async () => { await loadProgram(); },
+  allResources,
+  loadResourcesForAutocomplete: async () => { await loadResourcesForAutocomplete(); }
+});
 
 // Media Modal
 const showMediaModalState = ref(false);
@@ -2032,11 +1502,6 @@ const allMembers = ref<Member[]>([]);
 const loadingMembers = ref(false);
 const draftViewerSearchQuery = ref('');
 
-// Item/Sub-Item Form Resource Selector State
-const showItemResourceSelector = ref(false);
-const showAddSubItemResourceSelector = ref(false);
-const showEditSubItemResourceSelector = ref(false);
-
 // Inline Resource Selector State
 const showInlineResourceSelector = ref(false);
 const showFullResourceSelector = ref(false);
@@ -2045,61 +1510,16 @@ const inlineResourceItemType = ref('');
 const inlineResourceItemTitle = ref('');
 const resourceCollections = ref<Map<string, ResourceCollection>>(new Map());
 
-// Title Autocomplete State
-const allResources = ref<Resource[]>([]);
-const showTitleSuggestions = ref(false);
-const loadingResources = ref(false);
-
 // Computed Properties
 const serviceId = computed(() => route.params.id as string);
 
-const programItemTypes = computed(() => Object.values(ProgramItemType));
+const programItemTypes = computed(() =>
+  Object.values(ProgramItemType).filter(t => t !== ProgramItemType.SECTION)
+);
 
 const subItemTypes = computed(() =>
   Object.values(ProgramItemType).filter(t => t !== ProgramItemType.SECTION && t !== ProgramItemType.TITLE)
 );
-
-// Title autocomplete suggestions
-const titleSuggestions = computed(() => {
-  if (!itemForm.value.title || itemForm.value.title.length < 2) return [];
-  if (allResources.value.length === 0) return [];
-
-  return getSmartSuggestions(
-    itemForm.value.type,
-    itemForm.value.title,
-    allResources.value,
-    [],
-    5
-  );
-});
-
-// Sub-item title autocomplete
-const showAddSubItemTitleSuggestions = ref(false);
-const showEditSubItemTitleSuggestions = ref(false);
-
-const addSubItemTitleSuggestions = computed(() => {
-  if (!addSubItemForm.value.title || addSubItemForm.value.title.length < 2) return [];
-  if (allResources.value.length === 0) return [];
-  return getSmartSuggestions(
-    addSubItemForm.value.type || '',
-    addSubItemForm.value.title,
-    allResources.value,
-    [],
-    5
-  );
-});
-
-const editSubItemTitleSuggestions = computed(() => {
-  if (!editSubItemForm.value.title || editSubItemForm.value.title.length < 2) return [];
-  if (allResources.value.length === 0) return [];
-  return getSmartSuggestions(
-    editSubItemForm.value.type || '',
-    editSubItemForm.value.title,
-    allResources.value,
-    [],
-    5
-  );
-});
 
 const sortedItems = computed(() => {
   if (!program.value) return [];
@@ -2268,25 +1688,6 @@ const loadCollectionForResource = async (resource: Resource) => {
   }
 };
 
-const openItemResourceSelector = () => {
-  showItemResourceSelector.value = true;
-};
-
-const quickUnlinkResource = async (itemId: string) => {
-  if (!program.value || !user.value) return;
-  try {
-    await updateItemInProgram(
-      program.value.id,
-      itemId,
-      { resourceId: deleteField() as unknown as string },
-      user.value.uid
-    );
-    await showToast('Ressource déliée', 'success');
-  } catch (error) {
-    console.error('Error unlinking resource:', error);
-    await showToast('Erreur lors de la suppression du lien', 'danger');
-  }
-};
 
 const hasSubItems = (item: ProgramItem): boolean => {
   return !!(item.subItems && item.subItems.length > 0);
@@ -2487,9 +1888,107 @@ const createInitialProgram = async () => {
   }
 };
 
-// Edit Mode
-const toggleEditMode = () => {
-  isEditMode.value = !isEditMode.value;
+// Inline Duration Popover
+// Action Popover for item/sub-item actions
+const actionPopoverOpen = ref(false);
+const actionPopoverEvent = ref<Event | null>(null);
+const actionPopoverItem = ref<ProgramItem | null>(null);
+const actionPopoverSubItem = ref<{ itemId: string; subItem: ProgramSubItem } | null>(null);
+
+const openItemActionPopover = (event: Event, item: ProgramItem) => {
+  actionPopoverEvent.value = event;
+  actionPopoverItem.value = item;
+  actionPopoverSubItem.value = null;
+  actionPopoverOpen.value = true;
+};
+
+const openSubItemActionPopover = (event: Event, itemId: string, subItem: ProgramSubItem) => {
+  actionPopoverEvent.value = event;
+  actionPopoverItem.value = null;
+  actionPopoverSubItem.value = { itemId, subItem };
+  actionPopoverOpen.value = true;
+};
+
+const closeActionPopover = () => {
+  actionPopoverOpen.value = false;
+};
+
+const handleItemAction = (action: string) => {
+  const item = actionPopoverItem.value;
+  if (!item) return;
+  closeActionPopover();
+  if (action === 'edit') {
+    if (isSectionItem(item)) {
+      startInlineTitleEdit(item.id);
+    } else {
+      openEditItemModal(item);
+    }
+  } else if (action === 'add-sub') {
+    openAddSubItemModal(item.id);
+  } else if (action === 'delete') {
+    deleteItem(item.id);
+  }
+};
+
+const handleSubItemAction = (action: string) => {
+  const data = actionPopoverSubItem.value;
+  if (!data) return;
+  closeActionPopover();
+  if (action === 'edit') {
+    openEditSubItemModal(data.itemId, data.subItem);
+  } else if (action === 'delete') {
+    deleteSubItem(data.itemId, data.subItem.id);
+  }
+};
+
+const durationPopoverOpen = ref(false);
+const durationPopoverEvent = ref<Event | null>(null);
+const durationPopoverItemId = ref<string | null>(null);
+const durationPopoverValue = ref(0);
+
+const openDurationPopover = (event: Event, item: any) => {
+  durationPopoverEvent.value = event;
+  durationPopoverItemId.value = item.id;
+  durationPopoverValue.value = item.duration || 0;
+  durationPopoverOpen.value = true;
+};
+
+const handleDurationChange = (value: number) => {
+  durationPopoverValue.value = value;
+  if (durationPopoverItemId.value) {
+    inlineUpdateDuration(durationPopoverItemId.value, value);
+  }
+};
+
+// Inline Participants Popover
+const participantsPopoverOpen = ref(false);
+const participantsPopoverEvent = ref<Event | null>(null);
+const participantsPopoverItemId = ref<string | null>(null);
+const participantsPopoverValue = ref<ProgramParticipant[]>([]);
+
+const openParticipantsPopover = (event: Event, item: any) => {
+  participantsPopoverEvent.value = event;
+  participantsPopoverItemId.value = item.id;
+  participantsPopoverValue.value = [...(item.participants || [])];
+  participantsPopoverOpen.value = true;
+};
+
+const handleParticipantsPopoverDismiss = () => {
+  participantsPopoverOpen.value = false;
+  if (participantsPopoverItemId.value && participantsPopoverValue.value) {
+    inlineUpdateParticipants(participantsPopoverItemId.value, participantsPopoverValue.value);
+  }
+};
+
+// Inline Section Creation
+const handleAddSectionInline = async () => {
+  const newId = await addSectionInline();
+  if (newId) {
+    // Wait for the program to update via subscription, then activate inline editing
+    setTimeout(() => {
+      startInlineTitleEdit(newId);
+    }, 500);
+  }
 };
 
 // Draft Mode Functions
@@ -2624,30 +2123,6 @@ const updateProgramInfo = async () => {
   }
 };
 
-// Item Management
-const showAddItemModal = async (preselectedType?: ProgramItemType) => {
-  editingItemId.value = null;
-  itemForm.value = {
-    type: preselectedType || '' as ProgramItemType,
-    title: '',
-    subtitle: '',
-    participants: [],
-    duration: 0,
-    notes: '',
-    resourceId: null,
-    scriptureReference: '',
-    scriptureText: '',
-    scriptureVersion: ''
-  };
-  showTitleSuggestions.value = false;
-  showItemFormModal.value = true;
-
-  // Load resources for autocomplete if not already loaded
-  if (allResources.value.length === 0) {
-    loadResourcesForAutocomplete();
-  }
-};
-
 const loadResourcesForAutocomplete = async () => {
   if (loadingResources.value) return;
   try {
@@ -2658,200 +2133,6 @@ const loadResourcesForAutocomplete = async () => {
   } finally {
     loadingResources.value = false;
   }
-};
-
-const selectTitleSuggestion = (resource: Resource) => {
-  itemForm.value.title = resource.title;
-  itemForm.value.resourceId = resource.id;
-  showTitleSuggestions.value = false;
-  // Add to linkedResources so the inline resource card shows immediately
-  linkedResources.value.set(resource.id, resource);
-  subscribeToLinkedResource(resource.id);
-};
-
-const handleTitleInput = () => {
-  // Show suggestions when typing
-  showTitleSuggestions.value = itemForm.value.title.length >= 2;
-};
-
-const handleTitleBlur = () => {
-  // Delay hiding to allow click on suggestion
-  setTimeout(() => {
-    showTitleSuggestions.value = false;
-  }, 200);
-};
-
-// Sub-item title autocomplete handlers
-const handleAddSubItemTitleInput = () => {
-  showAddSubItemTitleSuggestions.value = addSubItemForm.value.title.length >= 2;
-};
-
-const handleAddSubItemTitleBlur = () => {
-  setTimeout(() => {
-    showAddSubItemTitleSuggestions.value = false;
-  }, 200);
-};
-
-const selectAddSubItemTitleSuggestion = (resource: Resource) => {
-  addSubItemForm.value.title = resource.title;
-  addSubItemForm.value.resourceId = resource.id;
-  showAddSubItemTitleSuggestions.value = false;
-  linkedResources.value.set(resource.id, resource);
-  subscribeToLinkedResource(resource.id);
-};
-
-const handleEditSubItemTitleInput = () => {
-  showEditSubItemTitleSuggestions.value = editSubItemForm.value.title.length >= 2;
-};
-
-const handleEditSubItemTitleBlur = () => {
-  setTimeout(() => {
-    showEditSubItemTitleSuggestions.value = false;
-  }, 200);
-};
-
-const selectEditSubItemTitleSuggestion = (resource: Resource) => {
-  editSubItemForm.value.title = resource.title;
-  editSubItemForm.value.resourceId = resource.id;
-  showEditSubItemTitleSuggestions.value = false;
-  linkedResources.value.set(resource.id, resource);
-  subscribeToLinkedResource(resource.id);
-};
-
-const showEditItemModalForItem = (item: ProgramItem) => {
-  editingItemId.value = item.id;
-  // Handle migration from single participant to multiple participants
-  let participants: ProgramParticipant[] = [];
-  if (item.participants && item.participants.length > 0) {
-    participants = item.participants;
-  } else if (item.participant) {
-    // Migrate old single participant to array
-    participants = [item.participant];
-  }
-  itemForm.value = {
-    type: item.type,
-    title: item.title,
-    subtitle: item.subtitle || '',
-    participants,
-    duration: item.duration || 0,
-    notes: item.notes || '',
-    resourceId: item.resourceId || null,
-    scriptureReference: item.scriptureReference || '',
-    scriptureText: item.scriptureText || '',
-    scriptureVersion: item.scriptureVersion || ''
-  };
-  showItemFormModal.value = true;
-};
-
-const closeItemFormModal = () => {
-  showItemFormModal.value = false;
-  editingItemId.value = null;
-};
-
-// Fetch Bible verses for "Lecture biblique" and "Prédication" items
-const handleFetchScripture = async () => {
-  if (!itemForm.value.scriptureReference) {
-    await showToast('Veuillez entrer une référence biblique', 'warning');
-    return;
-  }
-
-  fetchingScripture.value = true;
-  try {
-    const result = await bibleService.getScripture(itemForm.value.scriptureReference);
-
-    if (!result) {
-      await showToast('Référence biblique non reconnue. Exemple: Jean 3:16 ou Psaume 23:1-6', 'warning');
-      return;
-    }
-
-    // Update the reference with the normalized version from the API
-    itemForm.value.scriptureReference = result.reference;
-    itemForm.value.scriptureText = result.text;
-    itemForm.value.scriptureVersion = result.version;
-
-    await showToast('Versets récupérés avec succès', 'success');
-  } catch (error) {
-    console.error('Error fetching scripture:', error);
-    await showToast('Erreur lors de la récupération des versets', 'danger');
-  } finally {
-    fetchingScripture.value = false;
-  }
-};
-
-const clearScripture = () => {
-  itemForm.value.scriptureReference = '';
-  itemForm.value.scriptureText = '';
-  itemForm.value.scriptureVersion = '';
-};
-
-// Fetch scripture for Add Sub-Item form
-const handleFetchScriptureForAddSubItem = async () => {
-  if (!addSubItemForm.value.scriptureReference) {
-    await showToast('Veuillez entrer une référence biblique', 'warning');
-    return;
-  }
-
-  fetchingScripture.value = true;
-  try {
-    const result = await bibleService.getScripture(addSubItemForm.value.scriptureReference);
-
-    if (!result) {
-      await showToast('Référence biblique non reconnue. Exemple: Jean 3:16 ou Psaume 23:1-6', 'warning');
-      return;
-    }
-
-    addSubItemForm.value.scriptureReference = result.reference;
-    addSubItemForm.value.scriptureText = result.text;
-    addSubItemForm.value.scriptureVersion = result.version;
-
-    await showToast('Versets récupérés avec succès', 'success');
-  } catch (error) {
-    console.error('Error fetching scripture:', error);
-    await showToast('Erreur lors de la récupération des versets', 'danger');
-  } finally {
-    fetchingScripture.value = false;
-  }
-};
-
-const clearAddSubItemScripture = () => {
-  addSubItemForm.value.scriptureReference = '';
-  addSubItemForm.value.scriptureText = '';
-  addSubItemForm.value.scriptureVersion = 'LSG';
-};
-
-// Fetch scripture for Edit Sub-Item form
-const handleFetchScriptureForEditSubItem = async () => {
-  if (!editSubItemForm.value.scriptureReference) {
-    await showToast('Veuillez entrer une référence biblique', 'warning');
-    return;
-  }
-
-  fetchingScripture.value = true;
-  try {
-    const result = await bibleService.getScripture(editSubItemForm.value.scriptureReference);
-
-    if (!result) {
-      await showToast('Référence biblique non reconnue. Exemple: Jean 3:16 ou Psaume 23:1-6', 'warning');
-      return;
-    }
-
-    editSubItemForm.value.scriptureReference = result.reference;
-    editSubItemForm.value.scriptureText = result.text;
-    editSubItemForm.value.scriptureVersion = result.version;
-
-    await showToast('Versets récupérés avec succès', 'success');
-  } catch (error) {
-    console.error('Error fetching scripture:', error);
-    await showToast('Erreur lors de la récupération des versets', 'danger');
-  } finally {
-    fetchingScripture.value = false;
-  }
-};
-
-const clearEditSubItemScripture = () => {
-  editSubItemForm.value.scriptureReference = '';
-  editSubItemForm.value.scriptureText = '';
-  editSubItemForm.value.scriptureVersion = 'LSG';
 };
 
 // Scripture Modal Functions
@@ -2903,125 +2184,6 @@ const copySubItemScriptureToClipboard = async () => {
   } catch (error) {
     console.error('Error copying to clipboard:', error);
     await showToast('Erreur lors de la copie', 'danger');
-  }
-};
-
-const addItem = async () => {
-  if (!program.value || !user.value) return;
-
-  try {
-    loading.value = true;
-
-    // Build item object, excluding undefined values
-    const newItem: any = {
-      order: program.value.items.length,
-      type: itemForm.value.type,
-      title: itemForm.value.title
-    };
-
-    // Only add optional fields if they have values
-    if (itemForm.value.subtitle) newItem.subtitle = itemForm.value.subtitle;
-    if (itemForm.value.participants && itemForm.value.participants.length > 0) {
-      // Clean up participants to remove undefined values
-      newItem.participants = itemForm.value.participants.map(p => {
-        const cleaned: any = { id: p.id, name: p.name, isCustom: p.isCustom };
-        if (p.avatar) cleaned.avatar = p.avatar;
-        if (p.role) cleaned.role = p.role;
-        return cleaned;
-      });
-    }
-    if (itemForm.value.duration) newItem.duration = itemForm.value.duration;
-    if (itemForm.value.notes) newItem.notes = itemForm.value.notes;
-    if (itemForm.value.resourceId) newItem.resourceId = itemForm.value.resourceId;
-    // Scripture fields for "Lecture biblique" items
-    if (itemForm.value.scriptureReference) newItem.scriptureReference = itemForm.value.scriptureReference;
-    if (itemForm.value.scriptureText) newItem.scriptureText = itemForm.value.scriptureText;
-    if (itemForm.value.scriptureVersion) newItem.scriptureVersion = itemForm.value.scriptureVersion;
-
-    await addItemToProgram(
-      program.value.id,
-      newItem,
-      user.value.uid
-    );
-
-    closeItemFormModal();
-    await showToast('Élément ajouté avec succès', 'success');
-  } catch (error) {
-    console.error('Error adding item:', error);
-    await showToast('Erreur lors de l\'ajout de l\'élément', 'danger');
-  } finally {
-    loading.value = false;
-  }
-};
-
-const updateItem = async () => {
-  if (!program.value || !user.value || !editingItemId.value) return;
-
-  try {
-    loading.value = true;
-
-    // Build update object, excluding undefined values
-    const updates: any = {
-      type: itemForm.value.type,
-      title: itemForm.value.title
-    };
-
-    // Only add optional fields if they have values
-    if (itemForm.value.subtitle) updates.subtitle = itemForm.value.subtitle;
-    // Always include participants (empty array to remove, array to set)
-    if (itemForm.value.participants && itemForm.value.participants.length > 0) {
-      // Clean up participants to remove undefined values
-      updates.participants = itemForm.value.participants.map(p => {
-        const cleaned: any = { id: p.id, name: p.name, isCustom: p.isCustom };
-        if (p.avatar) cleaned.avatar = p.avatar;
-        if (p.role) cleaned.role = p.role;
-        return cleaned;
-      });
-    }
-    // Clear old participant field if it exists
-    updates.participant = undefined;
-    if (itemForm.value.duration) updates.duration = itemForm.value.duration;
-    if (itemForm.value.notes) updates.notes = itemForm.value.notes;
-    if (itemForm.value.resourceId) updates.resourceId = itemForm.value.resourceId;
-    // Scripture fields for "Lecture biblique" items
-    if (itemForm.value.scriptureReference) updates.scriptureReference = itemForm.value.scriptureReference;
-    if (itemForm.value.scriptureText) updates.scriptureText = itemForm.value.scriptureText;
-    if (itemForm.value.scriptureVersion) updates.scriptureVersion = itemForm.value.scriptureVersion;
-
-    await updateItemInProgram(
-      program.value.id,
-      editingItemId.value,
-      updates,
-      user.value.uid
-    );
-
-    closeItemFormModal();
-    await showToast('Élément mis à jour', 'success');
-  } catch (error) {
-    console.error('Error updating item:', error);
-    await showToast('Erreur lors de la mise à jour', 'danger');
-  } finally {
-    loading.value = false;
-  }
-};
-
-const deleteItem = async (itemId: string) => {
-  if (!program.value || !user.value) return;
-
-  const confirmed = await confirmAction('Supprimer cet élément du programme ?');
-  if (!confirmed) return;
-
-  try {
-    loading.value = true;
-
-    await deleteItemFromProgram(program.value.id, itemId, user.value.uid);
-
-    await showToast('Élément supprimé', 'success');
-  } catch (error) {
-    console.error('Error deleting item:', error);
-    await showToast('Erreur lors de la suppression', 'danger');
-  } finally {
-    loading.value = false;
   }
 };
 
@@ -3163,275 +2325,6 @@ const getResourceCollectionCached = (resourceId: string): ResourceCollection | n
   return resourceCollections.value.get(resource.collectionId) || null;
 };
 
-// Handle item reorder (drag and drop)
-const handleItemReorder = async (event: CustomEvent) => {
-  if (!program.value || !user.value) {
-    event.detail.complete();
-    return;
-  }
-
-  const { from, to } = event.detail;
-
-  // Don't process if position unchanged
-  if (from === to) {
-    event.detail.complete();
-    return;
-  }
-
-  // Clone items array and perform reorder
-  const itemsCopy = [...program.value.items];
-  const [movedItem] = itemsCopy.splice(from, 1);
-  itemsCopy.splice(to, 0, movedItem);
-
-  // Update order property for all items
-  itemsCopy.forEach((item, index) => {
-    item.order = index;
-  });
-
-  // Optimistic UI update
-  program.value.items = itemsCopy;
-
-  // Complete the reorder animation
-  event.detail.complete();
-
-  // Persist to Firebase
-  try {
-    await updateProgramOrder(
-      program.value.id,
-      program.value.sections,
-      itemsCopy,
-      user.value.uid
-    );
-  } catch (error) {
-    console.error('Error saving item order:', error);
-    // Reload program to revert on error
-    await loadProgram();
-    await showToast('Erreur lors de la réorganisation', 'danger');
-  }
-};
-
-// Handle sub-item reorder (drag and drop)
-const handleSubItemReorder = async (event: CustomEvent, parentItemId: string) => {
-  if (!program.value || !user.value) {
-    event.detail.complete();
-    return;
-  }
-
-  const { from, to } = event.detail;
-
-  // Don't process if position unchanged
-  if (from === to) {
-    event.detail.complete();
-    return;
-  }
-
-  // Find parent item
-  const parentItem = program.value.items.find(i => i.id === parentItemId);
-  if (!parentItem?.subItems) {
-    event.detail.complete();
-    return;
-  }
-
-  // Clone sub-items array and perform reorder
-  const subItemsCopy = [...parentItem.subItems];
-  const [movedSubItem] = subItemsCopy.splice(from, 1);
-  subItemsCopy.splice(to, 0, movedSubItem);
-
-  // Update order property for all sub-items
-  subItemsCopy.forEach((subItem, index) => {
-    subItem.order = index;
-  });
-
-  // Optimistic UI update
-  parentItem.subItems = subItemsCopy;
-
-  // Complete the reorder animation
-  event.detail.complete();
-
-  // Persist to Firebase
-  try {
-    await updateItemInProgram(
-      program.value.id,
-      parentItemId,
-      { subItems: subItemsCopy },
-      user.value.uid
-    );
-  } catch (error) {
-    console.error('Error saving sub-item order:', error);
-    // Reload program to revert on error
-    await loadProgram();
-    await showToast('Erreur lors de la réorganisation', 'danger');
-  }
-};
-
-// Sub-Item Management
-const showAddSubItemModalForItem = (itemId: string) => {
-  parentItemIdForSubItem.value = itemId;
-  addSubItemForm.value = {
-    type: '' as ProgramItemType | '',
-    title: '',
-    subtitle: '',
-    resourceId: null,
-    participants: [],
-    duration: 0,
-    notes: '',
-    scriptureReference: '',
-    scriptureText: '',
-    scriptureVersion: 'LSG'
-  };
-  showAddSubItemTitleSuggestions.value = false;
-  showAddSubItemModalState.value = true;
-  // Load resources for autocomplete if not already loaded
-  if (allResources.value.length === 0) {
-    loadResourcesForAutocomplete();
-  }
-};
-
-const closeAddSubItemModal = () => {
-  showAddSubItemModalState.value = false;
-  parentItemIdForSubItem.value = null;
-};
-
-const addSubItem = async () => {
-  if (!program.value || !parentItemIdForSubItem.value || !user.value) return;
-
-  try {
-    loading.value = true;
-
-    const parentItem = program.value.items.find(i => i.id === parentItemIdForSubItem.value);
-    const currentSubItems = parentItem?.subItems || [];
-
-    // Build sub-item object, excluding undefined values
-    const newSubItem: any = {
-      title: addSubItemForm.value.title,
-      order: currentSubItems.length
-    };
-
-    // Only add optional fields if they have values
-    if (addSubItemForm.value.type) newSubItem.type = addSubItemForm.value.type;
-    if (addSubItemForm.value.subtitle) newSubItem.subtitle = addSubItemForm.value.subtitle;
-    if (addSubItemForm.value.resourceId) newSubItem.resourceId = addSubItemForm.value.resourceId;
-    if (addSubItemForm.value.participants && addSubItemForm.value.participants.length > 0) newSubItem.participants = addSubItemForm.value.participants;
-    if (addSubItemForm.value.duration) newSubItem.duration = addSubItemForm.value.duration;
-    if (addSubItemForm.value.notes) newSubItem.notes = addSubItemForm.value.notes;
-    if (addSubItemForm.value.scriptureReference) newSubItem.scriptureReference = addSubItemForm.value.scriptureReference;
-    if (addSubItemForm.value.scriptureText) newSubItem.scriptureText = addSubItemForm.value.scriptureText;
-    if (addSubItemForm.value.scriptureVersion) newSubItem.scriptureVersion = addSubItemForm.value.scriptureVersion;
-
-    await addSubItemToItem(
-      program.value.id,
-      parentItemIdForSubItem.value,
-      newSubItem,
-      user.value.uid
-    );
-
-    // Auto-expand the parent item
-    expandedItems.value.add(parentItemIdForSubItem.value);
-
-    closeAddSubItemModal();
-    await showToast('Sous-élément ajouté', 'success');
-  } catch (error) {
-    console.error('Error adding sub-item:', error);
-    await showToast('Erreur lors de l\'ajout', 'danger');
-  } finally {
-    loading.value = false;
-  }
-};
-
-const showEditSubItemModalForItem = (itemId: string, subItem: ProgramSubItem) => {
-  parentItemIdForSubItem.value = itemId;
-  editSubItemForm.value = {
-    id: subItem.id,
-    parentItemId: itemId,
-    type: subItem.type || '' as ProgramItemType | '',
-    title: subItem.title,
-    subtitle: subItem.subtitle || '',
-    resourceId: subItem.resourceId || null,
-    participants: subItem.participants || [],
-    duration: subItem.duration || 0,
-    notes: subItem.notes || '',
-    scriptureReference: subItem.scriptureReference || '',
-    scriptureText: subItem.scriptureText || '',
-    scriptureVersion: subItem.scriptureVersion || 'LSG'
-  };
-  showEditSubItemTitleSuggestions.value = false;
-  showEditSubItemModalState.value = true;
-  // Load resources for autocomplete if not already loaded
-  if (allResources.value.length === 0) {
-    loadResourcesForAutocomplete();
-  }
-};
-
-const closeEditSubItemModal = () => {
-  showEditSubItemModalState.value = false;
-  parentItemIdForSubItem.value = null;
-};
-
-const updateSubItem = async () => {
-  if (!program.value || !editSubItemForm.value.parentItemId || !user.value) return;
-
-  try {
-    loading.value = true;
-
-    // Build update object, excluding undefined values
-    const updates: any = {
-      title: editSubItemForm.value.title
-    };
-
-    // Only add optional fields if they have values
-    if (editSubItemForm.value.type) updates.type = editSubItemForm.value.type;
-    if (editSubItemForm.value.subtitle) updates.subtitle = editSubItemForm.value.subtitle;
-    if (editSubItemForm.value.resourceId) updates.resourceId = editSubItemForm.value.resourceId;
-    if (editSubItemForm.value.participants && editSubItemForm.value.participants.length > 0) updates.participants = editSubItemForm.value.participants;
-    if (editSubItemForm.value.duration) updates.duration = editSubItemForm.value.duration;
-    if (editSubItemForm.value.notes) updates.notes = editSubItemForm.value.notes;
-    // Scripture fields - include even if empty to allow clearing
-    updates.scriptureReference = editSubItemForm.value.scriptureReference || null;
-    updates.scriptureText = editSubItemForm.value.scriptureText || null;
-    updates.scriptureVersion = editSubItemForm.value.scriptureVersion || null;
-
-    await updateSubItemInItem(
-      program.value.id,
-      editSubItemForm.value.parentItemId,
-      editSubItemForm.value.id,
-      updates,
-      user.value.uid
-    );
-
-    closeEditSubItemModal();
-    await showToast('Sous-élément mis à jour', 'success');
-  } catch (error) {
-    console.error('Error updating sub-item:', error);
-    await showToast('Erreur', 'danger');
-  } finally {
-    loading.value = false;
-  }
-};
-
-const deleteSubItem = async (itemId: string, subItemId: string) => {
-  if (!program.value || !user.value) return;
-
-  const confirmed = await confirmAction('Supprimer ce sous-élément ?');
-  if (!confirmed) return;
-
-  try {
-    loading.value = true;
-
-    await deleteSubItemFromItem(
-      program.value.id,
-      itemId,
-      subItemId,
-      user.value.uid
-    );
-
-    await showToast('Sous-élément supprimé', 'success');
-  } catch (error) {
-    console.error('Error deleting sub-item:', error);
-    await showToast('Erreur', 'danger');
-  } finally {
-    loading.value = false;
-  }
-};
 
 // Media Functions
 const showMediaContent = (content: any, title: string) => {
@@ -4257,57 +3150,6 @@ const getSlideTypeLabel = (type: ProgramItemType): string => {
   }
 };
 
-// Watch for resource selection to auto-populate title
-watch(() => itemForm.value.resourceId, async (newResourceId) => {
-  if (!newResourceId) return;
-  const resource = getLinkedResource(newResourceId);
-  if (resource) {
-    if (!itemForm.value.title) {
-      itemForm.value.title = resource.title;
-    }
-  } else {
-    // If resource not yet loaded, load it
-    try {
-      const loaded = await getResourceById(newResourceId);
-      if (loaded) {
-        linkedResources.value.set(newResourceId, loaded);
-        if (!itemForm.value.title) {
-          itemForm.value.title = loaded.title;
-        }
-      }
-    } catch (error) {
-      console.error('Error loading resource:', error);
-    }
-  }
-  subscribeToLinkedResource(newResourceId);
-});
-
-// Ensure sub-item linked resources are loaded for inline card display
-watch(() => addSubItemForm.value.resourceId, async (newResourceId) => {
-  if (!newResourceId) return;
-  if (!getLinkedResource(newResourceId)) {
-    try {
-      const loaded = await getResourceById(newResourceId);
-      if (loaded) linkedResources.value.set(newResourceId, loaded);
-    } catch (error) {
-      console.error('Error loading resource:', error);
-    }
-  }
-  subscribeToLinkedResource(newResourceId);
-});
-
-watch(() => editSubItemForm.value.resourceId, async (newResourceId) => {
-  if (!newResourceId) return;
-  if (!getLinkedResource(newResourceId)) {
-    try {
-      const loaded = await getResourceById(newResourceId);
-      if (loaded) linkedResources.value.set(newResourceId, loaded);
-    } catch (error) {
-      console.error('Error loading resource:', error);
-    }
-  }
-  subscribeToLinkedResource(newResourceId);
-});
 
 // Load music options
 const loadMusicOptions = async () => {
@@ -4680,8 +3522,27 @@ onUnmounted(() => {
   gap: 8px;
 }
 
+.add-item-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
 .add-item-button {
-  min-width: 200px;
+  min-width: 180px;
+}
+
+.add-section-button {
+  --border-color: var(--ion-color-medium);
+}
+
+.reorder-button {
+  --border-color: var(--ion-color-medium);
+}
+
+.done-reorder-button {
+  min-width: 150px;
 }
 
 /* Quick-Add Type Buttons */
@@ -4857,6 +3718,27 @@ ion-reorder.item-handle-column:active {
   font-weight: 600;
   margin: 0 0 0.25rem 0;
   color: var(--ion-color-dark);
+}
+
+.item-title.editable {
+  cursor: pointer;
+}
+
+.item-title.editable:hover {
+  text-decoration: underline;
+  text-decoration-style: dashed;
+  text-underline-offset: 2px;
+  text-decoration-color: var(--ion-color-medium);
+}
+
+.inline-title-input {
+  font-size: 1.1rem;
+  font-weight: 600;
+  --padding-start: 0;
+  --padding-end: 0;
+  --padding-top: 0;
+  --padding-bottom: 0;
+  margin: 0 0 0.25rem 0;
 }
 
 .item-subtitle {
@@ -5103,6 +3985,34 @@ ion-reorder.item-handle-column:active {
   color: var(--ion-color-medium-shade);
 }
 
+.item-duration.interactive,
+.item-participants.interactive {
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 2px 6px;
+  margin: -2px -6px;
+  transition: background 0.15s;
+}
+
+.item-duration.interactive:hover,
+.item-participants.interactive:hover {
+  background: var(--ion-color-light);
+}
+
+.popover-participants-content {
+  padding: 12px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.participants-popover {
+  --width: 320px;
+}
+
+.action-popover {
+  --width: 260px;
+}
+
 .item-participants {
   display: flex;
   flex-direction: column;
@@ -5135,15 +4045,37 @@ ion-reorder.item-handle-column:active {
   color: var(--ion-color-medium);
 }
 
-.item-actions-column {
-  flex-shrink: 0;
-  min-width: 120px;
+/* Program Items */
+.program-item-wrapper {
+  --padding-start: 0;
+  --padding-end: 0;
+  --inner-padding-end: 0;
+  --inner-padding-start: 0;
+  --background: transparent;
+  --min-height: auto;
+  width: 100%;
 }
 
-.item-actions {
-  display: flex;
-  gap: 0.25rem;
-  justify-content: flex-end;
+.program-item-wrapper::part(native) {
+  padding: 0;
+}
+
+/* 3-dot action menu button */
+.item-action-menu-btn {
+  --padding-start: 4px;
+  --padding-end: 4px;
+  margin: 0;
+  color: var(--ion-color-medium);
+  align-self: start;
+}
+
+.sub-item-action-menu-btn {
+  --padding-start: 2px;
+  --padding-end: 2px;
+  margin: 0;
+  margin-left: auto;
+  color: var(--ion-color-medium);
+  flex-shrink: 0;
 }
 
 /* Sub-Items */
@@ -5271,11 +4203,6 @@ ion-reorder.item-handle-column:active {
   align-items: center;
 }
 
-.sub-item-actions {
-  display: flex;
-  gap: 0.25rem;
-  flex-shrink: 0;
-}
 
 /* Media Modal */
 .media-modal {
@@ -5870,10 +4797,6 @@ ion-reorder.item-handle-column:active {
     align-items: flex-start;
   }
 
-  .item-actions-column {
-    width: 100%;
-    margin-top: 0.5rem;
-  }
 
   .item-actions {
     justify-content: flex-start;
@@ -5889,14 +4812,6 @@ ion-reorder.item-handle-column:active {
   }
 }
 
-/* Edit Mode */
-.edit-mode .program-item {
-  border: 1px dashed var(--ion-color-light-shade);
-}
-
-.edit-mode .program-item-wrapper:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-}
 
 /* Title Field with Resource Button */
 .title-field-with-button {
@@ -6112,19 +5027,9 @@ ion-reorder.item-handle-column:active {
   display: none;
 }
 
-/* Hide actions for section in view mode, show in edit mode */
-.program-item-wrapper.is-section .item-actions-column {
-  display: flex !important;
-}
-
-.program-item-wrapper.is-section .item-actions ion-button {
-  --color: white !important;
-  --ion-color-primary: white;
-  --ion-color-danger: white;
-}
-
-.program-item-wrapper.is-section .item-actions ion-button ion-icon {
-  color: white !important;
+.program-item-wrapper.is-section .item-action-menu-btn {
+  color: rgba(255, 255, 255, 0.8);
+  --color: rgba(255, 255, 255, 0.8);
 }
 
 /* Scripture Fetch Section */
