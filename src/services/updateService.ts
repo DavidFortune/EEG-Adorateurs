@@ -241,6 +241,23 @@ class UpdateService {
   async getReleaseNotes(): Promise<ReleaseNote[]> {
     return [
       {
+        version: '1.15.1',
+        date: '2026-03-07',
+        title: 'Correction des avatars membres',
+        description: 'Correction de l\'affichage des avatars dans toutes les vues de l\'application — les images cassées affichent maintenant les initiales, et les photos Google sont synchronisées automatiquement',
+        features: [],
+        fixes: [
+          'Les avatars avec URL cassée ou expirée affichent maintenant les initiales au lieu d\'une icône d\'image brisée',
+          'Ajout du style object-fit: cover sur les avatars dans ServiceMembersPage et ServiceDetailPage',
+          'Synchronisation automatique de la photo Google vers Firestore lors de la connexion',
+          'Correction de la création en double de ressources (boutons désactivés pendant la sauvegarde)'
+        ],
+        improvements: [
+          'Protection @error appliquée sur les 22 images d\'avatar à travers 12 composants',
+          'Les membres sans avatar personnalisé récupèrent leur photo Google automatiquement'
+        ]
+      },
+      {
         version: '1.15.0',
         date: '2026-03-06',
         title: 'UX programme améliorée et édition en ligne',

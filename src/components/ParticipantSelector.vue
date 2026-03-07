@@ -85,7 +85,7 @@
               :class="{ 'selected-item': isSelected(member.id) }"
             >
               <ion-avatar slot="start" class="member-avatar">
-                <img v-if="member.avatar" :src="member.avatar" :alt="member.fullName" />
+                <img v-if="member.avatar && !failedAvatars.has(member.id)" :src="member.avatar" :alt="member.fullName" @error="failedAvatars.add(member.id)" />
                 <span v-else class="initials">{{ getInitials(member.fullName) }}</span>
               </ion-avatar>
               <ion-label>
@@ -144,7 +144,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, reactive, computed, onMounted, watch } from 'vue';
 import {
   IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton,
   IonContent, IonSegment, IonSegmentButton, IonLabel, IonSearchbar,
@@ -183,6 +183,7 @@ const selectedParticipants = computed(() => props.participants || []);
 // Modal state
 const isOpen = ref(false);
 const activeTab = ref<'members' | 'custom'>('members');
+const failedAvatars = reactive(new Set<string>());
 const loading = ref(false);
 
 // Members state

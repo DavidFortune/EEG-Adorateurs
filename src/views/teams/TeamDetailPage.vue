@@ -137,9 +137,10 @@
               >
                 <div class="member-info">
                   <ion-avatar class="member-avatar">
-                    <img v-if="getMemberData(teamMember.memberId)?.avatar"
+                    <img v-if="getMemberData(teamMember.memberId)?.avatar && !failedAvatars.has(teamMember.memberId)"
                          :src="getMemberData(teamMember.memberId)?.avatar"
-                         :alt="getMemberData(teamMember.memberId)?.fullName" />
+                         :alt="getMemberData(teamMember.memberId)?.fullName"
+                         @error="failedAvatars.add(teamMember.memberId)" />
                     <div v-else class="avatar-initials">
                       {{ getMemberInitials(teamMember.memberId) }}
                     </div>
@@ -200,9 +201,10 @@
               >
                 <div class="member-info">
                   <ion-avatar class="member-avatar">
-                    <img v-if="getMemberData(teamMember.memberId)?.avatar"
+                    <img v-if="getMemberData(teamMember.memberId)?.avatar && !failedAvatars.has(teamMember.memberId)"
                          :src="getMemberData(teamMember.memberId)?.avatar"
-                         :alt="getMemberData(teamMember.memberId)?.fullName" />
+                         :alt="getMemberData(teamMember.memberId)?.fullName"
+                         @error="failedAvatars.add(teamMember.memberId)" />
                     <div v-else class="avatar-initials">
                       {{ getMemberInitials(teamMember.memberId) }}
                     </div>
@@ -439,9 +441,10 @@
           <div class="modal-content">
             <div class="member-info-header" v-if="memberToChangeRole">
               <ion-avatar class="member-avatar">
-                <img v-if="getMemberData(memberToChangeRole.memberId)?.avatar" 
-                     :src="getMemberData(memberToChangeRole.memberId)?.avatar" 
-                     :alt="getMemberData(memberToChangeRole.memberId)?.fullName" />
+                <img v-if="getMemberData(memberToChangeRole.memberId)?.avatar && !failedAvatars.has(memberToChangeRole.memberId)"
+                     :src="getMemberData(memberToChangeRole.memberId)?.avatar"
+                     :alt="getMemberData(memberToChangeRole.memberId)?.fullName"
+                     @error="failedAvatars.add(memberToChangeRole.memberId)" />
                 <div v-else class="avatar-initials">
                   {{ getMemberInitials(memberToChangeRole.memberId) }}
                 </div>
@@ -494,9 +497,10 @@
           <div class="modal-content">
             <div class="member-info-header" v-if="memberToApprove">
               <ion-avatar class="member-avatar">
-                <img v-if="getMemberData(memberToApprove.memberId)?.avatar"
+                <img v-if="getMemberData(memberToApprove.memberId)?.avatar && !failedAvatars.has(memberToApprove.memberId)"
                      :src="getMemberData(memberToApprove.memberId)?.avatar"
-                     :alt="getMemberData(memberToApprove.memberId)?.fullName" />
+                     :alt="getMemberData(memberToApprove.memberId)?.fullName"
+                     @error="failedAvatars.add(memberToApprove.memberId)" />
                 <div v-else class="avatar-initials">
                   {{ getMemberInitials(memberToApprove.memberId) }}
                 </div>
@@ -614,9 +618,10 @@
           <div class="modal-content">
             <div class="member-info-header" v-if="memberToChangePosition">
               <ion-avatar class="member-avatar">
-                <img v-if="getMemberData(memberToChangePosition.memberId)?.avatar"
+                <img v-if="getMemberData(memberToChangePosition.memberId)?.avatar && !failedAvatars.has(memberToChangePosition.memberId)"
                      :src="getMemberData(memberToChangePosition.memberId)?.avatar"
-                     :alt="getMemberData(memberToChangePosition.memberId)?.fullName" />
+                     :alt="getMemberData(memberToChangePosition.memberId)?.fullName"
+                     @error="failedAvatars.add(memberToChangePosition.memberId)" />
                 <div v-else class="avatar-initials">
                   {{ getMemberInitials(memberToChangePosition.memberId) }}
                 </div>
@@ -656,7 +661,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, reactive, onMounted, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
@@ -683,6 +688,7 @@ const { member: currentUser } = useUser();
 
 const team = ref<Team | null>(null);
 const members = ref<Member[]>([]);
+const failedAvatars = reactive(new Set<string>());
 const loading = ref(true);
 const showAddMemberModal = ref(false);
 const showTransferOwnershipModal = ref(false);

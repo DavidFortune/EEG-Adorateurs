@@ -24,7 +24,7 @@
             <div class="avatar-container">
               <div class="avatar-wrapper" @click="triggerAvatarUpload">
                 <div class="avatar">
-                  <img v-if="member?.avatar" :src="member.avatar" :alt="member.fullName" />
+                  <img v-if="member?.avatar && !avatarFailed" :src="member.avatar" :alt="member.fullName" @error="avatarFailed = true" />
                   <div v-else class="initials-avatar">
                     <span class="initials">{{ initials }}</span>
                   </div>
@@ -154,6 +154,7 @@ const router = useRouter();
 
 // State
 const loading = ref(true);
+const avatarFailed = ref(false);
 const saving = ref(false);
 const member = ref<Member | null>(null);
 const availableMinistries = ref<Ministry[]>([]);

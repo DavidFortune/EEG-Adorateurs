@@ -118,7 +118,7 @@
               :disabled="savingGuests"
             >
               <ion-avatar slot="start">
-                <img v-if="member.avatar" :src="member.avatar" :alt="member.fullName" />
+                <img v-if="member.avatar && !failedAvatars.has(member.id)" :src="member.avatar" :alt="member.fullName" @error="failedAvatars.add(member.id)" />
                 <div v-else class="avatar-initials">{{ getInitials(member.fullName) }}</div>
               </ion-avatar>
               <ion-label>
@@ -142,7 +142,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
+import { ref, reactive, onMounted, onUnmounted, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons,
@@ -194,6 +194,7 @@ const { user, isAdmin } = useUser();
 
 // Core state
 const service = ref<Service | null>(null);
+const failedAvatars = reactive(new Set<string>());
 const loading = ref(true);
 const updating = ref(false);
 const selectedSegment = ref<'programme' | 'ressources' | 'members'>('programme');
@@ -867,6 +868,13 @@ onUnmounted(() => {
   text-align: center;
   padding: 32px 16px;
   color: var(--ion-color-medium);
+}
+
+ion-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .avatar-initials {

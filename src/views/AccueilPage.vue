@@ -5,8 +5,8 @@
         <ion-title>Accueil</ion-title>
         <ion-buttons slot="end">
           <ion-button fill="clear" class="avatar-button" id="avatar-trigger-accueil" @click="toggleUserMenu">
-            <ion-avatar v-if="userAvatar" class="header-avatar">
-              <img :src="userAvatar" :alt="userName" />
+            <ion-avatar v-if="userAvatar && !avatarFailed" class="header-avatar">
+              <img :src="userAvatar" :alt="userName" @error="avatarFailed = true" />
             </ion-avatar>
             <ion-avatar v-else class="header-avatar initials-avatar">
               <span class="initials">{{ userInitials }}</span>
@@ -317,6 +317,7 @@ import type { ServiceAssignment } from '@/types/assignment';
 
 const router = useRouter();
 const { userAvatar, userInitials, userName, member, loadMemberData } = useUser();
+const avatarFailed = ref(false);
 const isUserMenuOpen = ref(false);
 const allServices = ref<Service[]>([]);
 const userTeamNames = ref<string[]>([]);

@@ -8,7 +8,7 @@
     <ion-content class="user-menu">
       <div class="user-info">
         <ion-avatar class="menu-avatar">
-          <img v-if="userAvatar" :src="userAvatar" :alt="userName" />
+          <img v-if="userAvatar && !avatarFailed" :src="userAvatar" :alt="userName" @error="avatarFailed = true" />
           <span v-else class="initials">{{ userInitials }}</span>
         </ion-avatar>
         <div class="user-details">
@@ -38,6 +38,7 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   IonPopover, IonContent, IonAvatar, IonList, IonItem, IonLabel, IonIcon,
@@ -60,6 +61,7 @@ const emit = defineEmits<{
 
 const router = useRouter();
 const { user, userAvatar, userInitials, userName } = useUser();
+const avatarFailed = ref(false);
 
 const showToast = async (message: string, color: 'success' | 'danger' = 'success') => {
   const toast = await toastController.create({

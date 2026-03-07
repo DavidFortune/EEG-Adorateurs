@@ -97,7 +97,7 @@
             <ion-card-content>
               <div class="member-header">
                 <div class="member-avatar">
-                  <img v-if="member.avatar" :src="member.avatar" :alt="member.fullName" />
+                  <img v-if="member.avatar && !failedAvatars.has(member.id)" :src="member.avatar" :alt="member.fullName" @error="failedAvatars.add(member.id)" />
                   <span v-else class="avatar-initials">{{ getInitials(member.fullName) }}</span>
                 </div>
                 <div class="member-info">
@@ -149,7 +149,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
@@ -172,6 +172,7 @@ const route = useRoute();
 const teamId = route.params.id as string;
 
 // State
+const failedAvatars = reactive(new Set<string>());
 const loading = ref(false);
 const team = ref<Team | null>(null);
 const teamMembers = ref<Member[]>([]);

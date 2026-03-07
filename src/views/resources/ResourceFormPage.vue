@@ -7,7 +7,7 @@
         </ion-buttons>
         <ion-title>{{ isEditMode ? 'Modifier la ressource' : 'Nouvelle ressource' }}</ion-title>
         <ion-buttons slot="end">
-          <ion-button @click="saveResource" :disabled="!isFormValid">
+          <ion-button @click="saveResource" :disabled="!isFormValid || loading">
             <ion-icon :icon="checkmarkOutline" />
           </ion-button>
         </ion-buttons>

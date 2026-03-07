@@ -32,7 +32,7 @@
             class="member-item"
           >
             <ion-avatar class="member-avatar">
-              <img v-if="member.avatar" :src="member.avatar" :alt="member.memberName" />
+              <img v-if="member.avatar && !failedAvatars.has(member.memberId)" :src="member.avatar" :alt="member.memberName" @error="failedAvatars.add(member.memberId)" />
               <div v-else class="avatar-initials">{{ getInitials(member.memberName) }}</div>
             </ion-avatar>
             <span class="member-name">{{ member.memberName }}</span>
@@ -58,7 +58,7 @@
             class="member-item"
           >
             <ion-avatar class="member-avatar">
-              <img v-if="guest.avatar" :src="guest.avatar" :alt="guest.fullName" />
+              <img v-if="guest.avatar && !failedAvatars.has(guest.id)" :src="guest.avatar" :alt="guest.fullName" @error="failedAvatars.add(guest.id)" />
               <div v-else class="avatar-initials guest-initials">{{ getInitials(guest.fullName) }}</div>
             </ion-avatar>
             <span class="member-name">{{ guest.fullName }}</span>
@@ -70,10 +70,13 @@
 </template>
 
 <script setup lang="ts">
+import { reactive } from 'vue';
 import { IonSpinner, IonIcon, IonChip, IonAvatar } from '@ionic/vue';
 import { peopleOutline, personAddOutline } from 'ionicons/icons';
 import type { Member } from '@/types/member';
 import type { ServiceAssignment } from '@/types/assignment';
+
+const failedAvatars = reactive(new Set<string>());
 
 interface TeamAssignmentGroup {
   teamId: string;

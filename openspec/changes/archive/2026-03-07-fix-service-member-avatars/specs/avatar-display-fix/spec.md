@@ -1,3 +1,5 @@
+## MODIFIED Requirements
+
 ### Requirement: Avatar images SHALL render as circular cover-fit images in all components
 All components that display user avatars MUST apply consistent CSS styling to `<img>` elements inside avatar containers: `width: 100%`, `height: 100%`, `object-fit: cover`, and `border-radius: 50%`.
 
@@ -29,7 +31,7 @@ All components that display user avatars MUST apply consistent CSS styling to `<
 - **WHEN** a member does not have an uploaded avatar photo
 - **THEN** the initials fallback SHALL continue to display as before with no visual change
 
----
+## ADDED Requirements
 
 ### Requirement: Avatar images SHALL fall back to initials when the image URL fails to load
 All avatar `<img>` elements MUST include an `@error` handler that triggers the initials fallback when the image URL is broken, expired, or unreachable. The `v-if` condition on the `<img>` MUST check both that the avatar field exists AND that it has not previously failed to load. This ensures users never see broken image icons.
@@ -48,8 +50,6 @@ All avatar `<img>` elements MUST include an `@error` handler that triggers the i
 - **WHEN** any component in the app renders a member avatar
 - **THEN** it MUST use the `@error` fallback pattern
 - **AND** broken image icons MUST never be visible to the user
-
----
 
 ### Requirement: Google photoURL SHALL be synced to Firestore member avatar on login
 When a member logs in and their Firestore member document has no `avatar` field, the system MUST check if the Firebase Auth user has a `photoURL` and, if so, update the member's Firestore `avatar` field with that URL. This sync MUST NOT overwrite a custom-uploaded avatar.

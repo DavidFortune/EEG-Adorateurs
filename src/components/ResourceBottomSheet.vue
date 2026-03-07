@@ -396,7 +396,7 @@
           <ion-button
             expand="block"
             @click="createAndLinkResource"
-            :disabled="!newResourceTitle.trim()"
+            :disabled="!newResourceTitle.trim() || loading"
             class="ion-margin-top"
           >
             <ion-icon :icon="addCircleOutline" slot="start" />

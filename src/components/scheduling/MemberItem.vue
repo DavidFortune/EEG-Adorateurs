@@ -5,11 +5,12 @@
     @click="handleClick"
   >
     <div class="member-avatar">
-      <img 
-        v-if="member.avatar" 
-        :src="member.avatar" 
+      <img
+        v-if="member.avatar && !avatarFailed"
+        :src="member.avatar"
         :alt="member.name"
         class="avatar-image"
+        @error="avatarFailed = true"
       />
       <span v-else class="avatar-initials">
         {{ getInitials(member.name) }}
@@ -34,7 +35,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { ref, computed } from 'vue';
 import { IonIcon } from '@ionic/vue';
 import { 
   checkmarkCircleOutline, 
@@ -56,6 +57,8 @@ const props = defineProps<Props>();
 const emit = defineEmits<{
   click: [memberId: string];
 }>();
+
+const avatarFailed = ref(false);
 
 const memberItemClasses = computed(() => ({
   'member-item--assigned': props.member.isAssigned,

@@ -83,7 +83,7 @@
                 <ion-list class="members-list">
                   <ion-item v-for="member in team.members" :key="member.memberId" lines="none" class="member-item">
                     <ion-avatar slot="start">
-                      <img v-if="member.avatar" :src="member.avatar" :alt="member.memberName" />
+                      <img v-if="member.avatar && !failedAvatars.has(member.memberId)" :src="member.avatar" :alt="member.memberName" @error="failedAvatars.add(member.memberId)" />
                       <div v-else class="avatar-initials">
                         {{ getInitials(member.memberName) }}
                       </div>
@@ -133,7 +133,7 @@
                 <ion-list class="members-list">
                   <ion-item v-for="guest in guestMembers" :key="guest.id" lines="none" class="member-item">
                     <ion-avatar slot="start">
-                      <img v-if="guest.avatar" :src="guest.avatar" :alt="guest.fullName" />
+                      <img v-if="guest.avatar && !failedAvatars.has(guest.id)" :src="guest.avatar" :alt="guest.fullName" @error="failedAvatars.add(guest.id)" />
                       <div v-else class="avatar-initials">
                         {{ getInitials(guest.fullName) }}
                       </div>
@@ -170,7 +170,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonBackButton,
@@ -201,6 +201,7 @@ const route = useRoute();
 const router = useRouter();
 const { isAdmin } = useUser();
 
+const failedAvatars = reactive(new Set<string>());
 const loading = ref(true);
 const loadingAssignments = ref(true);
 const service = ref<Service | null>(null);
@@ -630,6 +631,13 @@ onUnmounted(() => {
   width: 40px;
   height: 40px;
   margin-right: 12px;
+}
+
+.member-item ion-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .avatar-initials {

@@ -126,8 +126,8 @@
               <!-- Conductor Information -->
               <div v-if="program.conductor" class="conductor-info">
                 <div class="conductor-section">
-                  <ion-avatar v-if="program.conductor.avatar" class="conductor-avatar">
-                    <img :src="program.conductor.avatar" :alt="program.conductor.name" />
+                  <ion-avatar v-if="program.conductor.avatar && !failedAvatars.has('conductor')" class="conductor-avatar">
+                    <img :src="program.conductor.avatar" :alt="program.conductor.name" @error="failedAvatars.add('conductor')" />
                   </ion-avatar>
                   <div v-else class="conductor-initials">
                     {{ getParticipantInitials(program.conductor.name) }}
@@ -358,8 +358,8 @@
                       @click="isAdmin && openParticipantsPopover($event, item)"
                     >
                       <div v-for="participant in item.participants" :key="participant.id" class="item-participant">
-                        <ion-avatar v-if="participant.avatar" class="participant-avatar">
-                          <img :src="participant.avatar" :alt="participant.name" />
+                        <ion-avatar v-if="participant.avatar && !failedAvatars.has('p-' + participant.id)" class="participant-avatar">
+                          <img :src="participant.avatar" :alt="participant.name" @error="failedAvatars.add('p-' + participant.id)" />
                         </ion-avatar>
                         <span v-else class="participant-initials">{{ getParticipantInitials(participant.name) }}</span>
                         {{ participant.name }}
@@ -368,8 +368,8 @@
                     </div>
                     <!-- Legacy single participant support -->
                     <div v-else-if="item.participant" class="item-participant">
-                      <ion-avatar v-if="item.participant.avatar" class="participant-avatar">
-                        <img :src="item.participant.avatar" :alt="item.participant.name" />
+                      <ion-avatar v-if="item.participant.avatar && !failedAvatars.has('p-' + item.participant.id)" class="participant-avatar">
+                        <img :src="item.participant.avatar" :alt="item.participant.name" @error="failedAvatars.add('p-' + item.participant.id)" />
                       </ion-avatar>
                       <span v-else class="participant-initials">{{ getParticipantInitials(item.participant.name) }}</span>
                       {{ item.participant.name }}
@@ -1246,7 +1246,7 @@
               @click="toggleDraftViewer(member.firebaseUserId)"
             >
               <ion-avatar slot="start">
-                <img v-if="member.avatar" :src="member.avatar" :alt="member.fullName" />
+                <img v-if="member.avatar && !failedAvatars.has(member.id)" :src="member.avatar" :alt="member.fullName" @error="failedAvatars.add(member.id)" />
                 <div v-else class="avatar-initials">{{ getMemberInitials(member.fullName) }}</div>
               </ion-avatar>
               <ion-label>
@@ -1295,7 +1295,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonBackButton,
@@ -1356,6 +1356,7 @@ const route = useRoute();
 const { user, isAdmin } = useUser();
 
 // Reactive State
+const failedAvatars = reactive(new Set<string>());
 const loading = ref(true);
 const service = ref<Service | null>(null);
 const program = ref<ServiceProgram | null>(null);

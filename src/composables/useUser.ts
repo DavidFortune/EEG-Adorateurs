@@ -69,6 +69,16 @@ export function useUser() {
       try {
         member.value = await membersService.getMemberByFirebaseUserId(user.value.uid)
 
+        // Sync Google photoURL to Firestore if member has no avatar
+        if (member.value && !member.value.avatar && user.value.photoURL) {
+          try {
+            await membersService.updateMember(member.value.id, { avatar: user.value.photoURL })
+            member.value = { ...member.value, avatar: user.value.photoURL }
+          } catch (error) {
+            console.error('Error syncing Google avatar:', error)
+          }
+        }
+
         // Load member teams for permission checking
         if (member.value) {
           try {
