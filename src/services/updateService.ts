@@ -241,6 +241,30 @@ class UpdateService {
   async getReleaseNotes(): Promise<ReleaseNote[]> {
     return [
       {
+        version: '1.15.2',
+        date: '2026-03-07',
+        title: 'Édition rapide du programme et optimisation mobile',
+        description: 'Ajout de boutons d\'action rapide pour chaque élément du programme, affichage des métadonnées en pastilles compactes, et optimisation complète de la mise en page pour mobile',
+        features: [
+          'Boutons d\'action rapide (participant, durée, sous-titre, note) sur chaque élément',
+          'Édition en ligne du sous-titre et des notes directement depuis la liste du programme',
+          'Champ de référence biblique pour le type Prédication dans la barre d\'ajout',
+          'Recherche automatique des versets pour Lecture biblique et Prédication',
+          'Liaison automatique des ressources à la création (sans confirmation)'
+        ],
+        fixes: [
+          'Mise en page mobile optimisée — les titres ne sont plus tronqués',
+          'Poignée de réorganisation déplacée à droite pour libérer l\'espace du contenu',
+          'Bouton 3 points et poignée de réorganisation centrés verticalement'
+        ],
+        improvements: [
+          'Durée et participants affichés en pastilles compactes dans la zone de contenu',
+          'Nettoyage du code : suppression de ~180 lignes de CSS inutilisé et des imports/fonctions obsolètes',
+          'Sous-éléments restreints au type Titre uniquement',
+          'Sections créées via le menu 3 points au lieu de la barre d\'ajout'
+        ]
+      },
+      {
         version: '1.15.1',
         date: '2026-03-07',
         title: 'Correction des avatars membres',

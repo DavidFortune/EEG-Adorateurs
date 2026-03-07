@@ -437,6 +437,8 @@ interface Props {
   isOpen?: boolean;
   buttonFill?: 'clear' | 'outline' | 'solid';
   buttonSize?: 'small' | 'default' | 'large';
+  initialTitle?: string;
+  initialMode?: 'browse' | 'create';
 }
 
 interface Emits {
@@ -454,7 +456,9 @@ const props = withDefaults(defineProps<Props>(), {
   modalOnly: false,
   isOpen: false,
   buttonFill: 'outline',
-  buttonSize: 'default'
+  buttonSize: 'default',
+  initialTitle: '',
+  initialMode: 'browse'
 });
 const emit = defineEmits<Emits>();
 
@@ -801,13 +805,21 @@ const handleCreateResource = async () => {
 
     const newResourceId = await createResource(resourceData);
 
-    // Reload and auto-select
+    await showToast('Ressource créée avec succès', 'success');
+
+    // If opened in create mode (from InlineAddBar), auto-link and close
+    if (props.initialMode === 'create') {
+      emit('update:modelValue', newResourceId);
+      closeResourceModal();
+      resetCreateForm();
+      return;
+    }
+
+    // Otherwise reload and auto-select for manual confirmation
     await loadResources();
     tempSelectedId.value = newResourceId;
     mode.value = 'browse';
     resetCreateForm();
-
-    await showToast('Ressource créée avec succès', 'success');
   } catch (error) {
     console.error('Error creating resource:', error);
     await showToast('Erreur lors de la création', 'danger');
@@ -892,6 +904,13 @@ watch(() => props.isOpen, async (newVal) => {
     tempSelectedIds.value = [...props.selectedIds];
     tempSelectedId.value = props.modelValue ?? null;
     await loadResources();
+    // Support opening directly in create mode with pre-filled title
+    if (props.initialMode === 'create') {
+      mode.value = 'create';
+      if (props.initialTitle) {
+        createForm.value.title = props.initialTitle;
+      }
+    }
   }
 });
 
