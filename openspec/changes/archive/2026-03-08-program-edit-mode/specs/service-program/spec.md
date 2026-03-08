@@ -1,4 +1,4 @@
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Program items SHALL support inline creation and editing
 The service program SHALL allow creating items of the following types: Titre, Chant, Priere, Lecture biblique, Predication, Section, and additional types accessible via the ItemDetailSheet. Each program item MUST support: assigned participants, duration, subtitle, notes, sub-items (Titre type only), linked resources, and bible reference.
@@ -13,6 +13,14 @@ Resource autocomplete SHALL only be active for the Chant (song) type. When a res
 
 Scripture text SHALL be auto-fetched when creating items of type Lecture biblique (using the title as the reference) or Predication (using the scripture reference field).
 
+#### Scenario: Admin in edit mode creates an item via inline add bar
+- **WHEN** an admin in edit mode selects a type in the InlineAddBar, types a title, and presses Enter
+- **THEN** the item SHALL be created and appear in the program list immediately
+
+#### Scenario: Admin in read-only mode cannot create items
+- **WHEN** an admin views a program in read-only mode
+- **THEN** the InlineAddBar SHALL NOT be visible
+
 ### Requirement: Reorder mode SHALL be available only in edit mode
 The reorder drag handles SHALL only be visible when the user is in edit mode (`isEditing`). In read-only mode, drag handles SHALL be hidden. When visible, drag handles SHALL be in `slot="end"` alongside the 3-dot menu. All editing interactions (action menus, inline edits, add bar, quick actions) SHALL only be available in edit mode.
 
@@ -23,14 +31,6 @@ The reorder drag handles SHALL only be visible when the user is in edit mode (`i
 #### Scenario: Admin in read-only mode cannot reorder items
 - **WHEN** an admin views a program in read-only mode
 - **THEN** reorder drag handles SHALL NOT be visible
-
-### Requirement: Sub-items SHALL only be available for Titre type items
-Only items of type Titre SHALL support sub-items. The expand/collapse button, sub-items container, and sub-item InlineAddBar SHALL only appear for Titre type items. The 3-dot menu "Ajouter un sous-element" action SHALL only appear for Titre type items. The ItemDetailSheet "Ajouter un sous-element" shortcut SHALL only appear for Titre type items.
-
-### Requirement: Sections SHALL be created via 3-dot menu or InlineAddBar
-Section items SHALL be created via the 3-dot action menu on any non-section item, using "Ajouter une section" action. The new section SHALL be inserted after the selected item with proper order management. Section items SHALL also be creatable via a dedicated section button (dashed-border icon) in the main InlineAddBar type row (not shown in sub-item add bars). When created via the InlineAddBar, the section SHALL be appended at the end of the program. In both cases, inline title editing SHALL activate on the newly created section.
-
-Section items SHALL display with full-width danger-colored background, centered white text, and no sub-items. The 3-dot menu for sections SHALL hide "Ajouter un sous-element" and "Ajouter une section" actions.
 
 ### Requirement: Quick action buttons SHALL only be visible in edit mode
 Each non-section program item SHALL display a row of quick action icon buttons (participant, duration, subtitle, notes) only when the user is in edit mode (`isEditing`). In read-only mode, the quick action buttons SHALL be hidden. Metadata chips (duration, participants) SHALL remain visible in read-only mode but SHALL NOT be interactive (tapping SHALL NOT open popovers).
@@ -55,9 +55,6 @@ Clicking on item titles, subtitles, and notes SHALL only activate inline editing
 - **WHEN** an admin in read-only mode clicks on an item title
 - **THEN** nothing SHALL happen
 
-### Requirement: Item metadata SHALL display as inline chips
-Duration and participant information SHALL display as compact pill-shaped chips (meta-chips) inside the item content column, below the title/subtitle. Duration chips SHALL show the time icon and value (e.g., "5min"). Participant chips SHALL show the participant's avatar/initials and name. Chips SHALL be tappable by admins to open the corresponding popover for editing.
-
 ### Requirement: Mobile-optimized item layout
 The item layout SHALL be optimized for mobile screens:
 - The drag handle SHALL be in `slot="end"` (not in the item layout), alongside the 3-dot menu — only visible in edit mode
@@ -69,51 +66,6 @@ The item layout SHALL be optimized for mobile screens:
 - The order number badge SHALL be at least 28px diameter with centered text on mobile
 - Gaps between item elements (order badge, type icon, content) SHALL be at least 12px on mobile
 
-#### Scenario: Admin in edit mode creates an item via inline add bar
-- **WHEN** an admin in edit mode selects a type in the InlineAddBar, types a title, and presses Enter
-- **THEN** the item SHALL be created and appear in the program list immediately
-
-#### Scenario: Admin in read-only mode cannot create items
-- **WHEN** an admin views a program in read-only mode
-- **THEN** the InlineAddBar SHALL NOT be visible
-
-#### Scenario: Admin edits an item via bottom sheet
-- **WHEN** an admin taps the 3-dot menu on a program item and selects "Modifier"
-- **THEN** the ItemDetailSheet SHALL open as a bottom sheet
-
-#### Scenario: Admin creates a section via 3-dot menu
-- **WHEN** an admin taps the 3-dot menu on a non-section item and selects "Ajouter une section"
-- **THEN** a new section SHALL be inserted after that item
-- **AND** inline title editing SHALL activate on the new section
-
-#### Scenario: Admin creates a section via InlineAddBar
-- **WHEN** an admin taps the section button (dashed icon) in the InlineAddBar
-- **THEN** a new section SHALL be appended at the end of the program
-- **AND** inline title editing SHALL activate on the new section
-
-#### Scenario: Admin uses quick action buttons
-- **WHEN** an admin taps the subtitle quick action button on an item
-- **THEN** an inline text input SHALL appear for editing the subtitle
-- **WHEN** the admin types a subtitle and presses Enter or blurs the field
-- **THEN** the subtitle SHALL be saved to Firestore
-
-#### Scenario: Auto-fetch scripture on creation
-- **WHEN** an admin creates a Lecture biblique item with title "Psaumes 23"
-- **THEN** the scripture text for Psaumes 23 SHALL be auto-fetched and saved to the item
-- **WHEN** an admin creates a Predication item with scripture reference "Jean 3:16"
-- **THEN** the scripture text for Jean 3:16 SHALL be auto-fetched and saved to the item
-
 #### Scenario: Touch targets meet minimum size on mobile in edit mode
 - **WHEN** the ServiceProgramPage is viewed on a screen narrower than 768px in edit mode
 - **THEN** all quick action buttons, metadata chips, and menu triggers SHALL have tappable areas of at least 44×44px
-
----
-
-### Requirement: Sub-items SHALL provide hierarchical structure for Titre items
-Titre type items MUST support a hierarchical sub-item structure. Each sub-item SHALL support its own type, title, subtitle, notes, bible reference, participant assignment, duration, and linked resource.
-
-Sub-item creation SHALL use the InlineAddBar component displayed inside the expanded parent item. Sub-item editing SHALL use the ItemDetailSheet component. The "Ajouter un sous-element" shortcut SHALL NOT appear in the sheet when editing a sub-item.
-
-Sub-item actions (edit, delete) SHALL be accessed via a 3-dot menu button at the end of the sub-item row.
-
-All sub-item fields SHALL be optional to maintain backward compatibility.

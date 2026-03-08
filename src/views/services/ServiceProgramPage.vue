@@ -6,12 +6,31 @@
           <ion-back-button :default-href="`/service-detail/${route.params.id}`"></ion-back-button>
         </ion-buttons>
         <ion-title>Programme</ion-title>
-        <!-- Draft Status Badge -->
-        <ion-chip v-if="program && isDraft" color="warning" slot="end" class="draft-badge">
-          <ion-icon :icon="lockClosedOutline" />
-          <ion-label>Brouillon</ion-label>
-        </ion-chip>
         <ion-buttons slot="end">
+            <!-- Edit Mode: Countdown Timer (tappable to extend) -->
+            <ion-button
+              v-if="isEditing"
+              fill="clear"
+              size="small"
+              class="countdown-timer-btn"
+              :class="{ 'timer-warning': isTimerWarning }"
+              @click="extendEditMode"
+            >
+              <ion-icon :icon="timerOutline" slot="start" />
+              {{ formattedLockTime }}
+            </ion-button>
+            <!-- Edit Mode: "Terminer" button -->
+            <ion-button
+              v-if="isEditing"
+              fill="solid"
+              color="success"
+              size="small"
+              class="finish-edit-btn"
+              @click="exitEditMode"
+            >
+              <ion-icon :icon="checkmarkOutline" slot="start" />
+              Terminer
+            </ion-button>
             <ion-button v-if="program && program.items.length > 0" @click="showPresentation" fill="clear" color="primary">
               <ion-icon :icon="easelOutline" />
             </ion-button>
@@ -43,32 +62,46 @@
       </div>
 
       <!-- Draft Controls (Admin Only) -->
-      <div v-if="isAdmin && program && isDraft" class="draft-controls">
-        <ion-card color="warning">
-          <ion-card-content>
-            <div class="draft-controls-header">
-              <h3>
-                <ion-icon :icon="lockClosedOutline" />
-                Mode brouillon
-              </h3>
+      <div v-if="isEditing && program && isDraft" class="draft-controls">
+        <div class="draft-notice">
+          <div class="draft-notice-content">
+            <ion-icon :icon="lockClosedOutline" class="draft-notice-icon" />
+            <div class="draft-notice-text">
+              <strong>Mode brouillon</strong>
+              <span>Ce programme n'est pas encore visible pour les membres.</span>
             </div>
-            <p class="draft-description">
-              Ce programme est en mode brouillon. Seuls les administrateurs et les membres autorisés peuvent le voir.
-            </p>
+          </div>
+          <div class="draft-actions">
+            <ion-button @click="openDraftViewersModal" fill="outline" color="medium" size="small">
+              Gérer les accès ({{ program.draftViewerIds.length }})
+            </ion-button>
+            <ion-button @click="confirmPublish" fill="solid" color="dark" size="small">
+              Publier le programme
+            </ion-button>
+          </div>
+        </div>
+      </div>
 
-            <div class="draft-actions">
-              <ion-button @click="openDraftViewersModal" fill="outline" color="dark">
-                <ion-icon :icon="peopleOutline" slot="start" />
-                Gérer les accès ({{ program.draftViewerIds.length }})
-              </ion-button>
+      <!-- "Modifier le programme" Button (published programs, admin, not editing, not locked) -->
+      <div v-if="isAdmin && program && !isEditing && !isLockedByOther && !isDraft" class="edit-mode-controls">
+        <ion-button @click="enterEditMode" fill="solid" color="primary" expand="block" class="enter-edit-btn">
+          <ion-icon :icon="pencilOutline" slot="start" />
+          Modifier le programme
+        </ion-button>
+      </div>
 
-              <ion-button @click="confirmPublish" fill="solid" color="success">
-                <ion-icon :icon="checkmarkCircleOutline" slot="start" />
-                Publier le programme
-              </ion-button>
-            </div>
-          </ion-card-content>
-        </ion-card>
+      <!-- Lock Indicator (another user is editing) -->
+      <div v-if="isLockedByOther && lockHolder" class="lock-indicator">
+        <div class="lock-indicator-content">
+          <ion-icon :icon="lockClosedOutline" class="lock-indicator-icon" />
+          <div class="lock-indicator-text">
+            <strong>{{ lockHolder.userName }}</strong> est en train de modifier ce programme
+          </div>
+        </div>
+        <ion-button v-if="isAdmin" @click="forceEnterEditMode" fill="outline" color="warning" size="small">
+          <ion-icon :icon="handRightOutline" slot="start" />
+          Prendre le contrôle
+        </ion-button>
       </div>
 
       <!-- Access Denied Message (Non-Admin, Not in Viewers) -->
@@ -82,65 +115,47 @@
         </ion-card>
       </div>
 
-      <!-- YouTube Playlist Feature Notice -->
-      <div v-if="hasYouTubeVideos" class="youtube-feature-notice">
-        <div class="notice-content">
-          <ion-icon :icon="logoYoutube" class="notice-icon" />
-          <div class="notice-text">
-            <strong>Nouveauté !</strong> Cliquez sur l'icône
-            <ion-icon :icon="logoYoutube" class="inline-icon" />
-            pour accéder à la playlist YouTube des chants du service.<br/>
-            <strong>Idéal pour apprendre les chants et se mettre dans un esprit d'adoration !</strong>
-          </div>
-        </div>
-      </div>
+
 
       <div v-if="canViewProgram || !program" class="content-container">
         <!-- Program Summary -->
         <div v-if="program" class="program-summary">
-          <ion-card>
-            <ion-card-content>
-              <div class="program-header">
-                <h3>Résumé du programme</h3>
-                <ion-button v-if="isAdmin" @click="showEditProgramModal" fill="clear" size="small" color="primary">
-                  <ion-icon :icon="createOutline" slot="icon-only" />
-                </ion-button>
-              </div>
-              <div class="summary-stats">
-                <div class="stat-item">
-                  <ion-icon :icon="listOutline" class="stat-icon" />
-                  <div class="stat-details">
-                    <span class="stat-value">{{ program.items.length }}</span>
-                    <span class="stat-label">Éléments</span>
-                  </div>
-                </div>
-                <div class="stat-item">
-                  <ion-icon :icon="timeOutline" class="stat-icon" />
-                  <div class="stat-details">
-                    <span class="stat-value">{{ totalDuration }}</span>
-                    <span class="stat-label">Minutes</span>
-                  </div>
-                </div>
-              </div>
+          <div class="summary-stats">
+            <div class="stat-box">
+              <span class="stat-value">{{ program.items.length }}</span>
+              <span class="stat-label">Éléments</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-value">{{ totalDuration }}</span>
+              <span class="stat-label">Minutes</span>
+            </div>
+          </div>
 
-              <!-- Conductor Information -->
-              <div v-if="program.conductor" class="conductor-info">
-                <div class="conductor-section">
-                  <ion-avatar v-if="program.conductor.avatar && !failedAvatars.has('conductor')" class="conductor-avatar">
-                    <img :src="program.conductor.avatar" :alt="program.conductor.name" @error="failedAvatars.add('conductor')" />
-                  </ion-avatar>
-                  <div v-else class="conductor-initials">
-                    {{ getParticipantInitials(program.conductor.name) }}
-                  </div>
-                  <div class="conductor-details">
-                    <span class="conductor-label">Dirigeant</span>
-                    <span class="conductor-name">{{ program.conductor.name }}</span>
-                    <span v-if="program.conductor.role" class="conductor-role">{{ program.conductor.role }}</span>
-                  </div>
-                </div>
+          <!-- Conductor Information -->
+          <div v-if="program.conductor" class="conductor-info">
+            <div class="conductor-section">
+              <ion-avatar v-if="program.conductor.avatar && !failedAvatars.has('conductor')" class="conductor-avatar">
+                <img :src="program.conductor.avatar" :alt="program.conductor.name" @error="failedAvatars.add('conductor')" />
+              </ion-avatar>
+              <div v-else class="conductor-initials">
+                {{ getParticipantInitials(program.conductor.name) }}
               </div>
-            </ion-card-content>
-          </ion-card>
+              <div class="conductor-details">
+                <span class="conductor-label">Dirigeant</span>
+                <span class="conductor-name">{{ program.conductor.name }}</span>
+                <span v-if="program.conductor.role" class="conductor-role">{{ program.conductor.role }}</span>
+              </div>
+              <ion-button v-if="isEditing" @click="showEditProgramModal" fill="clear" size="small" color="primary" class="conductor-edit-btn">
+                <ion-icon :icon="createOutline" slot="icon-only" />
+              </ion-button>
+            </div>
+          </div>
+          <div v-else-if="isEditing" class="conductor-info">
+            <ion-button @click="showEditProgramModal" fill="clear" size="small" color="primary">
+              <ion-icon :icon="createOutline" slot="start" />
+              Ajouter un dirigeant
+            </ion-button>
+          </div>
         </div>
 
         <!-- No Program State -->
@@ -163,7 +178,7 @@
         <!-- Program Items (Flat List) -->
         <div v-if="program && program.items.length > 0" class="program-content">
           <div class="flat-items-view">
-            <ion-reorder-group :disabled="!isReorderMode" @ionItemReorder="handleItemReorder">
+            <ion-reorder-group :disabled="!isEditing" @ionItemReorder="handleItemReorder">
               <ion-item
                 v-for="(item, index) in sortedItems"
                 :key="item.id"
@@ -216,8 +231,8 @@
                     <h4
                       v-else
                       class="item-title"
-                      :class="{ 'editable': isAdmin }"
-                      @click="isAdmin && startInlineTitleEdit(item.id)"
+                      :class="{ 'editable': isEditing }"
+                      @click="isEditing && startInlineTitleEdit(item.id)"
                     >
                       {{ item.resourceId && getLinkedResource(item.resourceId) ? getLinkedResource(item.resourceId)?.title : item.title }}
                     </h4>
@@ -233,7 +248,7 @@
                         @keydown.escape="inlineSubtitleItemId = null"
                       />
                     </div>
-                    <p v-else-if="item.subtitle" class="item-subtitle" :class="{ 'editable': isAdmin }" @click="isAdmin && toggleInlineSubtitle(item.id)">{{ item.subtitle }}</p>
+                    <p v-else-if="item.subtitle" class="item-subtitle" :class="{ 'editable': isEditing }" @click="isEditing && toggleInlineSubtitle(item.id)">{{ item.subtitle }}</p>
 
                     <p v-if="item.resourceId && getLinkedResource(item.resourceId)?.reference" class="item-reference">{{ getLinkedResource(item.resourceId)?.reference }}</p>
 
@@ -242,8 +257,8 @@
                       <span
                         v-if="item.duration"
                         class="meta-chip"
-                        :class="{ 'interactive': isAdmin }"
-                        @click="isAdmin && openDurationPopover($event, item)"
+                        :class="{ 'interactive': isEditing }"
+                        @click="isEditing && openDurationPopover($event, item)"
                       >
                         <ion-icon :icon="timeOutline" />
                         {{ item.duration }}min
@@ -252,8 +267,8 @@
                         v-for="participant in (item.participants || [])"
                         :key="participant.id"
                         class="meta-chip participant-chip"
-                        :class="{ 'interactive': isAdmin }"
-                        @click="isAdmin && openParticipantsPopover($event, item)"
+                        :class="{ 'interactive': isEditing }"
+                        @click="isEditing && openParticipantsPopover($event, item)"
                       >
                         <ion-avatar v-if="participant.avatar && !failedAvatars.has('p-' + participant.id)" class="participant-avatar-sm">
                           <img :src="participant.avatar" :alt="participant.name" @error="failedAvatars.add('p-' + participant.id)" />
@@ -283,13 +298,13 @@
                         ref="inlineNotesRef"
                       ></textarea>
                     </div>
-                    <div v-else-if="item.notes" class="item-notes" :class="{ 'editable': isAdmin }" @click="isAdmin && toggleInlineNotes(item.id)">
+                    <div v-else-if="item.notes" class="item-notes" :class="{ 'editable': isEditing }" @click="isEditing && toggleInlineNotes(item.id)">
                       <ion-icon :icon="documentTextOutline" />
                       {{ item.notes }}
                     </div>
 
-                    <!-- Quick Action Buttons (Admin only, not for sections) -->
-                    <div v-if="isAdmin && !isSectionItem(item)" class="item-quick-actions">
+                    <!-- Quick Action Buttons (Edit mode only, not for sections) -->
+                    <div v-if="isEditing && !isSectionItem(item)" class="item-quick-actions">
                       <button
                         class="quick-action-btn"
                         :class="{ 'has-value': item.participants && item.participants.length > 0 }"
@@ -338,7 +353,7 @@
                         </button>
                         <!-- Quick Unlink (Edit Mode) -->
                         <button
-                          v-if="isAdmin"
+                          v-if="isEditing"
                           @click.stop="quickUnlinkResource(item.id)"
                           class="media-chip-button unlink-btn"
                           title="Délier la ressource"
@@ -352,7 +367,7 @@
                           <span v-for="prop in getResourceMusicProps(item.resourceId)" :key="prop" class="music-prop">{{ prop }}</span>
                         </div>
                         <button
-                          v-if="isAdmin && item.resourceId"
+                          v-if="isEditing && item.resourceId"
                           @click.stop="openMusicPropsModal(item.resourceId!)"
                           class="music-props-edit-btn"
                         >
@@ -388,14 +403,14 @@
 
                 <!-- Sub-Items (Expanded) -->
                 <div v-if="hasSubItems(item) && isItemExpanded(item.id)" class="sub-items-container">
-                  <ion-reorder-group :disabled="!isReorderMode" @ionItemReorder="(e) => handleSubItemReorder(e, item.id)">
+                  <ion-reorder-group :disabled="!isEditing" @ionItemReorder="(e) => handleSubItemReorder(e, item.id)">
                     <div
                       v-for="subItem in getSortedSubItems(item)"
                       :key="subItem.id"
                       class="sub-item"
                     >
                       <div class="sub-item-layout">
-                        <ion-reorder v-if="isReorderMode" class="sub-item-handle">
+                        <ion-reorder v-if="isEditing" class="sub-item-handle">
                           <ion-icon :icon="reorderTwoOutline" />
                         </ion-reorder>
                         <div v-else class="sub-item-bullet">•</div>
@@ -437,7 +452,7 @@
                             <!-- Music Properties for Sub-Item -->
                             <span v-for="prop in getResourceMusicProps(subItem.resourceId)" :key="prop" class="music-prop small">{{ prop }}</span>
                             <button
-                              v-if="isAdmin"
+                              v-if="isEditing"
                               @click.stop="openMusicPropsModal(subItem.resourceId!)"
                               class="music-props-edit-btn small"
                             >
@@ -448,7 +463,7 @@
 
                         <!-- 3-dot Action Menu for Sub-Item -->
                         <ion-button
-                          v-if="isAdmin"
+                          v-if="isEditing"
                           fill="clear"
                           size="small"
                           class="sub-item-action-menu-btn"
@@ -462,7 +477,7 @@
 
                   <!-- Sub-Item Inline Add Bar -->
                   <InlineAddBar
-                    v-if="isAdmin && canHaveSubItems(item)"
+                    v-if="isEditing && canHaveSubItems(item)"
                     :ref="(el: any) => { if (el) subItemAddBarRefs[item.id] = el }"
                     :parent-item-id="item.id"
                     :all-resources="allResources"
@@ -474,7 +489,7 @@
               </div>
               <!-- End Slot: Action Menu + Reorder Handle -->
               <ion-button
-                v-if="isAdmin"
+                v-if="isEditing"
                 slot="end"
                 fill="clear"
                 size="small"
@@ -494,12 +509,13 @@
 
         <!-- Inline Add Bar (always visible when program exists) -->
         <InlineAddBar
-          v-if="isAdmin && program"
+          v-if="isEditing && program"
           ref="mainAddBarRef"
           :all-resources="allResources"
           :service-id="serviceId"
           @add="handleInlineAdd"
           @link-resource="handleInlineLinkResource"
+          @add-section="handleAddSectionAtEnd"
         />
       </div>
 
@@ -1322,7 +1338,8 @@ import {
   logoYoutube, playBackOutline, playForwardOutline,
   removeOutline, bookOutline, copyOutline,
   lockClosedOutline, peopleOutline, checkmarkCircleOutline,
-  easelOutline, downloadOutline,
+  easelOutline, downloadOutline, checkmarkOutline, timerOutline,
+  pencilOutline, handRightOutline,
   closeCircleOutline,
   ellipsisVertical,
   personAddOutline,
@@ -1348,7 +1365,10 @@ import {
   addItemToProgram,
   publishProgram,
   updateDraftViewers,
-  canUserViewProgram
+  canUserViewProgram,
+  acquireEditLock,
+  releaseEditLock,
+  forceAcquireEditLock
 } from '@/firebase/programs';
 import type { Service } from '@/types/service';
 import type { ServiceProgram, ProgramItem, ProgramParticipant, ProgramSubItem } from '@/types/program';
@@ -1574,6 +1594,135 @@ const canViewProgram = computed(() => {
 const isDraft = computed(() => {
   return program.value?.isDraft ?? true;
 });
+
+// Edit Mode State
+const lockTimeRemaining = ref(0);
+const countdownInterval = ref<ReturnType<typeof setInterval> | null>(null);
+const hasShown30sWarning = ref(false);
+
+const isEditing = computed(() => {
+  if (!isAdmin.value || !program.value?.editLock || !user.value) return false;
+  const lock = program.value.editLock;
+  return lock.userId === user.value.uid && lock.expiresAt.getTime() > Date.now();
+});
+
+const isLockedByOther = computed(() => {
+  if (!program.value?.editLock || !user.value) return false;
+  const lock = program.value.editLock;
+  return lock.userId !== user.value.uid && lock.expiresAt.getTime() > Date.now();
+});
+
+const lockHolder = computed(() => {
+  if (!isLockedByOther.value || !program.value?.editLock) return null;
+  return {
+    userName: program.value.editLock.userName,
+    expiresAt: program.value.editLock.expiresAt
+  };
+});
+
+const formattedLockTime = computed(() => {
+  const secs = lockTimeRemaining.value;
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+});
+
+const isTimerWarning = computed(() => lockTimeRemaining.value <= 120 && lockTimeRemaining.value > 0);
+
+// Countdown Timer
+const startCountdown = () => {
+  stopCountdown();
+  hasShown30sWarning.value = false;
+  updateCountdown();
+  countdownInterval.value = setInterval(updateCountdown, 1000);
+};
+
+const updateCountdown = () => {
+  if (!program.value?.editLock) {
+    lockTimeRemaining.value = 0;
+    return;
+  }
+  const remaining = Math.max(0, Math.floor((program.value.editLock.expiresAt.getTime() - Date.now()) / 1000));
+  lockTimeRemaining.value = remaining;
+
+  if (remaining <= 30 && remaining > 0 && !hasShown30sWarning.value) {
+    hasShown30sWarning.value = true;
+    showToast('Votre session d\'édition expire bientôt', 'warning');
+  }
+
+  if (remaining <= 0) {
+    handleLockExpired();
+  }
+};
+
+const stopCountdown = () => {
+  if (countdownInterval.value) {
+    clearInterval(countdownInterval.value);
+    countdownInterval.value = null;
+  }
+};
+
+const handleLockExpired = async () => {
+  stopCountdown();
+  lockTimeRemaining.value = 0;
+  if (program.value && user.value) {
+    try {
+      await releaseEditLock(program.value.id, user.value.uid);
+    } catch (e) { /* best effort */ }
+  }
+  showToast('Session d\'édition expirée', 'warning');
+};
+
+// Lock Lifecycle
+const enterEditMode = async () => {
+  if (!program.value || !user.value) return;
+  const displayName = user.value.displayName || user.value.email || 'Utilisateur';
+  const result = await acquireEditLock(program.value.id, user.value.uid, displayName);
+  if (result.success) {
+    startCountdown();
+  } else if (result.holder) {
+    showToast(`${result.holder.userName} est en train de modifier ce programme`, 'warning');
+  }
+};
+
+const exitEditMode = async () => {
+  stopCountdown();
+  if (!program.value || !user.value) return;
+  try {
+    await releaseEditLock(program.value.id, user.value.uid);
+  } catch (e) {
+    console.error('Error releasing edit lock:', e);
+  }
+};
+
+const forceEnterEditMode = async () => {
+  if (!program.value || !user.value) return;
+  const displayName = user.value.displayName || user.value.email || 'Utilisateur';
+  const result = await forceAcquireEditLock(program.value.id, user.value.uid, displayName);
+  startCountdown();
+  if (result.previousHolder) {
+    showToast(`Vous avez pris le contrôle de l'édition de ${result.previousHolder.userName}`, 'warning');
+  }
+};
+
+const extendEditMode = async () => {
+  if (!program.value || !user.value) return;
+  const displayName = user.value.displayName || user.value.email || 'Utilisateur';
+  const result = await acquireEditLock(program.value.id, user.value.uid, displayName);
+  if (result.success) {
+    hasShown30sWarning.value = false;
+    showToast('Session d\'édition prolongée', 'success');
+  }
+};
+
+// beforeunload handler
+const handleBeforeUnload = () => {
+  if (isEditing.value && program.value && user.value) {
+    // Best-effort release using sendBeacon or sync XHR is not reliable with Firestore
+    // The TTL will handle cleanup if this fails
+    releaseEditLock(program.value.id, user.value.uid).catch(() => {});
+  }
+};
 
 const filteredDraftViewerMembers = computed(() => {
   if (!draftViewerSearchQuery.value) return allMembers.value;
@@ -1926,6 +2075,24 @@ const handleAddSectionAfterItem = async (afterItem: ProgramItem) => {
     }
     const newItem: any = {
       order: insertOrder,
+      type: 'Section',
+      title: 'Nouvelle section'
+    };
+    const created = await addItemToProgram(program.value.id, newItem, user.value.uid);
+    if (created?.id) {
+      setTimeout(() => startInlineTitleEdit(created.id), 500);
+    }
+  } catch (error) {
+    console.error('Error adding section:', error);
+  }
+};
+
+const handleAddSectionAtEnd = async () => {
+  if (!program.value || !user.value) return;
+  try {
+    const maxOrder = program.value.items.reduce((max, item) => Math.max(max, item.order), 0);
+    const newItem: any = {
+      order: maxOrder + 1,
       type: 'Section',
       title: 'Nouvelle section'
     };
@@ -3328,6 +3495,21 @@ const saveMusicProps = async () => {
 };
 
 // Lifecycle
+// Watch for lock displacement by another user
+watch(() => program.value?.editLock, (newLock, oldLock) => {
+  if (!user.value || !oldLock) return;
+  // Was held by current user, now held by someone else
+  if (oldLock.userId === user.value.uid && newLock && newLock.userId !== user.value.uid) {
+    stopCountdown();
+    lockTimeRemaining.value = 0;
+    showToast(`${newLock.userName} a pris le contrôle de l'édition`, 'warning');
+  }
+  // Lock acquired by current user (from subscription update) — restart countdown
+  if (newLock && newLock.userId === user.value.uid && newLock.expiresAt.getTime() > Date.now()) {
+    startCountdown();
+  }
+}, { deep: true });
+
 onMounted(async () => {
   loading.value = true;
   await Promise.all([loadService(), loadMusicOptions()]);
@@ -3335,9 +3517,20 @@ onMounted(async () => {
   loading.value = false;
   // Load resources for InlineAddBar autocomplete (non-blocking)
   loadResourcesForAutocomplete();
+  // Auto-acquire lock for draft programs
+  if (isAdmin.value && program.value && isDraft.value) {
+    enterEditMode();
+  }
+  window.addEventListener('beforeunload', handleBeforeUnload);
 });
 
 onUnmounted(() => {
+  // Release edit lock if held
+  if (isEditing.value && program.value && user.value) {
+    releaseEditLock(program.value.id, user.value.uid).catch(() => {});
+  }
+  stopCountdown();
+  window.removeEventListener('beforeunload', handleBeforeUnload);
   // Clean up program subscription
   if (programSubscription.value) {
     programSubscription.value();
@@ -3349,6 +3542,15 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* Mobile Spacing Tokens */
+:host,
+.program-content {
+  --program-item-padding-v: 1rem;
+  --program-item-padding-h: 1rem;
+  --program-item-gap: 1rem;
+  --program-touch-target: 44px;
+}
+
 /* Service Header */
 .service-header {
   background: linear-gradient(135deg, var(--ion-color-primary) 0%, var(--ion-color-primary-shade) 100%);
@@ -3376,74 +3578,6 @@ onUnmounted(() => {
   margin: 0;
 }
 
-/* YouTube Feature Notice */
-.youtube-feature-notice {
-  background: linear-gradient(135deg, #F3F4F6 0%, #E5E7EB 100%);
-  padding: 1rem 1.5rem;
-  margin: 0;
-  border-bottom: 1px solid #D1D5DB;
-  border-left: 4px solid #EF4444;
-}
-
-.notice-content {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  max-width: 1000px;
-  margin: 0 auto;
-}
-
-.notice-icon {
-  font-size: 2.5rem;
-  color: #EF4444;
-  flex-shrink: 0;
-}
-
-.notice-text {
-  flex: 1;
-  color: #374151;
-  font-size: 0.95rem;
-  line-height: 1.5;
-}
-
-.notice-text strong {
-  font-weight: 700;
-  font-size: 1.05rem;
-  color: #EF4444;
-}
-
-.inline-icon {
-  font-size: 1.2rem;
-  vertical-align: middle;
-  margin: 0 0.25rem;
-  color: #EF4444;
-}
-
-@media (max-width: 768px) {
-  .youtube-feature-notice {
-    padding: 0.75rem 1rem;
-  }
-
-  .notice-content {
-    gap: 0.75rem;
-  }
-
-  .notice-icon {
-    font-size: 2rem;
-  }
-
-  .notice-text {
-    font-size: 0.85rem;
-  }
-
-  .notice-text strong {
-    font-size: 0.95rem;
-  }
-
-  .inline-icon {
-    font-size: 1rem;
-  }
-}
 
 /* Content Container */
 .content-container {
@@ -3457,51 +3591,38 @@ onUnmounted(() => {
   margin-bottom: 1.5rem;
 }
 
-.program-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-
-.program-header h3 {
-  margin: 0;
-  font-size: 1.1rem;
-  font-weight: 600;
-}
-
 .summary-stats {
   display: flex;
-  justify-content: space-around;
-  gap: 1rem;
+  gap: 12px;
   margin-bottom: 1rem;
 }
 
-.stat-item {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.stat-icon {
-  font-size: 1.5rem;
-  color: var(--ion-color-primary);
-}
-
-.stat-details {
+.stat-box {
+  flex: 1;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 12px;
+  border: 1px solid var(--ion-color-light-shade);
+  border-radius: 12px;
+  background: white;
 }
 
 .stat-value {
-  font-size: 1.25rem;
+  font-size: 1.5rem;
   font-weight: 600;
-  color: var(--ion-color-dark);
+  color: var(--ion-color-primary);
 }
 
 .stat-label {
   font-size: 0.85rem;
   color: var(--ion-color-medium);
+  margin-top: 2px;
+}
+
+.conductor-edit-btn {
+  margin-left: auto;
 }
 
 /* Conductor Info */
@@ -3642,6 +3763,7 @@ onUnmounted(() => {
   overflow: hidden;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: all 0.2s ease;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .program-item-wrapper.has-subitems {
@@ -3757,8 +3879,9 @@ onUnmounted(() => {
 .item-title {
   font-size: 1.1rem;
   font-weight: 600;
-  margin: 0 0 0.25rem 0;
+  margin: 0 0 4px 0;
   color: var(--ion-color-dark);
+  line-height: 1.4;
 }
 
 .item-title.editable {
@@ -4879,35 +5002,189 @@ onUnmounted(() => {
 
 /* Responsive Design */
 @media (max-width: 768px) {
-  .program-item {
-    padding: 0.6rem 0.5rem;
+  /* Task 1.3 & 2.1: Override spacing tokens for mobile */
+  .program-content {
+    --program-item-padding-v: 12px;
+    --program-item-padding-h: 16px;
+    --program-item-gap: 12px;
   }
 
+  /* Task 2.1: Item card padding using tokens */
+  .program-item {
+    padding: var(--program-item-padding-v) var(--program-item-padding-h);
+  }
+
+  /* Task 2.4: Ensure minimum 12px gap between item elements */
   .item-layout {
-    gap: 0.5rem;
+    gap: var(--program-item-gap);
   }
 
   .item-order-column {
     min-width: unset;
   }
 
+  /* Task 2.4: Order badge sizing */
   .item-order {
     width: 28px;
     height: 28px;
     font-size: 0.75rem;
   }
 
+  /* Task 2.3: Content area readability */
   .item-title {
     font-size: 0.95rem;
+    line-height: 1.4;
   }
 
+  .item-subtitle {
+    line-height: 1.4;
+  }
+
+  .item-details-column {
+    line-height: 1.4;
+  }
+
+  /* Task 3.1 & 3.2 & 3.3: Quick action buttons touch targets */
+  .item-quick-actions {
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+
+  .quick-action-btn {
+    position: relative;
+    width: 28px;
+    height: 28px;
+  }
+
+  /* Expand tap target to 44px without changing visual size */
+  .quick-action-btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: var(--program-touch-target);
+    height: var(--program-touch-target);
+  }
+
+  /* Task 3.4: Metadata chip touch targets */
+  .meta-chip {
+    min-height: 32px;
+    padding: 6px 10px;
+    font-size: 0.8rem;
+  }
+
+  .meta-chip.interactive {
+    /* Expand tappable area to 44px using padding trick */
+    position: relative;
+  }
+
+  .meta-chip.interactive::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: var(--program-touch-target);
+    min-width: 100%;
+  }
+
+  /* Task 4.1: Metadata chips horizontal scroll */
+  .item-meta-chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 8px;
+    padding-bottom: 2px;
+  }
+
+  .item-meta-chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .item-meta-chips .meta-chip {
+    flex-shrink: 0;
+  }
+
+  /* Task 4.2: Chip text minimum font-size */
+  .meta-chip {
+    font-size: 13px;
+  }
+
+  /* Task 3.5: 3-dot menu and reorder handle touch targets */
+  .item-action-menu-btn {
+    min-width: var(--program-touch-target);
+    min-height: var(--program-touch-target);
+  }
+
+  /* Task 6.1 & 6.2: Program summary stats */
+  .stat-box {
+    padding: 12px 8px;
+  }
+
+  .stat-value {
+    font-size: 1.25rem;
+  }
+
+  /* Task 7.1 & 7.2 & 7.3: Sub-item container styling */
   .sub-items-container {
-    margin-left: 1.5rem;
+    margin-left: 24px;
+    padding: 0.75rem 0 0 1rem;
+    border-left: 2px solid rgba(var(--ion-color-primary-rgb), 0.3);
+    background: rgba(var(--ion-color-primary-rgb), 0.03);
+    border-radius: 0 8px 8px 0;
   }
 
-  .summary-stats {
-    flex-direction: column;
-    gap: 0.75rem;
+  /* Task 7.4: Expand/collapse toggle touch target */
+  .expand-button {
+    min-width: var(--program-touch-target);
+    min-height: var(--program-touch-target);
+  }
+
+  /* Task 8.1 & 8.2: Section dividers */
+  .program-item-wrapper.is-section {
+    margin-top: 16px;
+  }
+
+  .program-item-wrapper.is-section .program-item {
+    padding: 12px 1rem;
+  }
+
+  .program-item-wrapper.is-section .item-title {
+    font-size: 15px;
+  }
+}
+
+/* Task 1.2: Small phone breakpoint */
+@media (max-width: 480px) {
+  .program-content {
+    --program-item-padding-v: 10px;
+    --program-item-padding-h: 12px;
+    --program-item-gap: 10px;
+  }
+
+  .item-order {
+    width: 26px;
+    height: 26px;
+    font-size: 0.7rem;
+  }
+
+  .item-title {
+    font-size: 0.9rem;
+  }
+
+  .item-type span {
+    font-size: 0.75rem;
+  }
+
+  .stat-box {
+    padding: 10px 6px;
+  }
+
+  .stat-value {
+    font-size: 1.1rem;
   }
 }
 
@@ -5141,46 +5418,124 @@ onUnmounted(() => {
   border-top: 1px solid var(--ion-color-light-shade);
 }
 
-/* Draft Mode Styles */
-.draft-badge {
-  margin-right: 8px;
+/* Edit Mode Controls */
+.edit-mode-controls {
+  padding: 12px 16px;
 }
 
+.enter-edit-btn {
+  --border-radius: 12px;
+  font-weight: 600;
+}
+
+/* Countdown Timer in Toolbar */
+.countdown-timer-btn {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 0.85rem;
+  --color: var(--ion-color-medium);
+}
+
+.countdown-timer-btn.timer-warning {
+  --color: var(--ion-color-warning-shade);
+  animation: pulse-warning 1s ease-in-out infinite;
+}
+
+@keyframes pulse-warning {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.finish-edit-btn {
+  --border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+/* Lock Indicator */
+.lock-indicator {
+  margin: 12px 16px;
+  padding: 16px;
+  background: rgba(var(--ion-color-warning-rgb), 0.1);
+  border: 1px solid rgba(var(--ion-color-warning-rgb), 0.3);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  text-align: center;
+}
+
+.lock-indicator-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lock-indicator-icon {
+  font-size: 1.5rem;
+  color: var(--ion-color-warning-shade);
+  flex-shrink: 0;
+}
+
+.lock-indicator-text {
+  font-size: 0.9rem;
+  color: var(--ion-text-color);
+}
+
+/* Draft Mode Styles */
 .draft-controls {
   padding: 0 16px;
   margin-top: 16px;
 }
 
-.draft-controls ion-card {
-  margin: 0;
+.draft-notice {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--ion-color-light-shade);
 }
 
-.draft-controls-header {
+.draft-notice-content {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
-.draft-controls-header h3 {
-  margin: 0;
+.draft-notice-icon {
+  font-size: 1.5rem;
+  color: var(--ion-color-warning-shade);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.draft-notice-text {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 1.1rem;
-  font-weight: 600;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.draft-description {
-  font-size: 0.9rem;
-  margin-bottom: 16px;
-  opacity: 0.9;
+.draft-notice-text strong {
+  font-size: 0.95rem;
+  color: var(--ion-color-dark);
+}
+
+.draft-notice-text span {
+  font-size: 0.85rem;
+  color: var(--ion-color-medium);
 }
 
 .draft-actions {
   display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.draft-actions ion-button {
+  flex: 1;
+  font-size: 0.8rem;
+  --border-radius: 8px;
 }
 
 .access-denied {

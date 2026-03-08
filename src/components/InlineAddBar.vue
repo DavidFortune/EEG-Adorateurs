@@ -17,6 +17,14 @@
       >
         <ion-icon :icon="t.icon" />
       </button>
+      <button
+        v-if="!parentItemId"
+        class="type-icon-btn section-btn"
+        @click="emit('addSection')"
+        title="Section"
+      >
+        <ion-icon :icon="removeOutline" />
+      </button>
     </div>
 
     <!-- Title Input -->
@@ -109,7 +117,7 @@ import { IonInput, IonIcon, IonSpinner } from '@ionic/vue';
 import {
   musicalNoteOutline, handLeftOutline, libraryOutline, micOutline,
   arrowForwardOutline, sparklesOutline, addCircleOutline,
-  documentTextOutline
+  documentTextOutline, removeOutline
 } from 'ionicons/icons';
 import { ProgramItemType } from '@/types/program';
 import type { Resource } from '@/types/resource';
@@ -129,6 +137,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   add: [data: { type: ProgramItemType | '', title: string, resourceId?: string, scriptureReference?: string }];
   linkResource: [itemId: string, resourceId: string];
+  addSection: [];
 }>();
 
 const primaryTypes = [
@@ -482,5 +491,34 @@ defineExpose({ setLastCreatedItemId });
   font-size: 13px;
   color: var(--ion-color-medium-shade);
   font-style: italic;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  /* Task 9.1: Increased vertical padding */
+  .inline-add-bar {
+    padding: 12px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Task 9.2: Type selector touch targets */
+  .type-icon-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* Task 9.3: Text input minimum height */
+  .title-input {
+    min-height: 44px;
+  }
+
+  .input-wrapper {
+    min-height: 44px;
+  }
+
+  .submit-btn {
+    width: 36px;
+    height: 36px;
+  }
 }
 </style>

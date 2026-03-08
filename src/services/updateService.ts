@@ -241,6 +241,27 @@ class UpdateService {
   async getReleaseNotes(): Promise<ReleaseNote[]> {
     return [
       {
+        version: '1.15.3',
+        date: '2026-03-08',
+        title: 'Mode édition et verrouillage du programme',
+        description: 'Les programmes publiés s\'ouvrent désormais en lecture seule. Un bouton « Modifier le programme » active le mode édition avec un verrouillage distribué empêchant les modifications simultanées.',
+        features: [
+          'Mode lecture seule par défaut pour les programmes publiés',
+          'Bouton « Modifier le programme » pour activer le mode édition',
+          'Verrouillage distribué via Firestore — un seul éditeur à la fois',
+          'Minuteur de session d\'édition (10 min) avec avertissements visuels',
+          'Bouton « Terminer » pour quitter le mode édition et libérer le verrou',
+          'Indicateur de verrouillage montrant qui est en train de modifier',
+          'Bouton « Prendre le contrôle » pour forcer l\'acquisition du verrou'
+        ],
+        fixes: [],
+        improvements: [
+          'Les brouillons entrent automatiquement en mode édition à l\'ouverture',
+          'Libération automatique du verrou à la navigation ou fermeture du navigateur',
+          'Extension de session en un clic sur le minuteur'
+        ]
+      },
+      {
         version: '1.15.2',
         date: '2026-03-07',
         title: 'Édition rapide du programme et optimisation mobile',

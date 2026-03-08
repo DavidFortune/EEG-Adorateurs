@@ -11,10 +11,11 @@ import {
   onSnapshot,
   serverTimestamp,
   Timestamp,
+  runTransaction,
   type Unsubscribe
 } from 'firebase/firestore';
 import { db } from './config';
-import type { ServiceProgram, ProgramSection, ProgramItem } from '@/types/program';
+import type { ServiceProgram, ProgramSection, ProgramItem, EditLock } from '@/types/program';
 
 export interface FirestoreProgram extends Omit<ServiceProgram, 'createdAt' | 'updatedAt' | 'publishedAt'> {
   createdAt: Timestamp;
@@ -44,6 +45,14 @@ export const getProgramByServiceId = async (serviceId: string): Promise<ServiceP
     const doc = querySnapshot.docs[0];
     const data = doc.data() as FirestoreProgram;
 
+    const editLockData = (data as any).editLock;
+    const editLock: EditLock | null = editLockData ? {
+      userId: editLockData.userId,
+      userName: editLockData.userName,
+      lockedAt: editLockData.lockedAt?.toDate() || new Date(),
+      expiresAt: editLockData.expiresAt?.toDate() || new Date()
+    } : null;
+
     return {
       ...data,
       id: doc.id,
@@ -52,7 +61,8 @@ export const getProgramByServiceId = async (serviceId: string): Promise<ServiceP
       // Migration defaults for existing programs without draft fields
       isDraft: data.isDraft ?? false, // Existing programs default to published
       draftViewerIds: data.draftViewerIds ?? [],
-      publishedAt: data.publishedAt?.toDate()
+      publishedAt: data.publishedAt?.toDate(),
+      editLock
     };
   } catch (error) {
     console.error('Error fetching program:', error);
@@ -84,6 +94,14 @@ export const subscribeToProgramByServiceId = (
       const docSnapshot = querySnapshot.docs[0];
       const data = docSnapshot.data() as FirestoreProgram;
 
+      const editLockData = (data as any).editLock;
+      const editLock: EditLock | null = editLockData ? {
+        userId: editLockData.userId,
+        userName: editLockData.userName,
+        lockedAt: editLockData.lockedAt?.toDate() || new Date(),
+        expiresAt: editLockData.expiresAt?.toDate() || new Date()
+      } : null;
+
       const program: ServiceProgram = {
         ...data,
         id: docSnapshot.id,
@@ -92,7 +110,8 @@ export const subscribeToProgramByServiceId = (
         // Migration defaults for existing programs without draft fields
         isDraft: data.isDraft ?? false, // Existing programs default to published
         draftViewerIds: data.draftViewerIds ?? [],
-        publishedAt: data.publishedAt?.toDate()
+        publishedAt: data.publishedAt?.toDate(),
+        editLock
       };
 
       onUpdate(program);
@@ -685,4 +704,119 @@ export const canUserViewProgram = (
   }
 
   return false;
+};
+
+const LOCK_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+export interface AcquireLockResult {
+  success: boolean;
+  holder?: { userName: string; expiresAt: Date };
+}
+
+/**
+ * Acquire edit lock on a program using a Firestore transaction.
+ * Succeeds only if the lock is null or expired.
+ */
+export const acquireEditLock = async (
+  programId: string,
+  userId: string,
+  userName: string
+): Promise<AcquireLockResult> => {
+  const programRef = doc(db, PROGRAMS_COLLECTION, programId);
+
+  return runTransaction(db, async (transaction) => {
+    const programDoc = await transaction.get(programRef);
+    if (!programDoc.exists()) throw new Error('Program not found');
+
+    const data = programDoc.data();
+    const currentLock = data.editLock;
+    const now = Date.now();
+
+    // Check if lock is held by another user and not expired
+    if (currentLock && currentLock.userId !== userId) {
+      const expiresAt = currentLock.expiresAt?.toDate?.() || new Date(0);
+      if (expiresAt.getTime() > now) {
+        return {
+          success: false,
+          holder: { userName: currentLock.userName, expiresAt }
+        };
+      }
+    }
+
+    const lockedAt = new Date(now);
+    const expiresAt = new Date(now + LOCK_TTL_MS);
+
+    transaction.update(programRef, {
+      editLock: {
+        userId,
+        userName,
+        lockedAt: Timestamp.fromDate(lockedAt),
+        expiresAt: Timestamp.fromDate(expiresAt)
+      }
+    });
+
+    return { success: true };
+  });
+};
+
+/**
+ * Release edit lock on a program. Only succeeds if the current user holds the lock.
+ */
+export const releaseEditLock = async (
+  programId: string,
+  userId: string
+): Promise<void> => {
+  const programRef = doc(db, PROGRAMS_COLLECTION, programId);
+
+  return runTransaction(db, async (transaction) => {
+    const programDoc = await transaction.get(programRef);
+    if (!programDoc.exists()) return;
+
+    const data = programDoc.data();
+    const currentLock = data.editLock;
+
+    // Only release if current user holds the lock
+    if (currentLock && currentLock.userId === userId) {
+      transaction.update(programRef, { editLock: null });
+    }
+  });
+};
+
+export interface ForceAcquireLockResult {
+  previousHolder?: { userName: string } | null;
+}
+
+/**
+ * Force-acquire edit lock, displacing any current holder.
+ * Returns previous holder info so the UI can notify the displaced editor.
+ */
+export const forceAcquireEditLock = async (
+  programId: string,
+  userId: string,
+  userName: string
+): Promise<ForceAcquireLockResult> => {
+  const programRef = doc(db, PROGRAMS_COLLECTION, programId);
+
+  return runTransaction(db, async (transaction) => {
+    const programDoc = await transaction.get(programRef);
+    if (!programDoc.exists()) throw new Error('Program not found');
+
+    const data = programDoc.data();
+    const currentLock = data.editLock;
+    const previousHolder = currentLock && currentLock.userId !== userId
+      ? { userName: currentLock.userName }
+      : null;
+
+    const now = Date.now();
+    transaction.update(programRef, {
+      editLock: {
+        userId,
+        userName,
+        lockedAt: Timestamp.fromDate(new Date(now)),
+        expiresAt: Timestamp.fromDate(new Date(now + LOCK_TTL_MS))
+      }
+    });
+
+    return { previousHolder };
+  });
 };

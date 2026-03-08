@@ -62,6 +62,13 @@ export interface ProgramSection {
   color?: string;
 }
 
+export interface EditLock {
+  userId: string;
+  userName: string;
+  lockedAt: Date;
+  expiresAt: Date;
+}
+
 export interface ServiceProgram {
   id: string;
   serviceId: string;
@@ -80,6 +87,8 @@ export interface ServiceProgram {
   draftViewerIds: string[]; // Firebase UIDs allowed to view/edit when in draft
   publishedAt?: Date; // Timestamp when program was published
   publishedBy?: string; // Firebase UID who published the program
+  // Edit lock fields
+  editLock?: EditLock | null; // Distributed lock for concurrent editing prevention
 }
 
 export interface CreateProgramRequest {
