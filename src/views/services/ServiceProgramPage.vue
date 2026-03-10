@@ -82,8 +82,8 @@
         </div>
       </div>
 
-      <!-- "Modifier le programme" Button (published programs, admin, not editing, not locked) -->
-      <div v-if="isAdmin && program && !isEditing && !isLockedByOther && !isDraft" class="edit-mode-controls">
+      <!-- "Modifier le programme" Button (admin, not editing, not locked) -->
+      <div v-if="isAdmin && program && !isEditing && !isLockedByOther" class="edit-mode-controls">
         <ion-button @click="enterEditMode" fill="solid" color="primary" expand="block" class="enter-edit-btn">
           <ion-icon :icon="pencilOutline" slot="start" />
           Modifier le programme
@@ -1592,7 +1592,7 @@ const canViewProgram = computed(() => {
 });
 
 const isDraft = computed(() => {
-  return program.value?.isDraft ?? true;
+  return program.value?.isDraft ?? false;
 });
 
 // Edit Mode State
