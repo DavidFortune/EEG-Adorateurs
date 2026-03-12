@@ -15,7 +15,7 @@ import {
   type Unsubscribe
 } from 'firebase/firestore';
 import { db } from './config';
-import type { ServiceProgram, ProgramSection, ProgramItem, EditLock } from '@/types/program';
+import type { ServiceProgram, ProgramSection, ProgramItem, EditLock, ProgramStatus } from '@/types/program';
 
 export interface FirestoreProgram extends Omit<ServiceProgram, 'createdAt' | 'updatedAt' | 'publishedAt'> {
   createdAt: Timestamp;
@@ -23,6 +23,8 @@ export interface FirestoreProgram extends Omit<ServiceProgram, 'createdAt' | 'up
   createdBy: string;
   updatedBy: string;
   publishedAt?: Timestamp;
+  // Legacy field — read for migration, never written
+  isDraft?: boolean;
 }
 
 const PROGRAMS_COLLECTION = 'programs';
@@ -58,8 +60,8 @@ export const getProgramByServiceId = async (serviceId: string): Promise<ServiceP
       id: doc.id,
       createdAt: data.createdAt.toDate(),
       updatedAt: data.updatedAt.toDate(),
-      // Migration defaults for existing programs without draft fields
-      isDraft: data.isDraft ?? false, // Existing programs default to published
+      // Migration: derive status from legacy isDraft if status field is absent
+      status: (data.status as ProgramStatus) ?? (data.isDraft === true ? 'draft' : 'published'),
       draftViewerIds: data.draftViewerIds ?? [],
       publishedAt: data.publishedAt?.toDate(),
       editLock
@@ -107,8 +109,8 @@ export const subscribeToProgramByServiceId = (
         id: docSnapshot.id,
         createdAt: data.createdAt?.toDate() || new Date(),
         updatedAt: data.updatedAt?.toDate() || new Date(),
-        // Migration defaults for existing programs without draft fields
-        isDraft: data.isDraft ?? false, // Existing programs default to published
+        // Migration: derive status from legacy isDraft if status field is absent
+        status: (data.status as ProgramStatus) ?? (data.isDraft === true ? 'draft' : 'published'),
         draftViewerIds: data.draftViewerIds ?? [],
         publishedAt: data.publishedAt?.toDate(),
         editLock
@@ -129,7 +131,7 @@ export const subscribeToProgramByServiceId = (
  * Create a new program
  */
 export const createProgram = async (
-  program: Omit<ServiceProgram, 'id' | 'createdAt' | 'updatedAt' | 'isDraft' | 'draftViewerIds' | 'publishedAt' | 'publishedBy'>,
+  program: Omit<ServiceProgram, 'id' | 'createdAt' | 'updatedAt' | 'status' | 'draftViewerIds' | 'publishedAt' | 'publishedBy'>,
   userId: string
 ): Promise<ServiceProgram> => {
   console.log('Firebase createProgram called with:', { program, userId });
@@ -171,7 +173,7 @@ export const createProgram = async (
       ...program,
       items: itemsWithIds,
       sections: sectionsWithIds, // Keep for backward compatibility, but will be empty for new programs
-      isDraft: true, // New programs are drafts by default
+      status: 'draft' as ProgramStatus, // New programs are drafts by default
       draftViewerIds: [userId], // Creator can always view their own draft
       createdAt: now,
       updatedAt: now,
@@ -641,12 +643,13 @@ export const publishProgram = async (
     const programData = programDoc.data() as FirestoreProgram;
 
     // Prevent re-publishing already published programs
-    if (!programData.isDraft) {
+    const currentStatus = (programData as any).status ?? (programData.isDraft === true ? 'draft' : 'published');
+    if (currentStatus !== 'draft') {
       throw new Error('Program is already published');
     }
 
     await updateDoc(programRef, {
-      isDraft: false,
+      status: 'published' as ProgramStatus,
       publishedAt: serverTimestamp(),
       publishedBy: userId,
       updatedAt: serverTimestamp(),
@@ -693,7 +696,7 @@ export const canUserViewProgram = (
   if (!program) return false;
 
   // Published programs are visible to everyone
-  if (!program.isDraft) return true;
+  if (program.status === 'published') return true;
 
   // Admins can always view drafts
   if (isAdmin) return true;

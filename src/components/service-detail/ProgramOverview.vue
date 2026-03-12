@@ -115,7 +115,7 @@ const canViewContent = computed(() => {
 });
 
 const isDraft = computed(() => {
-  return props.program?.isDraft ?? false;
+  return props.program?.status === 'draft';
 });
 
 const itemCount = computed(() => {

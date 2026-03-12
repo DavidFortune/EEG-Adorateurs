@@ -7,9 +7,9 @@
         </ion-buttons>
         <ion-title>Programme</ion-title>
         <ion-buttons slot="end">
-            <!-- Edit Mode: Countdown Timer (tappable to extend) -->
+            <!-- Edit Mode: Countdown Timer (published only, tappable to extend) -->
             <ion-button
-              v-if="isEditing"
+              v-if="isEditing && isPublished"
               fill="clear"
               size="small"
               class="countdown-timer-btn"
@@ -19,9 +19,9 @@
               <ion-icon :icon="timerOutline" slot="start" />
               {{ formattedLockTime }}
             </ion-button>
-            <!-- Edit Mode: "Terminer" button -->
+            <!-- Edit Mode: "Terminer" button (published only) -->
             <ion-button
-              v-if="isEditing"
+              v-if="isEditing && isPublished"
               fill="solid"
               color="success"
               size="small"
@@ -62,7 +62,7 @@
       </div>
 
       <!-- Draft Controls (Admin Only) -->
-      <div v-if="isEditing && program && isDraft" class="draft-controls">
+      <div v-if="isAdmin && program && isDraft" class="draft-controls">
         <div class="draft-notice">
           <div class="draft-notice-content">
             <ion-icon :icon="lockClosedOutline" class="draft-notice-icon" />
@@ -82,16 +82,16 @@
         </div>
       </div>
 
-      <!-- "Modifier le programme" Button (admin, not editing, not locked) -->
-      <div v-if="isAdmin && program && !isEditing && !isLockedByOther" class="edit-mode-controls">
+      <!-- "Modifier le programme" Button (admin, published, not editing, not locked) -->
+      <div v-if="isAdmin && program && isPublished && !isEditing && !isLockedByOther" class="edit-mode-controls">
         <ion-button @click="enterEditMode" fill="solid" color="primary" expand="block" class="enter-edit-btn">
           <ion-icon :icon="pencilOutline" slot="start" />
           Modifier le programme
         </ion-button>
       </div>
 
-      <!-- Lock Indicator (another user is editing) -->
-      <div v-if="isLockedByOther && lockHolder" class="lock-indicator">
+      <!-- Lock Indicator (another user is editing, published only) -->
+      <div v-if="isPublished && isLockedByOther && lockHolder" class="lock-indicator">
         <div class="lock-indicator-content">
           <ion-icon :icon="lockClosedOutline" class="lock-indicator-icon" />
           <div class="lock-indicator-text">
@@ -1592,7 +1592,11 @@ const canViewProgram = computed(() => {
 });
 
 const isDraft = computed(() => {
-  return program.value?.isDraft ?? false;
+  return program.value?.status === 'draft';
+});
+
+const isPublished = computed(() => {
+  return program.value?.status === 'published';
 });
 
 // Edit Mode State
@@ -1601,12 +1605,17 @@ const countdownInterval = ref<ReturnType<typeof setInterval> | null>(null);
 const hasShown30sWarning = ref(false);
 
 const isEditing = computed(() => {
-  if (!isAdmin.value || !program.value?.editLock || !user.value) return false;
+  if (!isAdmin.value || !program.value || !user.value) return false;
+  // Drafts: always editable for admins (no lock needed)
+  if (isDraft.value) return true;
+  // Published: editable only with active lock
+  if (!program.value.editLock) return false;
   const lock = program.value.editLock;
   return lock.userId === user.value.uid && lock.expiresAt.getTime() > Date.now();
 });
 
 const isLockedByOther = computed(() => {
+  if (!isPublished.value) return false; // Drafts can't be "locked"
   if (!program.value?.editLock || !user.value) return false;
   const lock = program.value.editLock;
   return lock.userId !== user.value.uid && lock.expiresAt.getTime() > Date.now();
@@ -1675,7 +1684,7 @@ const handleLockExpired = async () => {
 
 // Lock Lifecycle
 const enterEditMode = async () => {
-  if (!program.value || !user.value) return;
+  if (!program.value || !user.value || !isPublished.value) return;
   const displayName = user.value.displayName || user.value.email || 'Utilisateur';
   const result = await acquireEditLock(program.value.id, user.value.uid, displayName);
   if (result.success) {
@@ -1687,7 +1696,7 @@ const enterEditMode = async () => {
 
 const exitEditMode = async () => {
   stopCountdown();
-  if (!program.value || !user.value) return;
+  if (!program.value || !user.value || !isPublished.value) return;
   try {
     await releaseEditLock(program.value.id, user.value.uid);
   } catch (e) {
@@ -1696,7 +1705,7 @@ const exitEditMode = async () => {
 };
 
 const forceEnterEditMode = async () => {
-  if (!program.value || !user.value) return;
+  if (!program.value || !user.value || !isPublished.value) return;
   const displayName = user.value.displayName || user.value.email || 'Utilisateur';
   const result = await forceAcquireEditLock(program.value.id, user.value.uid, displayName);
   startCountdown();
@@ -1706,7 +1715,7 @@ const forceEnterEditMode = async () => {
 };
 
 const extendEditMode = async () => {
-  if (!program.value || !user.value) return;
+  if (!program.value || !user.value || !isPublished.value) return;
   const displayName = user.value.displayName || user.value.email || 'Utilisateur';
   const result = await acquireEditLock(program.value.id, user.value.uid, displayName);
   if (result.success) {
@@ -1717,7 +1726,7 @@ const extendEditMode = async () => {
 
 // beforeunload handler
 const handleBeforeUnload = () => {
-  if (isEditing.value && program.value && user.value) {
+  if (isEditing.value && isPublished.value && program.value && user.value) {
     // Best-effort release using sendBeacon or sync XHR is not reliable with Firestore
     // The TTL will handle cleanup if this fails
     releaseEditLock(program.value.id, user.value.uid).catch(() => {});

@@ -62,6 +62,8 @@ export interface ProgramSection {
   color?: string;
 }
 
+export type ProgramStatus = 'draft' | 'published';
+
 export interface EditLock {
   userId: string;
   userName: string;
@@ -82,8 +84,8 @@ export interface ServiceProgram {
   updatedAt: Date;
   createdBy?: string; // User ID who created the program
   updatedBy?: string; // User ID who last updated the program
-  // Draft mode fields
-  isDraft: boolean; // true = draft (limited visibility), false = published
+  // Lifecycle status
+  status: ProgramStatus; // 'draft' = limited visibility, 'published' = visible to all
   draftViewerIds: string[]; // Firebase UIDs allowed to view/edit when in draft
   publishedAt?: Date; // Timestamp when program was published
   publishedBy?: string; // Firebase UID who published the program
