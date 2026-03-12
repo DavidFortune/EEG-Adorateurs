@@ -38,25 +38,12 @@
       </div>
 
       <!-- Draft Controls (Admin Only) -->
-      <div v-if="isAdmin && program && isDraft" class="draft-controls">
-        <div class="draft-notice">
-          <div class="draft-notice-content">
-            <ion-icon :icon="lockClosedOutline" class="draft-notice-icon" />
-            <div class="draft-notice-text">
-              <strong>Mode brouillon</strong>
-              <span>Ce programme n'est pas encore visible pour les membres.</span>
-            </div>
-          </div>
-          <div class="draft-actions">
-            <ion-button @click="openDraftViewersModal" fill="outline" color="medium" size="small">
-              Gérer les accès ({{ program.draftViewerIds.length }})
-            </ion-button>
-            <ion-button @click="confirmPublish" fill="solid" color="dark" size="small">
-              Publier le programme
-            </ion-button>
-          </div>
-        </div>
-      </div>
+      <DraftModeControls
+        v-if="isAdmin && program && isDraft"
+        :viewer-count="program.draftViewerIds.length"
+        @open-viewers="openDraftViewersModal"
+        @publish="confirmPublish"
+      />
 
       <!-- Access Denied Message (Non-Admin, Not in Viewers) -->
       <div v-if="program && !canViewProgram" class="access-denied">
@@ -71,85 +58,34 @@
 
       <div v-if="canViewProgram || !program" class="content-container">
         <!-- Edit Mode Controls (admin, published, not locked by other) -->
-        <div v-if="isAdmin && program && isPublished && !isLockedByOther" class="edit-mode-controls">
-          <!-- Not editing: Enter edit mode -->
-          <ion-button v-if="!isEditing" @click="enterEditMode" fill="solid" color="primary" expand="block" class="enter-edit-btn">
-            <ion-icon :icon="pencilOutline" slot="start" />
-            Modifier le programme
-          </ion-button>
-          <!-- Editing: Timer + Finish button -->
-          <div v-else class="editing-controls">
-            <ion-button
-              fill="outline"
-              :color="isTimerWarning ? 'warning' : 'medium'"
-              size="small"
-              class="countdown-timer-btn"
-              :class="{ 'timer-warning': isTimerWarning }"
-              @click="extendEditMode"
-            >
-              <ion-icon :icon="timerOutline" slot="start" />
-              {{ formattedLockTime }}
-            </ion-button>
-            <ion-button @click="exitEditMode" fill="solid" color="success" expand="block" class="finish-edit-btn">
-              <ion-icon :icon="checkmarkOutline" slot="start" />
-              Terminer les modifications
-            </ion-button>
-          </div>
-        </div>
+        <EditModeControls
+          v-if="isAdmin && program && isPublished && !isLockedByOther"
+          :is-editing="isEditing"
+          :is-timer-warning="isTimerWarning"
+          :formatted-lock-time="formattedLockTime"
+          @enter="enterEditMode"
+          @exit="exitEditMode"
+          @extend="extendEditMode"
+        />
 
         <!-- Lock Indicator (another user is editing, published only) -->
-        <div v-if="isPublished && isLockedByOther && lockHolder" class="lock-indicator">
-          <div class="lock-indicator-content">
-            <ion-icon :icon="lockClosedOutline" class="lock-indicator-icon" />
-            <div class="lock-indicator-text">
-              <strong>{{ lockHolder.userName }}</strong> est en train de modifier ce programme
-            </div>
-          </div>
-          <ion-button v-if="isAdmin" @click="forceEnterEditMode" fill="outline" color="warning" size="small">
-            <ion-icon :icon="handRightOutline" slot="start" />
-            Prendre le contrôle
-          </ion-button>
-        </div>
+        <EditLockIndicator
+          v-if="isPublished && isLockedByOther && lockHolder"
+          :lock-holder="lockHolder"
+          :is-admin="isAdmin"
+          @force-enter="forceEnterEditMode"
+        />
 
         <!-- Program Summary -->
-        <div v-if="program" class="program-summary">
-          <div class="summary-stats">
-            <div class="stat-box">
-              <span class="stat-value">{{ program.items.length }}</span>
-              <span class="stat-label">Éléments</span>
-            </div>
-            <div class="stat-box">
-              <span class="stat-value">{{ totalDuration }}</span>
-              <span class="stat-label">Minutes</span>
-            </div>
-          </div>
-
-          <!-- Conductor Information -->
-          <div v-if="program.conductor" class="conductor-info">
-            <div class="conductor-section">
-              <ion-avatar v-if="program.conductor.avatar && !failedAvatars.has('conductor')" class="conductor-avatar">
-                <img :src="program.conductor.avatar" :alt="program.conductor.name" @error="failedAvatars.add('conductor')" />
-              </ion-avatar>
-              <div v-else class="conductor-initials">
-                {{ getParticipantInitials(program.conductor.name) }}
-              </div>
-              <div class="conductor-details">
-                <span class="conductor-label">Dirigeant</span>
-                <span class="conductor-name">{{ program.conductor.name }}</span>
-                <span v-if="program.conductor.role" class="conductor-role">{{ program.conductor.role }}</span>
-              </div>
-              <ion-button v-if="isEditing" @click="showEditProgramModal" fill="clear" size="small" color="primary" class="conductor-edit-btn">
-                <ion-icon :icon="createOutline" slot="icon-only" />
-              </ion-button>
-            </div>
-          </div>
-          <div v-else-if="isEditing" class="conductor-info">
-            <ion-button @click="showEditProgramModal" fill="clear" size="small" color="primary">
-              <ion-icon :icon="createOutline" slot="start" />
-              Ajouter un dirigeant
-            </ion-button>
-          </div>
-        </div>
+        <ProgramSummary
+          v-if="program"
+          :item-count="program.items.length"
+          :total-duration="totalDuration"
+          :conductor="program.conductor"
+          :is-editing="isEditing"
+          :failed-avatars="failedAvatars"
+          @edit-program="showEditProgramModal"
+        />
 
         <!-- No Program State -->
         <div v-if="!program && !loading" class="no-program">
@@ -636,396 +572,28 @@
       </ion-modal>
 
       <!-- Media Modal (for displaying lyrics, videos, etc.) -->
-      <ion-modal :is-open="showMediaModalState" @ionModalDidDismiss="closeMediaModal" class="media-modal fullscreen-modal">
-        <ion-header>
-          <ion-toolbar>
-            <ion-title>{{ selectedMediaTitle }}</ion-title>
-            <ion-buttons slot="end">
-              <ion-button @click="closeMediaModal">
-                <ion-icon :icon="closeOutline" />
-              </ion-button>
-            </ion-buttons>
-          </ion-toolbar>
-        </ion-header>
-        <ion-content v-if="selectedMediaContent">
-          <!-- YouTube Video -->
-          <div v-if="(selectedMediaContent.type === 'video' || selectedMediaContent.type === 'youtube') && selectedMediaContent.url && isYouTubeUrl(selectedMediaContent.url)" class="video-container">
-            <iframe
-              :src="getYouTubeEmbedUrl(selectedMediaContent.url) || ''"
-              frameborder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowfullscreen
-              class="youtube-iframe"
-            ></iframe>
-          </div>
-
-          <!-- Regular Video Content -->
-          <div v-else-if="selectedMediaContent.type === 'video' && selectedMediaContent.url" class="video-container">
-            <video controls :src="selectedMediaContent.url" class="full-width-video"></video>
-          </div>
-
-          <!-- Spotify Content -->
-          <div v-if="selectedMediaContent.type === 'spotify' && selectedMediaContent.url" class="spotify-container">
-            <iframe
-              :src="getSpotifyEmbedUrl(selectedMediaContent.url) || ''"
-              width="100%"
-              height="352"
-              frameborder="0"
-              allowtransparency="true"
-              allow="encrypted-media"
-              class="spotify-iframe"
-            ></iframe>
-            <ion-button
-              :href="selectedMediaContent.url"
-              target="_blank"
-              expand="block"
-              fill="outline"
-              style="margin-top: 1rem;"
-            >
-              <ion-icon :icon="musicalNoteOutline" slot="start" />
-              Ouvrir dans Spotify
-            </ion-button>
-          </div>
-
-          <!-- Audio Content -->
-          <div v-if="selectedMediaContent.type === 'audio' && selectedMediaContent.url" class="audio-container">
-            <audio controls :src="selectedMediaContent.url" class="full-width-audio"></audio>
-          </div>
-
-          <!-- Lyrics Content -->
-          <div v-if="selectedMediaContent.type === 'lyrics'" class="lyrics-container">
-            <div class="lyrics-content">
-              <pre>{{ selectedMediaContent.content }}</pre>
-            </div>
-          </div>
-
-          <!-- PDF/Document Content -->
-          <div v-if="selectedMediaContent.type === 'music_sheet' && selectedMediaContent.url" class="document-container">
-            <ion-button @click="openInNewTab(selectedMediaContent.url)" expand="block" fill="outline">
-              <ion-icon :icon="documentOutline" slot="start" />
-              Ouvrir la partition
-            </ion-button>
-          </div>
-
-          <!-- Debug/Fallback - Show if no content matched -->
-          <div v-if="!['video', 'youtube', 'spotify', 'audio', 'lyrics', 'music_sheet'].includes(selectedMediaContent.type)" class="debug-container" style="padding: 1rem;">
-            <p><strong>Type:</strong> {{ selectedMediaContent.type }}</p>
-            <p><strong>URL:</strong> {{ selectedMediaContent.url }}</p>
-            <p><strong>Content:</strong> {{ selectedMediaContent.content }}</p>
-          </div>
-        </ion-content>
-      </ion-modal>
+      <MediaDisplayModal
+        :is-open="showMediaModalState"
+        :content="selectedMediaContent"
+        :title="selectedMediaTitle"
+        @close="closeMediaModal"
+      />
 
 
       <!-- YouTube Playlist Modal -->
-      <ion-modal :is-open="showYouTubePlaylistModalState" @ionModalDidDismiss="closeYouTubePlaylist" class="youtube-playlist-modal fullscreen-modal">
-        <ion-header>
-          <ion-toolbar>
-            <ion-title>
-              <ion-icon :icon="logoYoutube" style="vertical-align: middle; margin-right: 0.5rem;" />
-              Playlist YouTube
-            </ion-title>
-            <ion-buttons slot="end">
-              <ion-button @click="closeYouTubePlaylist">
-                <ion-icon :icon="closeOutline" />
-              </ion-button>
-            </ion-buttons>
-          </ion-toolbar>
-        </ion-header>
-        <ion-content class="fullscreen-content">
-          <div class="youtube-player-container">
-            <!-- Main Video Player -->
-            <div v-if="youtubeVideos.length > 0" class="main-player-section">
-              <div class="current-video-info">
-                <div class="video-counter">
-                  Vidéo {{ currentVideoIndex + 1 }} / {{ youtubeVideos.length }}
-                </div>
-                <h2 class="current-video-title">{{ youtubeVideos[currentVideoIndex].title }}</h2>
-                <p v-if="youtubeVideos[currentVideoIndex].subtitle" class="current-video-subtitle">
-                  {{ youtubeVideos[currentVideoIndex].subtitle }}
-                </p>
-              </div>
-
-              <div
-                class="main-video-wrapper"
-                @touchstart="handleTouchStart"
-                @touchmove="handleTouchMove"
-                @touchend="handleTouchEnd"
-              >
-                <iframe
-                  :id="`youtube-player-${currentVideoIndex}`"
-                  :key="currentVideoIndex"
-                  :src="getAutoplayEmbedUrl(youtubeVideos[currentVideoIndex].embedUrl)"
-                  frameborder="0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                  allowfullscreen
-                  class="main-video-iframe"
-                ></iframe>
-                <div v-if="showPlayPrompt" class="play-prompt-overlay" @click="dismissPlayPrompt">
-                  <div class="play-prompt-content">
-                    <ion-icon :icon="playCircleOutline" class="play-prompt-icon" />
-                    <p class="play-prompt-text">Appuyez sur la vidéo pour démarrer la lecture</p>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Player Controls -->
-              <div class="player-controls">
-                <ion-button
-                  @click="previousVideo"
-                  :disabled="currentVideoIndex === 0"
-                  fill="solid"
-                  color="danger"
-                  class="nav-button"
-                >
-                  <ion-icon :icon="playBackOutline" slot="start" class="hide-mobile" />
-                  <ion-icon :icon="playBackOutline" slot="icon-only" class="show-mobile" />
-                  <span class="hide-mobile">Précédent</span>
-                </ion-button>
-
-                <div class="progress-indicator">
-                  <div
-                    v-for="(video, index) in youtubeVideos"
-                    :key="index"
-                    :class="['progress-dot', { 'active': index === currentVideoIndex, 'played': index < currentVideoIndex }]"
-                    @click="goToVideo(index)"
-                  ></div>
-                </div>
-
-                <ion-button
-                  @click="nextVideo"
-                  :disabled="currentVideoIndex === youtubeVideos.length - 1"
-                  fill="solid"
-                  color="danger"
-                  class="nav-button"
-                >
-                  <span class="hide-mobile">Suivant</span>
-                  <ion-icon :icon="playForwardOutline" slot="icon-only" class="show-mobile" />
-                  <ion-icon :icon="playForwardOutline" slot="end" class="hide-mobile" />
-                </ion-button>
-              </div>
-            </div>
-
-            <!-- Playlist Queue -->
-            <div class="playlist-queue">
-              <h3 class="queue-title">File d'attente ({{ youtubeVideos.length }})</h3>
-              <div class="queue-list">
-                <div
-                  v-for="(video, index) in youtubeVideos"
-                  :key="index"
-                  :class="['queue-item', { 'active': index === currentVideoIndex, 'played': index < currentVideoIndex }]"
-                  @click="goToVideo(index)"
-                >
-                  <div class="queue-item-number">{{ index + 1 }}</div>
-                  <div class="queue-item-info">
-                    <div class="queue-item-title">{{ video.title }}</div>
-                    <div class="queue-item-subtitle-group">
-                      <div v-if="video.subtitle" class="queue-item-subtitle">{{ video.subtitle }}</div>
-                      <div v-if="video.programItemNumber && video.programItemTitle" class="queue-item-context">
-                        #{{ video.programItemNumber }} - {{ video.programItemTitle }}
-                      </div>
-                    </div>
-                  </div>
-                  <ion-icon
-                    v-if="index === currentVideoIndex"
-                    :icon="playCircleOutline"
-                    class="queue-item-playing"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </ion-content>
-      </ion-modal>
+      <YouTubePlaylistModal
+        :is-open="showYouTubePlaylistModalState"
+        :videos="youtubeVideos"
+        @close="closeYouTubePlaylist"
+      />
 
       <!-- Presentation Modal (PowerPoint-style 16:9 Fullscreen) -->
-      <ion-modal :is-open="showPresentationModalState" @ionModalDidDismiss="closePresentation" class="presentation-modal fullscreen-modal">
-        <ion-content class="presentation-content" :fullscreen="true">
-          <div class="presentation-container"
-            @touchstart="handlePresentationTouchStart"
-            @touchmove="handlePresentationTouchMove"
-            @touchend="handlePresentationTouchEnd"
-          >
-            <!-- Close Button -->
-            <div class="presentation-close-btn">
-              <ion-button @click="closePresentation" fill="clear" color="light">
-                <ion-icon :icon="closeOutline" />
-              </ion-button>
-            </div>
-
-            <!-- Slide Display -->
-            <div v-if="presentationSlides.length > 0" class="slide-section">
-              <!-- Slide Counter -->
-              <div class="slide-counter">
-                {{ currentSlideIndex + 1 }} / {{ presentationSlides.length }}
-              </div>
-
-              <!-- Main Slide -->
-              <div class="slide-wrapper">
-                <!-- Scripture Slide (for Lecture biblique or Prédication with scripture) -->
-                <div v-if="currentSlide?.scriptureReference" class="slide-fullscreen slide-scripture-mode">
-                  <!-- Scripture Header -->
-                  <div class="scripture-slide-header">
-                    <div class="scripture-badge">
-                      <ion-icon :icon="currentSlide.type === 'Prédication' ? micOutline : libraryOutline" />
-                      <span>{{ currentSlide.type === 'Prédication' ? 'Prédication' : 'Lecture biblique' }}</span>
-                    </div>
-                    <div class="scripture-header-right">
-                      <div v-if="currentSlide.scripturePage && currentSlide.scriptureTotal && currentSlide.scriptureTotal > 1" class="scripture-page-indicator">
-                        {{ currentSlide.scripturePage }}/{{ currentSlide.scriptureTotal }}
-                      </div>
-                      <div v-if="currentSlide.itemNumber" class="slide-number">#{{ currentSlide.itemNumber }}</div>
-                    </div>
-                  </div>
-
-                  <!-- Scripture Content -->
-                  <div class="scripture-slide-body">
-                    <!-- For sermons, show the title first (only on first page) -->
-                    <div v-if="currentSlide.type === 'Prédication' && currentSlide.title && (!currentSlide.scripturePage || currentSlide.scripturePage === 1)" class="sermon-title">{{ currentSlide.title }}</div>
-
-                    <div class="scripture-reference-large">{{ currentSlide.scriptureReference }}</div>
-                    <div class="scripture-divider"></div>
-                    <div v-if="currentSlide.scriptureText" class="scripture-text-large scripture-text-formatted" v-html="formatScriptureForDisplay(currentSlide.scriptureText)"></div>
-                    <div v-else class="scripture-no-text">
-                      <ion-icon :icon="bookOutline" />
-                      <span>Texte non disponible</span>
-                    </div>
-                  </div>
-
-                  <!-- Scripture Footer -->
-                  <div v-if="currentSlide.participant || currentSlide.duration" class="scripture-slide-footer">
-                    <div v-if="currentSlide.participant" class="slide-participant">
-                      <ion-icon :icon="personOutline" />
-                      <span>{{ currentSlide.participant }}</span>
-                    </div>
-                    <div v-if="currentSlide.duration" class="slide-duration">
-                      <ion-icon :icon="timeOutline" />
-                      <span>{{ currentSlide.duration }} min</span>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Lyrics Slide (sub-item or regular song) -->
-                <div v-else-if="currentSlide?.isLyricsSlide" class="slide-fullscreen slide-lyrics-mode">
-                  <!-- Lyrics Header -->
-                  <div class="slide-header-compact">
-                    <div class="slide-parent-info">
-                      <span v-if="currentSlide.parentTitle" class="parent-title">{{ currentSlide.parentTitle }}</span>
-                    </div>
-                    <div v-if="currentSlide.lyricsTotal && currentSlide.lyricsTotal > 1" class="lyrics-page-indicator">
-                      Page {{ currentSlide.lyricsPage }} / {{ currentSlide.lyricsTotal }}
-                    </div>
-                  </div>
-
-                  <!-- Song Title -->
-                  <div class="slide-song-header">
-                    <ion-icon :icon="musicalNoteOutline" class="song-icon" />
-                    <h1 class="slide-song-title">{{ currentSlide.title }}</h1>
-                  </div>
-
-                  <!-- Lyrics Display -->
-                  <div class="slide-lyrics-full">
-                    <div v-if="currentSlide.lyrics" class="lyrics-text">{{ currentSlide.lyrics }}</div>
-                    <div v-else class="no-lyrics-message">
-                      <ion-icon :icon="documentTextOutline" />
-                      <span>Aucune parole disponible</span>
-                    </div>
-                  </div>
-
-                  <!-- Notes (only on first page) -->
-                  <div v-if="currentSlide.notes" class="slide-notes-bottom">
-                    <ion-icon :icon="documentTextOutline" />
-                    <span>{{ currentSlide.notes }}</span>
-                  </div>
-                </div>
-
-                <!-- Regular Slide (non-lyrics) -->
-                <div v-else class="slide-fullscreen" :class="{ 'is-section': currentSlide?.isSection }">
-                  <!-- Slide Header -->
-                  <div class="slide-header">
-                    <div class="slide-type-badge">
-                      <ion-icon :icon="getSlideTypeIcon(currentSlide?.type || 'Chant')" />
-                      <span>{{ getSlideTypeLabel(currentSlide?.type || 'Chant') }}</span>
-                    </div>
-                    <div v-if="currentSlide && !currentSlide.isSection && currentSlide.itemNumber" class="slide-number">
-                      #{{ currentSlide.itemNumber }}
-                    </div>
-                  </div>
-
-                  <!-- Slide Content -->
-                  <div class="slide-body">
-                    <h1 class="slide-title">{{ currentSlide?.title }}</h1>
-                    <p v-if="currentSlide?.subtitle" class="slide-subtitle">
-                      {{ currentSlide.subtitle }}
-                    </p>
-
-                    <!-- Notes -->
-                    <div v-if="currentSlide?.notes" class="slide-notes">
-                      <ion-icon :icon="documentTextOutline" />
-                      <span>{{ currentSlide.notes }}</span>
-                    </div>
-                  </div>
-
-                  <!-- Slide Footer -->
-                  <div class="slide-footer">
-                    <div v-if="currentSlide?.participant" class="slide-participant">
-                      <ion-icon :icon="personOutline" />
-                      <span>{{ currentSlide.participant }}</span>
-                    </div>
-                    <div v-if="currentSlide?.duration" class="slide-duration">
-                      <ion-icon :icon="timeOutline" />
-                      <span>{{ currentSlide.duration }} min</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Navigation Controls -->
-              <div class="presentation-controls">
-                <ion-button
-                  @click="previousSlide"
-                  :disabled="currentSlideIndex === 0"
-                  fill="solid"
-                  color="light"
-                  class="nav-button"
-                >
-                  <ion-icon :icon="playBackOutline" slot="start" class="hide-mobile" />
-                  <ion-icon :icon="playBackOutline" slot="icon-only" class="show-mobile" />
-                  <span class="hide-mobile">Précédent</span>
-                </ion-button>
-
-                <div class="slide-progress-indicator">
-                  <div
-                    v-for="(slide, index) in presentationSlides"
-                    :key="index"
-                    :class="['slide-progress-dot', { 'active': index === currentSlideIndex, 'viewed': index < currentSlideIndex, 'is-section': slide.isSection, 'is-lyrics': slide.isLyricsSlide }]"
-                    @click="goToSlide(index)"
-                    :title="slide.lyricsPage ? `${slide.title} (${slide.lyricsPage}/${slide.lyricsTotal})` : slide.title"
-                  ></div>
-                </div>
-
-                <ion-button
-                  @click="nextSlide"
-                  :disabled="currentSlideIndex === presentationSlides.length - 1"
-                  fill="solid"
-                  color="light"
-                  class="nav-button"
-                >
-                  <span class="hide-mobile">Suivant</span>
-                  <ion-icon :icon="playForwardOutline" slot="icon-only" class="show-mobile" />
-                  <ion-icon :icon="playForwardOutline" slot="end" class="hide-mobile" />
-                </ion-button>
-              </div>
-            </div>
-
-            <!-- No slides -->
-            <div v-else class="no-slides">
-              <ion-icon :icon="documentTextOutline" class="no-slides-icon" />
-              <p>Aucun élément dans le programme</p>
-            </div>
-          </div>
-        </ion-content>
-      </ion-modal>
+      <PresentationModal
+        :is-open="showPresentationModalState"
+        :slides="presentationSlides"
+        :linked-resources="linkedResources"
+        @close="closePresentation"
+      />
 
       <!-- Scripture Display Modal -->
       <ion-modal :is-open="showScriptureModalState" @ionModalDidDismiss="closeScriptureModal" :initial-breakpoint="0.7" :breakpoints="[0, 0.5, 0.7, 1]">
@@ -1068,141 +636,28 @@
       />
 
       <!-- Music Properties Edit Modal -->
-      <ion-modal :is-open="showMusicPropsModalState" @ionModalDidDismiss="closeMusicPropsModal" :initial-breakpoint="0.6" :breakpoints="[0, 0.6, 0.9]">
-        <ion-header>
-          <ion-toolbar>
-            <ion-title>Propriétés musicales</ion-title>
-            <ion-buttons slot="end">
-              <ion-button @click="closeMusicPropsModal">
-                <ion-icon :icon="closeOutline" />
-              </ion-button>
-            </ion-buttons>
-          </ion-toolbar>
-        </ion-header>
-        <ion-content class="ion-padding">
-          <div class="music-props-form">
-            <ion-item>
-              <ion-select
-                v-model="musicPropsForm.musicKey"
-                label="Tonalité"
-                label-placement="stacked"
-                interface="action-sheet"
-                placeholder="Sélectionner..."
-              >
-                <ion-select-option value="">Aucune</ion-select-option>
-                <ion-select-option v-for="option in musicKeys" :key="option.id" :value="option.id">
-                  {{ option.name }}
-                </ion-select-option>
-              </ion-select>
-            </ion-item>
-
-            <ion-item>
-              <ion-select
-                v-model="musicPropsForm.musicBeat"
-                label="Signature"
-                label-placement="stacked"
-                interface="action-sheet"
-                placeholder="Sélectionner..."
-              >
-                <ion-select-option value="">Aucune</ion-select-option>
-                <ion-select-option v-for="option in musicBeats" :key="option.id" :value="option.id">
-                  {{ option.name }}
-                </ion-select-option>
-              </ion-select>
-            </ion-item>
-
-            <ion-item>
-              <ion-select
-                v-model="musicPropsForm.musicTempo"
-                label="Tempo"
-                label-placement="stacked"
-                interface="action-sheet"
-                placeholder="Sélectionner..."
-              >
-                <ion-select-option value="">Aucun</ion-select-option>
-                <ion-select-option v-for="option in musicTempos" :key="option.id" :value="option.id">
-                  {{ option.name }} <span v-if="option.label">({{ option.label }})</span>
-                </ion-select-option>
-              </ion-select>
-            </ion-item>
-
-            <ion-item>
-              <ion-select
-                v-model="musicPropsForm.musicStyle"
-                label="Style"
-                label-placement="stacked"
-                interface="action-sheet"
-                placeholder="Sélectionner..."
-              >
-                <ion-select-option value="">Aucun</ion-select-option>
-                <ion-select-option v-for="option in musicStyles" :key="option.id" :value="option.id">
-                  {{ option.name }}
-                </ion-select-option>
-              </ion-select>
-            </ion-item>
-
-            <ion-button @click="saveMusicProps" expand="block" class="ion-margin-top">
-              Enregistrer
-            </ion-button>
-          </div>
-        </ion-content>
-      </ion-modal>
+      <MusicPropertiesModal
+        :is-open="showMusicPropsModalState"
+        :resource-id="editingResourceId"
+        :initial-form="musicPropsForm"
+        :music-keys="musicKeys"
+        :music-beats="musicBeats"
+        :music-tempos="musicTempos"
+        :music-styles="musicStyles"
+        @close="closeMusicPropsModal"
+        @save="handleMusicPropsSave"
+      />
 
       <!-- Draft Viewers Modal -->
-      <ion-modal :is-open="showDraftViewersModal" @didDismiss="showDraftViewersModal = false">
-        <ion-header>
-          <ion-toolbar>
-            <ion-title>Gérer les accès</ion-title>
-            <ion-buttons slot="end">
-              <ion-button @click="showDraftViewersModal = false">
-                <ion-icon :icon="closeOutline" />
-              </ion-button>
-            </ion-buttons>
-          </ion-toolbar>
-          <ion-toolbar>
-            <ion-searchbar
-              v-model="draftViewerSearchQuery"
-              placeholder="Rechercher un membre..."
-              :debounce="300"
-            ></ion-searchbar>
-          </ion-toolbar>
-        </ion-header>
-        <ion-content>
-          <div v-if="loadingMembers" class="modal-loading">
-            <ion-spinner name="crescent" />
-            <p>Chargement des membres...</p>
-          </div>
-
-          <ion-list v-else>
-            <ion-item
-              v-for="member in filteredDraftViewerMembers"
-              :key="member.id"
-              :button="true"
-              @click="toggleDraftViewer(member.firebaseUserId)"
-            >
-              <ion-avatar slot="start">
-                <img v-if="member.avatar && !failedAvatars.has(member.id)" :src="member.avatar" :alt="member.fullName" @error="failedAvatars.add(member.id)" />
-                <div v-else class="avatar-initials">{{ getMemberInitials(member.fullName) }}</div>
-              </ion-avatar>
-              <ion-label>
-                <h3>{{ member.fullName }}</h3>
-                <p>{{ member.email }}</p>
-              </ion-label>
-              <ion-checkbox
-                slot="end"
-                :checked="draftViewerIds.includes(member.firebaseUserId)"
-                @click.stop
-              ></ion-checkbox>
-            </ion-item>
-          </ion-list>
-
-          <div class="modal-footer">
-            <ion-button @click="saveDraftViewers" expand="block" color="primary">
-              Enregistrer les accès
-            </ion-button>
-          </div>
-        </ion-content>
-      </ion-modal>
+      <DraftViewersModal
+        :is-open="showDraftViewersModal"
+        :initial-viewer-ids="draftViewerIds"
+        :members="allMembers"
+        :loading-members="loadingMembers"
+        :failed-avatars="failedAvatars"
+        @close="showDraftViewersModal = false"
+        @save="handleDraftViewersSave"
+      />
 
       <!-- Inline Resource Bottom Sheet Selector -->
       <ResourceBottomSheet
@@ -1238,29 +693,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRoute } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonBackButton,
   IonButton, IonIcon, IonCard, IonCardContent, IonLoading, IonModal, IonAvatar,
-  IonItem, IonLabel, IonInput, IonSelect, IonSelectOption,
-  IonSpinner, IonReorderGroup, IonReorder, toastController, alertController,
-  IonList, IonCheckbox, IonChip, IonSearchbar,
+  IonItem, IonLabel, IonInput,
+  IonReorderGroup, IonReorder, toastController, alertController,
   IonPopover
 } from '@ionic/vue';
 import {
-  calendarOutline, createOutline, listOutline, timeOutline,
+  calendarOutline, createOutline, timeOutline,
   personOutline, documentTextOutline,
-  closeOutline, musicalNoteOutline, libraryOutline, micOutline,
-  handLeftOutline,
+  closeOutline, musicalNoteOutline,
   reorderThreeOutline, addOutline, trashOutline,
   playCircleOutline, volumeHighOutline, documentOutline,
   chatboxEllipsesOutline, chevronDownOutline, chevronForwardOutline,
-  logoYoutube, playBackOutline, playForwardOutline,
+  logoYoutube,
   removeOutline, bookOutline, copyOutline,
-  lockClosedOutline, peopleOutline, checkmarkCircleOutline, chevronUpOutline,
-  easelOutline, downloadOutline, checkmarkOutline, timerOutline,
-  pencilOutline, handRightOutline,
+  lockClosedOutline, chevronUpOutline,
+  easelOutline, downloadOutline,
   closeCircleOutline,
   searchOutline,
   personAddOutline,
@@ -1273,6 +725,16 @@ import ParticipantSelector from '@/components/ParticipantSelector.vue';
 import SendProgramSMSModal from '@/components/SendProgramSMSModal.vue';
 import InlineAddBar from '@/components/InlineAddBar.vue';
 import DurationStepper from '@/components/DurationStepper.vue';
+import PresentationModal from '@/components/program/PresentationModal.vue';
+import YouTubePlaylistModal from '@/components/program/YouTubePlaylistModal.vue';
+import MediaDisplayModal from '@/components/program/MediaDisplayModal.vue';
+import MusicPropertiesModal from '@/components/program/MusicPropertiesModal.vue';
+import DraftViewersModal from '@/components/program/DraftViewersModal.vue';
+import ProgramSummary from '@/components/program/ProgramSummary.vue';
+import EditModeControls from '@/components/program/EditModeControls.vue';
+import EditLockIndicator from '@/components/program/EditLockIndicator.vue';
+import DraftModeControls from '@/components/program/DraftModeControls.vue';
+import { useEditLock } from '@/composables/useEditLock';
 import { useProgramItems } from '@/composables/useProgramItems';
 import { serviceService } from '@/services/serviceService';
 import { timezoneUtils } from '@/utils/timezone';
@@ -1285,10 +747,7 @@ import {
   addItemToProgram,
   publishProgram,
   updateDraftViewers,
-  canUserViewProgram,
-  acquireEditLock,
-  releaseEditLock,
-  forceAcquireEditLock
+  canUserViewProgram
 } from '@/firebase/programs';
 import type { Service } from '@/types/service';
 import type { ServiceProgram, ProgramItem, ProgramParticipant } from '@/types/program';
@@ -1297,7 +756,7 @@ import { membersService } from '@/firebase/members';
 import type { Resource, ResourceOption } from '@/types/resource';
 import { getAllResourceOptions, updateResource, subscribeToResource, getResources } from '@/firebase/resources';
 import { deleteField, type Unsubscribe } from 'firebase/firestore';
-import { isYouTubeUrl, getYouTubeEmbedUrl, getSpotifyEmbedUrl } from '@/utils/resource-utils';
+import { isYouTubeUrl, getYouTubeEmbedUrl } from '@/utils/resource-utils';
 import { bibleService } from '@/services/bibleService';
 
 const route = useRoute();
@@ -1530,7 +989,6 @@ const youtubeVideos = ref<Array<{
   programItemNumber?: number;
   programItemTitle?: string;
 }>>([]);
-const currentVideoIndex = ref(0);
 
 // Presentation Modal (PowerPoint-style 16:9)
 const showPresentationModalState = ref(false);
@@ -1554,29 +1012,6 @@ const presentationSlides = ref<Array<{
   isLyricsSlide?: boolean;
   parentTitle?: string;
 }>>([]);
-const currentSlideIndex = ref(0);
-
-// Computed property for current slide
-const currentSlide = computed(() => {
-  if (presentationSlides.value.length === 0) return null;
-  return presentationSlides.value[currentSlideIndex.value];
-});
-
-// Presentation touch/swipe handling
-const presentationTouchStartX = ref(0);
-const presentationTouchEndX = ref(0);
-const presentationTouchStartY = ref(0);
-const presentationTouchEndY = ref(0);
-
-// Touch/Swipe handling
-const touchStartX = ref(0);
-const touchEndX = ref(0);
-const touchStartY = ref(0);
-const touchEndY = ref(0);
-
-// Play prompt for mobile
-const showPlayPrompt = ref(false);
-
 // Music Properties Edit Modal
 const showMusicPropsModalState = ref(false);
 const editingResourceId = ref<string | null>(null);
@@ -1598,7 +1033,6 @@ const showDraftViewersModal = ref(false);
 const draftViewerIds = ref<string[]>([]);
 const allMembers = ref<Member[]>([]);
 const loadingMembers = ref(false);
-const draftViewerSearchQuery = ref('');
 
 // (ItemDetailSheet removed - all editing is now inline via expandable cards)
 
@@ -1638,148 +1072,12 @@ const isPublished = computed(() => {
   return program.value?.status === 'published';
 });
 
-// Edit Mode State
-const lockTimeRemaining = ref(0);
-const countdownInterval = ref<ReturnType<typeof setInterval> | null>(null);
-const hasShown30sWarning = ref(false);
-
-const isEditing = computed(() => {
-  if (!isAdmin.value || !program.value || !user.value) return false;
-  // Drafts: always editable for admins (no lock needed)
-  if (isDraft.value) return true;
-  // Published: editable only with active lock
-  if (!program.value.editLock) return false;
-  const lock = program.value.editLock;
-  return lock.userId === user.value.uid && lock.expiresAt.getTime() > Date.now();
-});
-
-const isLockedByOther = computed(() => {
-  if (!isPublished.value) return false; // Drafts can't be "locked"
-  if (!program.value?.editLock || !user.value) return false;
-  const lock = program.value.editLock;
-  return lock.userId !== user.value.uid && lock.expiresAt.getTime() > Date.now();
-});
-
-const lockHolder = computed(() => {
-  if (!isLockedByOther.value || !program.value?.editLock) return null;
-  return {
-    userName: program.value.editLock.userName,
-    expiresAt: program.value.editLock.expiresAt
-  };
-});
-
-const formattedLockTime = computed(() => {
-  const secs = lockTimeRemaining.value;
-  const m = Math.floor(secs / 60);
-  const s = secs % 60;
-  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-});
-
-const isTimerWarning = computed(() => lockTimeRemaining.value <= 120 && lockTimeRemaining.value > 0);
-
-// Countdown Timer
-const startCountdown = () => {
-  stopCountdown();
-  hasShown30sWarning.value = false;
-  updateCountdown();
-  countdownInterval.value = setInterval(updateCountdown, 1000);
-};
-
-const updateCountdown = () => {
-  if (!program.value?.editLock) {
-    lockTimeRemaining.value = 0;
-    return;
-  }
-  const remaining = Math.max(0, Math.floor((program.value.editLock.expiresAt.getTime() - Date.now()) / 1000));
-  lockTimeRemaining.value = remaining;
-
-  if (remaining <= 30 && remaining > 0 && !hasShown30sWarning.value) {
-    hasShown30sWarning.value = true;
-    showToast('Votre session d\'édition expire bientôt', 'warning');
-  }
-
-  if (remaining <= 0) {
-    handleLockExpired();
-  }
-};
-
-const stopCountdown = () => {
-  if (countdownInterval.value) {
-    clearInterval(countdownInterval.value);
-    countdownInterval.value = null;
-  }
-};
-
-const handleLockExpired = async () => {
-  stopCountdown();
-  lockTimeRemaining.value = 0;
-  if (program.value && user.value) {
-    try {
-      await releaseEditLock(program.value.id, user.value.uid);
-    } catch (e) { /* best effort */ }
-  }
-  showToast('Session d\'édition expirée', 'warning');
-};
-
-// Lock Lifecycle
-const enterEditMode = async () => {
-  if (!program.value || !user.value || !isPublished.value) return;
-  const displayName = user.value.displayName || user.value.email || 'Utilisateur';
-  const result = await acquireEditLock(program.value.id, user.value.uid, displayName);
-  if (result.success) {
-    startCountdown();
-  } else if (result.holder) {
-    showToast(`${result.holder.userName} est en train de modifier ce programme`, 'warning');
-  }
-};
-
-const exitEditMode = async () => {
-  stopCountdown();
-  if (!program.value || !user.value || !isPublished.value) return;
-  try {
-    await releaseEditLock(program.value.id, user.value.uid);
-  } catch (e) {
-    console.error('Error releasing edit lock:', e);
-  }
-};
-
-const forceEnterEditMode = async () => {
-  if (!program.value || !user.value || !isPublished.value) return;
-  const displayName = user.value.displayName || user.value.email || 'Utilisateur';
-  const result = await forceAcquireEditLock(program.value.id, user.value.uid, displayName);
-  startCountdown();
-  if (result.previousHolder) {
-    showToast(`Vous avez pris le contrôle de l'édition de ${result.previousHolder.userName}`, 'warning');
-  }
-};
-
-const extendEditMode = async () => {
-  if (!program.value || !user.value || !isPublished.value) return;
-  const displayName = user.value.displayName || user.value.email || 'Utilisateur';
-  const result = await acquireEditLock(program.value.id, user.value.uid, displayName);
-  if (result.success) {
-    hasShown30sWarning.value = false;
-    showToast('Session d\'édition prolongée', 'success');
-  }
-};
-
-// beforeunload handler
-const handleBeforeUnload = () => {
-  if (isEditing.value && isPublished.value && program.value && user.value) {
-    // Best-effort release using sendBeacon or sync XHR is not reliable with Firestore
-    // The TTL will handle cleanup if this fails
-    releaseEditLock(program.value.id, user.value.uid).catch(() => {});
-  }
-};
-
-const filteredDraftViewerMembers = computed(() => {
-  if (!draftViewerSearchQuery.value) return allMembers.value;
-  const query = draftViewerSearchQuery.value.toLowerCase();
-  return allMembers.value.filter(m =>
-    m.fullName.toLowerCase().includes(query) ||
-    m.email?.toLowerCase().includes(query)
-  );
-});
+// Edit Mode (via composable)
+const {
+  isEditing, isLockedByOther, lockHolder,
+  formattedLockTime, isTimerWarning,
+  enterEditMode, exitEditMode, forceEnterEditMode, extendEditMode
+} = useEditLock(program, user, isAdmin, isDraft, isPublished);
 
 const hasYouTubeVideos = computed(() => {
   if (!program.value) return false;
@@ -2060,7 +1358,6 @@ const openDraftViewersModal = async () => {
   draftViewerIds.value = [...program.value.draftViewerIds];
   loadingMembers.value = true;
   showDraftViewersModal.value = true;
-  draftViewerSearchQuery.value = '';
 
   try {
     allMembers.value = await membersService.getAllMembers();
@@ -2072,38 +1369,16 @@ const openDraftViewersModal = async () => {
   }
 };
 
-const toggleDraftViewer = (firebaseUid: string) => {
-  const index = draftViewerIds.value.indexOf(firebaseUid);
-  if (index > -1) {
-    draftViewerIds.value.splice(index, 1);
-  } else {
-    draftViewerIds.value.push(firebaseUid);
-  }
-};
-
-const saveDraftViewers = async () => {
+const handleDraftViewersSave = async (viewerIds: string[]) => {
   if (!program.value || !user.value) return;
-
   try {
-    await updateDraftViewers(
-      program.value.id,
-      draftViewerIds.value,
-      user.value.uid
-    );
+    await updateDraftViewers(program.value.id, viewerIds, user.value.uid);
     showDraftViewersModal.value = false;
     await showToast('Accès mis à jour', 'success');
   } catch (error) {
     console.error('Error saving draft viewers:', error);
     await showToast('Erreur lors de la mise à jour des accès', 'danger');
   }
-};
-
-const getMemberInitials = (fullName: string): string => {
-  const parts = fullName.trim().split(' ');
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  }
-  return fullName.substring(0, 2).toUpperCase();
 };
 
 // Edit Program Modal
@@ -2282,10 +1557,6 @@ const closeMediaModal = () => {
   selectedMediaTitle.value = '';
 };
 
-const openInNewTab = (url: string) => {
-  window.open(url, '_blank');
-};
-
 // SMS Functions
 const showSMSModal = () => {
   showSMSModalState.value = true;
@@ -2345,147 +1616,12 @@ const collectYouTubeVideos = () => {
 
 const showYouTubePlaylist = () => {
   youtubeVideos.value = collectYouTubeVideos();
-  currentVideoIndex.value = 0;
   showYouTubePlaylistModalState.value = true;
-
-  // Show play prompt on mobile after a short delay
-  setTimeout(() => {
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    if (isMobile) {
-      showPlayPrompt.value = true;
-    }
-  }, 500);
 };
 
 const closeYouTubePlaylist = () => {
   showYouTubePlaylistModalState.value = false;
-  currentVideoIndex.value = 0;
-  showPlayPrompt.value = false;
 };
-
-const nextVideo = () => {
-  if (currentVideoIndex.value < youtubeVideos.value.length - 1) {
-    currentVideoIndex.value++;
-    showPlayPrompt.value = false;
-  }
-};
-
-const previousVideo = () => {
-  if (currentVideoIndex.value > 0) {
-    currentVideoIndex.value--;
-    showPlayPrompt.value = false;
-  }
-};
-
-const goToVideo = (index: number) => {
-  currentVideoIndex.value = index;
-  showPlayPrompt.value = false;
-};
-
-const dismissPlayPrompt = () => {
-  showPlayPrompt.value = false;
-};
-
-const getAutoplayEmbedUrl = (embedUrl: string): string => {
-  // Add autoplay parameter and enable JS API to YouTube embed URL
-  const separator = embedUrl.includes('?') ? '&' : '?';
-  return `${embedUrl}${separator}autoplay=1&rel=0&enablejsapi=1`;
-};
-
-// Touch/Swipe handlers
-const handleTouchStart = (e: TouchEvent) => {
-  touchStartX.value = e.touches[0].clientX;
-  touchStartY.value = e.touches[0].clientY;
-};
-
-const handleTouchMove = (e: TouchEvent) => {
-  touchEndX.value = e.touches[0].clientX;
-  touchEndY.value = e.touches[0].clientY;
-};
-
-const handleTouchEnd = () => {
-  const deltaX = touchStartX.value - touchEndX.value;
-  const deltaY = Math.abs(touchStartY.value - touchEndY.value);
-
-  // Minimum swipe distance (in pixels)
-  const minSwipeDistance = 50;
-
-  // Check if horizontal swipe is dominant (not vertical scroll)
-  if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaX) > deltaY * 2) {
-    if (deltaX > 0) {
-      // Swiped left - next video
-      if (currentVideoIndex.value < youtubeVideos.value.length - 1) {
-        nextVideo();
-      }
-    } else {
-      // Swiped right - previous video
-      if (currentVideoIndex.value > 0) {
-        previousVideo();
-      }
-    }
-  }
-
-  // Reset values
-  touchStartX.value = 0;
-  touchEndX.value = 0;
-  touchStartY.value = 0;
-  touchEndY.value = 0;
-};
-
-// YouTube Player API integration for auto-advance
-const setupYouTubeAPIListener = () => {
-  // Load YouTube IFrame API if not already loaded
-  if (!(window as any).YT) {
-    const tag = document.createElement('script');
-    tag.src = 'https://www.youtube.com/iframe_api';
-    const firstScriptTag = document.getElementsByTagName('script')[0];
-    firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
-
-    // Setup callback for when API is ready
-    (window as any).onYouTubeIframeAPIReady = () => {
-      initYouTubePlayer();
-    };
-  } else {
-    initYouTubePlayer();
-  }
-};
-
-const initYouTubePlayer = () => {
-  // Wait for iframe to be available
-  setTimeout(() => {
-    const iframe = document.querySelector('.main-video-iframe') as HTMLIFrameElement;
-    if (!iframe || !iframe.contentWindow) return;
-
-    // Initialize YouTube player with event listeners
-    new (window as any).YT.Player(iframe, {
-      events: {
-        onStateChange: (event: any) => {
-          // YT.PlayerState.ENDED = 0
-          if (event.data === 0) {
-            // Video ended, play next
-            if (currentVideoIndex.value < youtubeVideos.value.length - 1) {
-              nextVideo();
-            }
-          }
-        }
-      }
-    });
-  }, 1000);
-};
-
-// Watch for video changes to reinitialize player
-watch(currentVideoIndex, () => {
-  if (showYouTubePlaylistModalState.value) {
-    initYouTubePlayer();
-  }
-});
-
-// Setup API when modal opens
-watch(showYouTubePlaylistModalState, (isOpen) => {
-  if (isOpen && youtubeVideos.value.length > 0) {
-    setupYouTubeAPIListener();
-  }
-});
 
 // Presentation Functions (PowerPoint-style 16:9)
 
@@ -2599,13 +1735,6 @@ const splitScriptureIntoPages = (text: string, maxVersesPerPage: number = 1): st
 const formatScriptureForPresentation = (text: string): string => {
   if (!text) return '';
   return text.trim();
-};
-
-// Format scripture text for display - style the verse number
-const formatScriptureForDisplay = (text: string): string => {
-  if (!text) return '';
-  // Style the verse number at the start
-  return text.replace(/^(\d{1,3})\s+/, '<span class="verse-number">$1</span> ');
 };
 
 const collectPresentationSlides = () => {
@@ -2736,7 +1865,6 @@ const collectPresentationSlides = () => {
 
 const showPresentation = () => {
   presentationSlides.value = collectPresentationSlides();
-  currentSlideIndex.value = 0;
   showPresentationModalState.value = true;
 };
 
@@ -2834,77 +1962,7 @@ const exportProgramText = async () => {
 
 const closePresentation = () => {
   showPresentationModalState.value = false;
-  currentSlideIndex.value = 0;
-};
-
-const nextSlide = () => {
-  if (currentSlideIndex.value < presentationSlides.value.length - 1) {
-    currentSlideIndex.value++;
-  }
-};
-
-const previousSlide = () => {
-  if (currentSlideIndex.value > 0) {
-    currentSlideIndex.value--;
-  }
-};
-
-const goToSlide = (index: number) => {
-  currentSlideIndex.value = index;
-};
-
-const handlePresentationTouchStart = (e: TouchEvent) => {
-  presentationTouchStartX.value = e.touches[0].clientX;
-  presentationTouchStartY.value = e.touches[0].clientY;
-};
-
-const handlePresentationTouchMove = (e: TouchEvent) => {
-  presentationTouchEndX.value = e.touches[0].clientX;
-  presentationTouchEndY.value = e.touches[0].clientY;
-};
-
-const handlePresentationTouchEnd = () => {
-  const deltaX = presentationTouchStartX.value - presentationTouchEndX.value;
-  const deltaY = Math.abs(presentationTouchStartY.value - presentationTouchEndY.value);
-
-  const minSwipeDistance = 50;
-
-  if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaX) > deltaY * 2) {
-    if (deltaX > 0) {
-      nextSlide();
-    } else {
-      previousSlide();
-    }
-  }
-
-  presentationTouchStartX.value = 0;
-  presentationTouchEndX.value = 0;
-  presentationTouchStartY.value = 0;
-  presentationTouchEndY.value = 0;
-};
-
-const getSlideTypeIcon = (type: string): string => {
-  const iconMap: Record<string, string> = {
-    'Chant': musicalNoteOutline,
-    'Prière': handLeftOutline,
-    'Lecture biblique': libraryOutline,
-    'Prédication': micOutline,
-    'Section': bookOutline,
-    'Titre': bookOutline,
-  };
-  return iconMap[type] || documentTextOutline;
-};
-
-const getSlideTypeLabel = (type: string): string => {
-  const labelMap: Record<string, string> = {
-    'Chant': 'Chant',
-    'Prière': 'Prière',
-    'Lecture biblique': 'Lecture biblique',
-    'Prédication': 'Prédication',
-    'Section': 'Section',
-    'Titre': 'Titre',
-  };
-  return labelMap[type] || type;
+  presentationSlides.value = [];
 };
 
 
@@ -2992,55 +2050,25 @@ const closeMusicPropsModal = () => {
   editingResourceId.value = null;
 };
 
-// Save music properties
-const saveMusicProps = async () => {
+// Handle music properties save from modal
+const handleMusicPropsSave = async (form: { musicKey: string; musicBeat: string; musicTempo: string; musicStyle: string }) => {
   if (!editingResourceId.value) return;
-
   try {
     await updateResource(editingResourceId.value, {
-      musicKey: musicPropsForm.value.musicKey || undefined,
-      musicBeat: musicPropsForm.value.musicBeat || undefined,
-      musicTempo: musicPropsForm.value.musicTempo || undefined,
-      musicStyle: musicPropsForm.value.musicStyle || undefined
+      musicKey: form.musicKey || undefined,
+      musicBeat: form.musicBeat || undefined,
+      musicTempo: form.musicTempo || undefined,
+      musicStyle: form.musicStyle || undefined
     });
-
-    const toast = await toastController.create({
-      message: 'Propriétés musicales mises à jour',
-      duration: 1500,
-      position: 'bottom',
-      color: 'success'
-    });
-    await toast.present();
-
+    await showToast('Propriétés musicales mises à jour', 'success');
     closeMusicPropsModal();
   } catch (error) {
     console.error('Error saving music properties:', error);
-    const toast = await toastController.create({
-      message: 'Erreur lors de la mise à jour',
-      duration: 2000,
-      position: 'bottom',
-      color: 'danger'
-    });
-    await toast.present();
+    await showToast('Erreur lors de la mise à jour', 'danger');
   }
 };
 
 // Lifecycle
-// Watch for lock displacement by another user
-watch(() => program.value?.editLock, (newLock, oldLock) => {
-  if (!user.value || !oldLock) return;
-  // Was held by current user, now held by someone else
-  if (oldLock.userId === user.value.uid && newLock && newLock.userId !== user.value.uid) {
-    stopCountdown();
-    lockTimeRemaining.value = 0;
-    showToast(`${newLock.userName} a pris le contrôle de l'édition`, 'warning');
-  }
-  // Lock acquired by current user (from subscription update) — restart countdown
-  if (newLock && newLock.userId === user.value.uid && newLock.expiresAt.getTime() > Date.now()) {
-    startCountdown();
-  }
-}, { deep: true });
-
 onMounted(async () => {
   loading.value = true;
   await Promise.all([loadService(), loadMusicOptions()]);
@@ -3052,16 +2080,9 @@ onMounted(async () => {
   if (isAdmin.value && program.value && isDraft.value) {
     enterEditMode();
   }
-  window.addEventListener('beforeunload', handleBeforeUnload);
 });
 
 onUnmounted(() => {
-  // Release edit lock if held
-  if (isEditing.value && program.value && user.value) {
-    releaseEditLock(program.value.id, user.value.uid).catch(() => {});
-  }
-  stopCountdown();
-  window.removeEventListener('beforeunload', handleBeforeUnload);
   // Clean up program subscription
   if (programSubscription.value) {
     programSubscription.value();
@@ -3117,99 +2138,7 @@ onUnmounted(() => {
   padding: 1rem;
 }
 
-/* Program Summary */
-.program-summary {
-  margin-bottom: 1.5rem;
-}
-
-.summary-stats {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 1rem;
-}
-
-.stat-box {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 16px 12px;
-  border: 1px solid var(--ion-color-light-shade);
-  border-radius: 12px;
-  background: white;
-}
-
-.stat-value {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: var(--ion-color-primary);
-}
-
-.stat-label {
-  font-size: 0.85rem;
-  color: var(--ion-color-medium);
-  margin-top: 2px;
-}
-
-.conductor-edit-btn {
-  margin-left: auto;
-}
-
-/* Conductor Info */
-.conductor-info {
-  border-top: 1px solid var(--ion-color-light);
-  padding-top: 1rem;
-  margin-top: 1rem;
-}
-
-.conductor-section {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.conductor-avatar {
-  width: 40px;
-  height: 40px;
-  flex-shrink: 0;
-}
-
-.conductor-initials {
-  width: 40px;
-  height: 40px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--ion-color-primary);
-  color: white;
-  font-size: 14px;
-  font-weight: 600;
-  border-radius: 50%;
-}
-
-.conductor-details {
-  display: flex;
-  flex-direction: column;
-}
-
-.conductor-label {
-  font-size: 0.85rem;
-  color: var(--ion-color-medium);
-}
-
-.conductor-name {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--ion-color-dark);
-}
-
-.conductor-role {
-  font-size: 0.9rem;
-  color: var(--ion-color-medium);
-  font-style: italic;
-}
+/* (Program Summary / Conductor styles moved to ProgramSummary component) */
 
 /* No Program State */
 .no-program {
@@ -3610,9 +2539,7 @@ onUnmounted(() => {
   font-size: 12px;
 }
 
-.music-props-form ion-item {
-  margin-bottom: 0.5rem;
-}
+/* (Music props form styles moved to MusicPropertiesModal component) */
 
 /* Resource Link Section (Modals) */
 .resource-link-section {
@@ -3867,576 +2794,13 @@ onUnmounted(() => {
   color: var(--ion-color-medium);
 }
 
-/* Media Modal */
-.media-modal {
-  --width: 90%;
-  --height: 80%;
-  --border-radius: 12px;
-}
+/* (Media Modal, Lyrics View Modal, Fullscreen Modal styles moved to child components) */
 
-.video-container,
-.audio-container,
-.spotify-container,
-.lyrics-container,
-.document-container {
-  padding: 1rem;
-}
+/* (Lyrics view styles moved to child components) */
 
-.full-width-video,
-.full-width-audio {
-  width: 100%;
-}
+/* (Scripture/Lyrics content display styles moved to child components) */
 
-.youtube-iframe {
-  width: 100%;
-  aspect-ratio: 16/9;
-  min-height: 315px;
-  border-radius: 8px;
-}
-
-.spotify-iframe {
-  width: 100%;
-  border-radius: 12px;
-}
-
-.lyrics-content {
-  background: var(--ion-color-light);
-  padding: 1.5rem;
-  border-radius: 8px;
-}
-
-.lyrics-content pre {
-  white-space: pre-wrap;
-  font-family: var(--ion-font-family);
-  font-size: 1rem;
-  line-height: 1.6;
-  margin: 0;
-}
-
-/* Lyrics View Button */
-.item-lyrics-button {
-  margin-top: 0.75rem;
-}
-
-.view-lyrics-btn {
-  --padding-top: 8px;
-  --padding-bottom: 8px;
-  --padding-start: 16px;
-  --padding-end: 16px;
-  font-weight: 600;
-}
-
-/* Lyrics View Modal */
-.lyrics-view-modal {
-  --width: 90%;
-  --height: 80%;
-  --border-radius: 12px;
-}
-
-/* Fullscreen Modal */
-.fullscreen-modal {
-  --width: 100%;
-  --height: 100%;
-  --border-radius: 0;
-}
-
-.fullscreen-content {
-  --padding-top: 0;
-  --padding-bottom: 0;
-  --padding-start: 0;
-  --padding-end: 0;
-}
-
-.lyrics-view-modal-content {
-  --padding-top: 1rem;
-}
-
-.lyrics-view-container {
-  padding: 0.5rem;
-}
-
-.lyrics-item-card {
-  background: white;
-  border-radius: 0;
-  padding: 0.75rem;
-  margin-bottom: 0.5rem;
-  box-shadow: none;
-  border-bottom: 1px solid var(--ion-color-light);
-}
-
-.lyrics-item-header {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.5rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 2px solid var(--ion-color-primary);
-}
-
-.lyrics-item-header-text {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.lyrics-item-number {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  background: var(--ion-color-primary);
-  color: white;
-  border-radius: 50%;
-  font-weight: 700;
-  font-size: 1.25rem;
-  flex-shrink: 0;
-}
-
-.lyrics-item-title {
-  margin: 0;
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: var(--ion-color-dark);
-  line-height: 1.2;
-}
-
-.lyrics-item-subtitle {
-  margin: 0;
-  font-size: 0.95rem;
-  font-weight: 500;
-  color: var(--ion-color-medium-shade);
-  line-height: 1.2;
-}
-
-.lyrics-item-notes {
-  margin: 0;
-  font-size: 0.9rem;
-  font-weight: 400;
-  color: var(--ion-color-medium);
-  font-style: italic;
-  line-height: 1.2;
-}
-
-.scripture-content-display {
-  background: var(--ion-color-primary-tint);
-  padding: 1rem;
-  border-radius: 12px;
-  margin-top: 0.5rem;
-  border-left: 3px solid var(--ion-color-primary);
-}
-
-.scripture-reference-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 600;
-  color: var(--ion-color-primary);
-  margin-bottom: 0.75rem;
-  font-size: 0.95rem;
-}
-
-.scripture-reference-header ion-icon {
-  font-size: 1.1rem;
-}
-
-.scripture-reference-header .scripture-version {
-  font-weight: 400;
-  font-size: 0.85rem;
-  color: var(--ion-color-medium);
-  margin-left: auto;
-}
-
-.scripture-content-display .scripture-text {
-  font-size: 1.1rem;
-  line-height: 1.8;
-  color: var(--ion-color-dark);
-}
-
-.scripture-content-display .scripture-text .verse-number {
-  font-weight: 700;
-  color: var(--ion-color-primary);
-  margin-right: 0.25rem;
-}
-
-.lyrics-content-display {
-  background: transparent;
-  padding: 0.5rem 0;
-  border-radius: 0;
-  margin-top: 0.5rem;
-}
-
-.lyrics-content-display pre {
-  white-space: pre-wrap;
-  font-family: var(--ion-font-family);
-  font-size: 1.1rem;
-  line-height: 1.7;
-  margin: 0;
-  color: var(--ion-color-dark);
-  font-weight: 400;
-}
-
-.no-lyrics {
-  text-align: center;
-  padding: 2rem;
-  color: var(--ion-color-medium);
-  font-style: italic;
-}
-
-/* YouTube Playlist Modal */
-.youtube-playlist-modal {
-  --width: 100%;
-  --height: 100%;
-  --border-radius: 0;
-}
-
-.youtube-player-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  background: #000;
-}
-
-/* Main Player Section */
-.main-player-section {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  background: #000;
-}
-
-.current-video-info {
-  padding: 1rem;
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.7));
-  color: white;
-}
-
-.video-counter {
-  font-size: 0.85rem;
-  color: var(--ion-color-danger);
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-}
-
-.current-video-title {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: white;
-  line-height: 1.3;
-}
-
-.current-video-subtitle {
-  margin: 0.25rem 0 0 0;
-  font-size: 1rem;
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.main-video-wrapper {
-  flex: 1;
-  position: relative;
-  background: #000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.main-video-iframe {
-  width: 100%;
-  height: 100%;
-  border: none;
-}
-
-.play-prompt-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10;
-  cursor: pointer;
-  animation: fadeIn 0.3s ease-in;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.play-prompt-content {
-  text-align: center;
-  color: white;
-  padding: 2rem;
-}
-
-.play-prompt-icon {
-  font-size: 4rem;
-  color: #EF4444;
-  margin-bottom: 1rem;
-  animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.1);
-    opacity: 0.8;
-  }
-}
-
-.play-prompt-text {
-  font-size: 1.1rem;
-  font-weight: 500;
-  margin: 0;
-  line-height: 1.5;
-}
-
-/* Player Controls */
-.player-controls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1rem;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.7));
-  gap: 1rem;
-}
-
-.progress-indicator {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  overflow-x: auto;
-  padding: 0.5rem 0;
-}
-
-.progress-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.3);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-}
-
-.progress-dot:hover {
-  background: rgba(255, 255, 255, 0.5);
-  transform: scale(1.2);
-}
-
-.progress-dot.active {
-  background: var(--ion-color-danger);
-  width: 16px;
-  height: 16px;
-}
-
-.progress-dot.played {
-  background: rgba(255, 255, 255, 0.6);
-}
-
-/* Playlist Queue */
-.playlist-queue {
-  background: var(--ion-color-light);
-  border-top: 2px solid var(--ion-color-medium);
-  max-height: 40%;
-  overflow-y: auto;
-}
-
-.queue-title {
-  margin: 0;
-  padding: 1rem;
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--ion-color-dark);
-  background: white;
-  border-bottom: 1px solid var(--ion-color-light-shade);
-  sticky: top;
-  top: 0;
-  z-index: 1;
-}
-
-.queue-list {
-  display: flex;
-  flex-direction: column;
-}
-
-.queue-item {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  background: white;
-  border-bottom: 1px solid var(--ion-color-light);
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.queue-item:hover {
-  background: var(--ion-color-light-tint);
-}
-
-.queue-item.active {
-  background: var(--ion-color-danger);
-  border-left: 4px solid var(--ion-color-danger-shade);
-}
-
-.queue-item.played {
-  opacity: 0.6;
-}
-
-.queue-item-number {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--ion-color-light);
-  color: var(--ion-color-dark);
-  font-weight: 600;
-  font-size: 0.9rem;
-  flex-shrink: 0;
-}
-
-.queue-item.active .queue-item-number {
-  background: rgba(255, 255, 255, 0.3);
-  color: white;
-}
-
-.queue-item-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.queue-item-title {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--ion-color-dark);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.queue-item.active .queue-item-title {
-  color: white;
-}
-
-.queue-item-subtitle-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.queue-item-subtitle {
-  font-size: 0.8rem;
-  color: var(--ion-color-medium-shade);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.queue-item.active .queue-item-subtitle {
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.queue-item-context {
-  font-size: 0.75rem;
-  color: var(--ion-color-medium);
-  font-style: italic;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.queue-item.active .queue-item-context {
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.queue-item-playing {
-  font-size: 1.5rem;
-  color: white;
-  flex-shrink: 0;
-}
-
-/* Utility classes for responsive display */
-.hide-mobile {
-  display: inline;
-}
-
-.show-mobile {
-  display: none;
-}
-
-/* Navigation buttons */
-.nav-button {
-  --padding-start: 1rem;
-  --padding-end: 1rem;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .current-video-title {
-    font-size: 1.2rem;
-  }
-
-  .player-controls {
-    flex-direction: row;
-    gap: 0.5rem;
-    padding: 0.75rem;
-  }
-
-  .nav-button {
-    --padding-start: 0.5rem;
-    --padding-end: 0.5rem;
-    min-width: 44px;
-    flex-shrink: 0;
-  }
-
-  .hide-mobile {
-    display: none;
-  }
-
-  .show-mobile {
-    display: inline;
-  }
-
-  .progress-indicator {
-    flex: 1;
-    gap: 0.35rem;
-    padding: 0;
-  }
-
-  .progress-dot {
-    width: 10px;
-    height: 10px;
-  }
-
-  .progress-dot.active {
-    width: 14px;
-    height: 14px;
-  }
-
-  .playlist-queue {
-    max-height: 50%;
-  }
-}
+/* (YouTube Playlist Modal CSS moved to YouTubePlaylistModal component) */
 
 /* Responsive Design */
 @media (max-width: 768px) {
@@ -4557,15 +2921,6 @@ onUnmounted(() => {
     min-height: var(--program-touch-target);
   }
 
-  /* Task 6.1 & 6.2: Program summary stats */
-  .stat-box {
-    padding: 12px 8px;
-  }
-
-  .stat-value {
-    font-size: 1.25rem;
-  }
-
   /* Task 7.4: Expand/collapse toggle touch target */
   .expand-button {
     min-width: var(--program-touch-target);
@@ -4594,14 +2949,6 @@ onUnmounted(() => {
 
   .item-type span {
     font-size: 0.75rem;
-  }
-
-  .stat-box {
-    padding: 10px 6px;
-  }
-
-  .stat-value {
-    font-size: 1.1rem;
   }
 }
 
@@ -4760,130 +3107,7 @@ onUnmounted(() => {
   border-top: 1px solid var(--ion-color-light-shade);
 }
 
-/* Edit Mode Controls */
-.edit-mode-controls {
-  margin-bottom: 1rem;
-}
-
-.enter-edit-btn {
-  --border-radius: 12px;
-  font-weight: 600;
-}
-
-.editing-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.countdown-timer-btn {
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  font-size: 0.8rem;
-  --border-radius: 12px;
-  flex-shrink: 0;
-}
-
-.countdown-timer-btn.timer-warning {
-  animation: pulse-warning 1s ease-in-out infinite;
-}
-
-@keyframes pulse-warning {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
-
-.finish-edit-btn {
-  --border-radius: 12px;
-  font-weight: 600;
-  flex: 1;
-}
-
-/* Lock Indicator */
-.lock-indicator {
-  margin: 12px 16px;
-  padding: 16px;
-  background: rgba(var(--ion-color-warning-rgb), 0.1);
-  border: 1px solid rgba(var(--ion-color-warning-rgb), 0.3);
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  align-items: center;
-  text-align: center;
-}
-
-.lock-indicator-content {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.lock-indicator-icon {
-  font-size: 1.5rem;
-  color: var(--ion-color-warning-shade);
-  flex-shrink: 0;
-}
-
-.lock-indicator-text {
-  font-size: 0.9rem;
-  color: var(--ion-text-color);
-}
-
-/* Draft Mode Styles */
-.draft-controls {
-  padding: 0 16px;
-  margin-top: 16px;
-}
-
-.draft-notice {
-  background: white;
-  border-radius: 12px;
-  padding: 16px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  border: 1px solid var(--ion-color-light-shade);
-}
-
-.draft-notice-content {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.draft-notice-icon {
-  font-size: 1.5rem;
-  color: var(--ion-color-warning-shade);
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-
-.draft-notice-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.draft-notice-text strong {
-  font-size: 0.95rem;
-  color: var(--ion-color-dark);
-}
-
-.draft-notice-text span {
-  font-size: 0.85rem;
-  color: var(--ion-color-medium);
-}
-
-.draft-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.draft-actions ion-button {
-  flex: 1;
-  font-size: 0.8rem;
-  --border-radius: 8px;
-}
+/* (Edit Mode Controls, Lock Indicator, Draft Controls styles moved to child components) */
 
 .access-denied {
   padding: 16px;
@@ -4909,797 +3133,13 @@ onUnmounted(() => {
   color: var(--ion-color-medium);
 }
 
-/* Draft Viewers Modal */
-.modal-loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 32px;
-  gap: 16px;
-}
+/* (Draft Viewers Modal styles moved to DraftViewersModal component) */
 
-.modal-footer {
-  padding: 16px;
-  background: var(--ion-background-color);
-  border-top: 1px solid var(--ion-color-light);
-}
+/* (Presentation Modal styles moved to PresentationModal component) */
 
-.avatar-initials {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--ion-color-primary);
-  color: white;
-  font-weight: 600;
-  font-size: 0.9rem;
-  border-radius: 50%;
-}
+/* (YouTube Playlist Modal styles moved to YouTubePlaylistModal component) */
 
-/* Presentation Modal (Fullscreen 16:9) */
-.presentation-modal {
-  --width: 100%;
-  --height: 100%;
-  --border-radius: 0;
-}
-
-.presentation-content {
-  --background: #000;
-}
-
-.presentation-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 100%;
-  background: #000;
-  position: relative;
-}
-
-/* Close Button */
-.presentation-close-btn {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  z-index: 100;
-}
-
-.presentation-close-btn ion-button {
-  --color: rgba(255, 255, 255, 0.8);
-  font-size: 1.5rem;
-}
-
-.presentation-close-btn ion-button:hover {
-  --color: white;
-}
-
-.slide-section {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.slide-counter {
-  position: absolute;
-  top: 1rem;
-  left: 1rem;
-  font-size: 1rem;
-  color: rgba(255, 255, 255, 0.7);
-  font-weight: 600;
-  z-index: 100;
-  background: rgba(0, 0, 0, 0.5);
-  padding: 0.25rem 0.75rem;
-  border-radius: 20px;
-}
-
-.slide-wrapper {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  overflow: hidden;
-}
-
-/* Fullscreen Slide Container */
-.slide-fullscreen {
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(145deg, #1a1a2e 0%, #16213e 100%);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  position: relative;
-}
-
-/* Lyrics Mode Slide */
-.slide-fullscreen.slide-lyrics-mode {
-  background: linear-gradient(145deg, #0a0a15 0%, #1a1a2e 100%);
-}
-
-/* Scripture Mode Slide */
-.slide-fullscreen.slide-scripture-mode {
-  background: linear-gradient(145deg, #1a0a0a 0%, #2e1a1a 50%, #1a1a2e 100%);
-}
-
-.scripture-slide-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem 3rem;
-  flex-shrink: 0;
-}
-
-.scripture-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.6rem 1.25rem;
-  background: rgba(181, 18, 27, 0.9);
-  color: white;
-  border-radius: 30px;
-  font-size: 1.1rem;
-  font-weight: 600;
-}
-
-.scripture-badge ion-icon {
-  font-size: 1.4rem;
-}
-
-.scripture-slide-body {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  padding: 2rem 4rem;
-  text-align: center;
-}
-
-.sermon-title {
-  font-size: 2.2rem;
-  font-weight: 700;
-  color: white;
-  margin-bottom: 1rem;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-}
-
-.scripture-reference-large {
-  font-size: 2rem;
-  font-weight: 700;
-  color: #e8c4a0;
-  margin-bottom: 1rem;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-  font-family: Georgia, 'Times New Roman', serif;
-  flex-shrink: 0;
-}
-
-.scripture-divider {
-  width: 80px;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, #e8c4a0, transparent);
-  margin-bottom: 1rem;
-  flex-shrink: 0;
-}
-
-.scripture-text-large {
-  font-size: 2.8rem;
-  color: #f5f0e8;
-  line-height: 1.6;
-  max-width: 85%;
-  font-family: Georgia, 'Times New Roman', serif;
-  font-style: italic;
-  text-align: center;
-  padding: 1rem 2rem;
-}
-
-.scripture-no-text {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-  color: rgba(255, 255, 255, 0.4);
-}
-
-.scripture-no-text ion-icon {
-  font-size: 4rem;
-}
-
-.scripture-no-text span {
-  font-size: 1.25rem;
-}
-
-.scripture-slide-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 3rem;
-  font-size: 1.1rem;
-  color: rgba(255, 255, 255, 0.6);
-  flex-shrink: 0;
-}
-
-.scripture-header-right {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.scripture-page-indicator {
-  background: rgba(232, 196, 160, 0.2);
-  color: #e8c4a0;
-  padding: 0.4rem 0.9rem;
-  border-radius: 20px;
-  font-size: 1rem;
-  font-weight: 600;
-  border: 1px solid rgba(232, 196, 160, 0.3);
-}
-
-.scripture-text-formatted {
-  text-align: left;
-  text-align-last: left;
-}
-
-.scripture-text-formatted .verse-number {
-  display: inline-block;
-  color: #e8c4a0;
-  font-weight: 700;
-  font-size: 0.8em;
-  vertical-align: super;
-  margin-right: 0.2em;
-  font-style: normal;
-}
-
-/* Slide Header */
-.slide-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem 2rem;
-  background: rgba(0, 0, 0, 0.3);
-  flex-shrink: 0;
-}
-
-.slide-header-compact {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 2rem;
-  background: rgba(0, 0, 0, 0.4);
-  flex-shrink: 0;
-}
-
-.slide-parent-info {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.parent-title {
-  font-size: 1rem;
-  color: rgba(255, 255, 255, 0.7);
-  font-weight: 500;
-}
-
-.subitem-counter {
-  font-size: 0.9rem;
-  color: var(--ion-color-primary);
-  font-weight: 700;
-  background: rgba(255, 255, 255, 0.1);
-  padding: 0.25rem 0.75rem;
-  border-radius: 20px;
-}
-
-.lyrics-page-indicator {
-  font-size: 1rem;
-  color: white;
-  font-weight: 700;
-  background: var(--ion-color-primary);
-  padding: 0.35rem 1rem;
-  border-radius: 20px;
-}
-
-.slide-notes-bottom {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 1rem 2rem;
-  background: rgba(0, 0, 0, 0.3);
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 1rem;
-  flex-shrink: 0;
-}
-
-.slide-notes-bottom ion-icon {
-  font-size: 1.25rem;
-  flex-shrink: 0;
-}
-
-.slide-type-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  background: var(--ion-color-primary);
-  color: white;
-  border-radius: 25px;
-  font-size: 1rem;
-  font-weight: 600;
-}
-
-.slide-type-badge ion-icon {
-  font-size: 1.2rem;
-}
-
-.slide-number {
-  font-size: 2rem;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.6);
-}
-
-/* Song Header for Lyrics Mode */
-.slide-song-header {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  padding: 1.5rem 2rem;
-  flex-shrink: 0;
-}
-
-.song-icon {
-  font-size: 2.5rem;
-  color: var(--ion-color-primary);
-}
-
-.slide-song-title {
-  margin: 0;
-  font-size: 2.5rem;
-  font-weight: 700;
-  color: white;
-  text-align: center;
-}
-
-/* Slide Body */
-.slide-body {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  padding: 2rem 4rem;
-  text-align: center;
-  overflow-y: auto;
-}
-
-.slide-title {
-  margin: 0;
-  font-size: 4rem;
-  font-weight: 700;
-  color: white;
-  line-height: 1.2;
-  max-width: 90%;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-}
-
-.slide-subtitle {
-  margin: 1rem 0 0 0;
-  font-size: 1.75rem;
-  color: rgba(255, 255, 255, 0.8);
-  font-weight: 500;
-}
-
-/* Scripture Display */
-.slide-scripture {
-  margin-top: 2rem;
-  padding: 2rem;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  max-width: 80%;
-  border-left: 4px solid var(--ion-color-primary);
-}
-
-.slide-scripture .scripture-reference {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--ion-color-primary);
-  margin-bottom: 1rem;
-}
-
-.slide-scripture .scripture-text {
-  font-size: 1.5rem;
-  color: white;
-  font-style: italic;
-  line-height: 1.8;
-  max-height: none;
-  overflow-y: visible;
-}
-
-/* Sub-items List */
-.slide-subitems {
-  margin-top: 2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  text-align: left;
-  max-width: 70%;
-}
-
-.subitem {
-  display: flex;
-  gap: 1rem;
-  font-size: 1.75rem;
-  color: white;
-  padding: 0.5rem 0;
-}
-
-.subitem-number {
-  font-weight: 700;
-  color: var(--ion-color-primary);
-  min-width: 2.5rem;
-}
-
-.subitem-title {
-  flex: 1;
-}
-
-/* Full Lyrics Display */
-.slide-lyrics-full {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem 2rem;
-  overflow: hidden;
-  width: 100%;
-}
-
-.lyrics-text {
-  font-size: 2rem;
-  color: white;
-  white-space: pre-line;
-  line-height: 1.7;
-  text-align: center;
-  max-width: 90%;
-}
-
-.no-lyrics-message {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.no-lyrics-message ion-icon {
-  font-size: 4rem;
-}
-
-.no-lyrics-message span {
-  font-size: 1.5rem;
-}
-
-/* Notes */
-.slide-notes {
-  margin-top: 1.5rem;
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  font-size: 1.2rem;
-  color: rgba(255, 255, 255, 0.7);
-  max-width: 70%;
-  text-align: left;
-  padding: 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 8px;
-}
-
-.slide-notes ion-icon {
-  font-size: 1.5rem;
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-
-/* Slide Footer */
-.slide-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 2rem;
-  background: rgba(0, 0, 0, 0.3);
-  font-size: 1.1rem;
-  color: rgba(255, 255, 255, 0.7);
-  flex-shrink: 0;
-}
-
-.slide-participant, .slide-duration {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.slide-participant ion-icon, .slide-duration ion-icon {
-  font-size: 1.2rem;
-}
-
-/* Presentation Controls */
-.presentation-controls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1rem 2rem;
-  gap: 1rem;
-  background: rgba(0, 0, 0, 0.8);
-  flex-shrink: 0;
-}
-
-.presentation-controls .nav-button {
-  --border-radius: 8px;
-  --background: rgba(255, 255, 255, 0.15);
-  --color: white;
-  font-weight: 600;
-}
-
-.presentation-controls .nav-button:hover {
-  --background: rgba(255, 255, 255, 0.25);
-}
-
-.slide-progress-indicator {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  overflow-x: auto;
-  padding: 0.5rem 0;
-}
-
-.slide-progress-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.3);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-}
-
-.slide-progress-dot:hover {
-  background: rgba(255, 255, 255, 0.5);
-  transform: scale(1.2);
-}
-
-.slide-progress-dot.active {
-  background: var(--ion-color-primary);
-  width: 16px;
-  height: 16px;
-  box-shadow: 0 0 10px var(--ion-color-primary);
-}
-
-.slide-progress-dot.viewed {
-  background: rgba(255, 255, 255, 0.6);
-}
-
-.slide-progress-dot.is-lyrics {
-  background: rgba(255, 255, 255, 0.25);
-  width: 6px;
-  height: 6px;
-}
-
-.slide-progress-dot.is-lyrics.active {
-  background: var(--ion-color-primary);
-  width: 10px;
-  height: 10px;
-}
-
-.slide-progress-dot.is-lyrics.viewed {
-  background: rgba(255, 255, 255, 0.5);
-}
-
-/* No slides state */
-.no-slides {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: rgba(255, 255, 255, 0.6);
-}
-
-.no-slides-icon {
-  font-size: 5rem;
-  margin-bottom: 1.5rem;
-}
-
-.no-slides p {
-  font-size: 1.5rem;
-  margin: 0;
-}
-
-/* Responsive adjustments for presentation */
-@media (max-width: 1024px) {
-  .slide-title {
-    font-size: 3rem;
-  }
-
-  .slide-song-title {
-    font-size: 2rem;
-  }
-
-  .lyrics-text {
-    font-size: 1.5rem;
-  }
-
-  .sermon-title {
-    font-size: 1.8rem;
-  }
-
-  .scripture-reference-large {
-    font-size: 1.8rem;
-  }
-
-  .scripture-text-large {
-    font-size: 2.2rem;
-    line-height: 1.5;
-  }
-
-  .subitem {
-    font-size: 1.5rem;
-  }
-}
-
-@media (max-width: 768px) {
-  .slide-header {
-    padding: 1rem 1.5rem;
-  }
-
-  .slide-type-badge {
-    font-size: 0.85rem;
-    padding: 0.4rem 0.8rem;
-  }
-
-  .slide-number {
-    font-size: 1.5rem;
-  }
-
-  .slide-body {
-    padding: 1.5rem 2rem;
-  }
-
-  .slide-title {
-    font-size: 2rem;
-  }
-
-  .slide-subtitle {
-    font-size: 1.25rem;
-  }
-
-  .slide-song-title {
-    font-size: 1.5rem;
-  }
-
-  .song-icon {
-    font-size: 1.75rem;
-  }
-
-  .lyrics-text {
-    font-size: 1.2rem;
-    line-height: 1.6;
-  }
-
-  .scripture-slide-header {
-    padding: 1rem 1.5rem;
-  }
-
-  .scripture-badge {
-    font-size: 0.9rem;
-    padding: 0.4rem 0.8rem;
-  }
-
-  .scripture-slide-body {
-    padding: 1.5rem 2rem;
-  }
-
-  .sermon-title {
-    font-size: 1.4rem;
-    margin-bottom: 0.75rem;
-  }
-
-  .scripture-reference-large {
-    font-size: 1.4rem;
-    margin-bottom: 0.75rem;
-  }
-
-  .scripture-divider {
-    width: 60px;
-    margin-bottom: 1rem;
-  }
-
-  .scripture-text-large {
-    font-size: 1.5rem;
-    line-height: 1.5;
-    max-width: 95%;
-    padding: 0.5rem 1rem;
-  }
-
-  .scripture-slide-footer {
-    padding: 0.75rem 1.5rem;
-    font-size: 0.95rem;
-  }
-
-  .subitem {
-    font-size: 1.2rem;
-  }
-
-  .slide-footer {
-    padding: 0.75rem 1.5rem;
-    font-size: 0.95rem;
-  }
-
-  .presentation-controls {
-    padding: 0.75rem 1rem;
-  }
-
-  .slide-progress-dot {
-    width: 10px;
-    height: 10px;
-  }
-
-  .slide-progress-dot.active {
-    width: 14px;
-    height: 14px;
-  }
-
-  .slide-counter {
-    font-size: 0.85rem;
-    top: 0.75rem;
-    left: 0.75rem;
-  }
-
-  .presentation-close-btn {
-    top: 0.5rem;
-    right: 0.5rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .slide-title {
-    font-size: 1.5rem;
-  }
-
-  .lyrics-text {
-    font-size: 1rem;
-  }
-
-  .slide-subitems {
-    max-width: 90%;
-  }
-
-  .subitem {
-    font-size: 1rem;
-    gap: 0.5rem;
-  }
-
-  .subitem-number {
-    min-width: 1.5rem;
-  }
-}
-
-/* Hide/Show mobile elements */
-@media (min-width: 768px) {
-  .presentation-controls .show-mobile {
-    display: none !important;
-  }
-}
-
-@media (max-width: 768px) {
-  .presentation-controls .hide-mobile {
-    display: none !important;
-  }
-}
+/* (Slide/Presentation/YouTube CSS moved to child components) */
 
 /* ========================================
    Expanded Edit Card
