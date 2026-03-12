@@ -6,6 +6,7 @@ import {
   updateItemInProgram,
   deleteItemFromProgram,
   createGroupItem,
+  createSectionItem,
   updateProgramOrder
 } from '@/firebase/programs';
 import { deleteField } from 'firebase/firestore';
@@ -91,6 +92,23 @@ export function useProgramItems(params: UseProgramItemsParams) {
     }
   };
 
+  // --- Section Operations ---
+
+  const createSection = async (title: string, order: number): Promise<string | null> => {
+    if (!program.value || !user.value) return null;
+    try {
+      loading.value = true;
+      const created = await createSectionItem(program.value.id, title, order, user.value.uid);
+      return created.id;
+    } catch (error) {
+      console.error('Error creating section:', error);
+      await showToast('Erreur lors de la création de la section', 'danger');
+      return null;
+    } finally {
+      loading.value = false;
+    }
+  };
+
   // --- Reorder Handlers ---
 
   const handleItemReorder = async (event: CustomEvent) => {
@@ -154,8 +172,11 @@ export function useProgramItems(params: UseProgramItemsParams) {
   // --- Inline Editing ---
 
   const editingTitleItemId = ref<string | null>(null);
+  const editingTitleInitialValue = ref('');
 
   const startInlineTitleEdit = (itemId: string) => {
+    const item = program.value?.items.find(i => i.id === itemId);
+    editingTitleInitialValue.value = item?.title || '';
     editingTitleItemId.value = itemId;
   };
 
@@ -249,10 +270,13 @@ export function useProgramItems(params: UseProgramItemsParams) {
     deleteItem,
     // Groups
     createGroup,
+    // Sections
+    createSection,
     // Reorder
     handleItemReorder,
     // Inline editing
     editingTitleItemId,
+    editingTitleInitialValue,
     startInlineTitleEdit,
     cancelInlineTitleEdit,
     inlineUpdateTitle,

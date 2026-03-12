@@ -62,8 +62,13 @@
       <!-- Program Items (only visible if user has access) -->
       <template v-if="canViewContent" v-for="(item, index) in sortedItems" :key="item.id">
         <!-- Section Item (special styling) -->
-        <div v-if="item.type === 'Section'" class="program-item section-item">
+        <div v-if="item.isSection || item.type === 'Section'" class="program-item section-item">
           <span class="section-title">{{ item.title }}</span>
+        </div>
+
+        <!-- Group Header -->
+        <div v-else-if="item.isGroup" class="program-item group-item">
+          <span class="group-title">{{ item.title }}</span>
         </div>
 
         <!-- Regular Item -->
@@ -120,7 +125,7 @@ const isDraft = computed(() => {
 
 const itemCount = computed(() => {
   if (!props.program) return 0;
-  return props.program.items.filter(item => item.type !== 'Section').length;
+  return props.program.items.filter(item => !item.isSection && !item.isGroup && item.type !== 'Section').length;
 });
 
 const formatDuration = (minutes: number): string => {
@@ -140,7 +145,8 @@ const sortedItems = computed(() => {
 const getItemNumber = (index: number): number => {
   let count = 0;
   for (let i = 0; i <= index; i++) {
-    if (sortedItems.value[i].type !== 'Section') {
+    const item = sortedItems.value[i];
+    if (!item.isSection && !item.isGroup && item.type !== 'Section') {
       count++;
     }
   }
@@ -272,16 +278,33 @@ const getTypeColor = (type: string | undefined): string => {
 
 /* Section Item Styling */
 .section-item {
-  background: var(--ion-color-danger);
+  background: var(--ion-color-primary-tint);
   justify-content: center;
   padding: 10px 12px;
 }
 
 .section-title {
-  color: white;
-  font-weight: 600;
-  font-size: 0.95rem;
+  color: var(--ion-color-primary);
+  font-weight: 700;
+  font-size: 0.9rem;
   text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* Group Item Styling */
+.group-item {
+  background: var(--ion-color-primary);
+  justify-content: flex-start;
+  padding: 8px 12px;
+}
+
+.group-title {
+  color: white;
+  font-weight: 700;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 .item-number {

@@ -107,35 +107,14 @@
         <!-- Program Items (Flat List) -->
         <div v-if="program && program.items.length > 0" class="program-content">
           <div class="flat-items-view">
-            <ion-reorder-group :disabled="!isEditing" @ionItemReorder="(e) => { collapseAllEditExpanded(); handleItemReorder(e); }">
+            <ion-reorder-group :disabled="!isEditing" @ionItemReorder="handleItemReorder">
               <template v-for="(item, index) in sortedItems" :key="item.id">
-              <!-- Inter-item add zone (between items, edit mode only) -->
-              <div
-                v-if="isEditing && index > 0"
-                class="inter-item-add-zone"
-                :class="{ active: activeAddZoneIndex === index }"
-                @click.stop="toggleAddZone(index)"
-              >
-                <div v-if="activeAddZoneIndex !== index" class="add-zone-trigger">
-                  <ion-icon :icon="addOutline" />
-                </div>
-                <div v-else class="add-zone-options">
-                  <button class="add-zone-btn" @click.stop="addItemAtPosition(index)">
-                    <ion-icon :icon="addOutline" />
-                    Élément
-                  </button>
-                  <button class="add-zone-btn" @click.stop="addGroupAtPosition(index)">
-                    <ion-icon :icon="removeOutline" />
-                    Groupe
-                  </button>
-                </div>
-              </div>
               <!-- Skip items in collapsed groups -->
               <ion-item
                 v-if="!item.groupId || !collapsedGroupIds.has(item.groupId)"
                 lines="none"
                 class="program-item-wrapper"
-                :class="{ 'expanded': isItemExpanded(item.id), 'is-group-header': item.isGroup, 'is-grouped-item': !!item.groupId }"
+                :class="{ 'expanded': isItemExpanded(item.id), 'is-group-header': item.isGroup, 'is-section-item': item.isSection, 'is-grouped-item': !!item.groupId }"
               >
               <div
                 class="program-item"
@@ -145,7 +124,7 @@
                   <div class="group-header-content">
                     <ion-input
                       v-if="editingTitleItemId === item.id"
-                      :value="item.title"
+                      :value="editingTitleInitialValue"
                       class="group-header-title-input"
                       autofocus
                       @ionBlur="inlineUpdateTitle(item.id, ($event.target as HTMLIonInputElement).value as string || item.title)"
@@ -181,6 +160,27 @@
                   </div>
                 </div>
 
+                <!-- Section rendering (colored banner divider) -->
+                <div v-else-if="item.isSection" class="section-banner">
+                  <ion-input
+                    v-if="editingTitleItemId === item.id"
+                    :value="editingTitleInitialValue"
+                    class="section-title-input"
+                    autofocus
+                    @ionBlur="inlineUpdateTitle(item.id, ($event.target as HTMLIonInputElement).value as string || item.title)"
+                    @keydown.enter="inlineUpdateTitle(item.id, ($event.target as HTMLIonInputElement).value as string || item.title)"
+                    @keydown.escape="cancelInlineTitleEdit"
+                  />
+                  <h4
+                    v-else
+                    class="section-title"
+                    :class="{ 'editable': isEditing }"
+                    @click="isEditing && startInlineTitleEdit(item.id)"
+                  >
+                    {{ item.title }}
+                  </h4>
+                </div>
+
                 <!-- Regular item rendering -->
                 <div v-else class="item-layout">
                   <!-- Order Number -->
@@ -193,7 +193,7 @@
 
                     <ion-input
                       v-if="editingTitleItemId === item.id"
-                      :value="item.title"
+                      :value="editingTitleInitialValue"
                       class="inline-title-input"
                       autofocus
                       @ionBlur="inlineUpdateTitle(item.id, ($event.target as HTMLIonInputElement).value as string || item.title)"
@@ -360,142 +360,21 @@
 
                 </div>
 
-                <!-- Expanded Edit Card (inline editing of all fields) -->
-                <div v-if="isEditing && isEditExpanded(item.id) && !item.isGroup" class="expanded-edit-card">
-                  <!-- Title -->
-                  <div class="expanded-field">
-                    <label class="expanded-field-label">Titre</label>
-                    <ion-input
-                      :value="item.resourceId && getLinkedResource(item.resourceId) ? getLinkedResource(item.resourceId)?.title : item.title"
-                      placeholder="Titre..."
-                      class="expanded-field-input"
-                      @ionBlur="inlineUpdateTitle(item.id, ($event.target as HTMLIonInputElement).value as string || item.title)"
-                    />
-                  </div>
-
-                  <!-- Subtitle -->
-                  <div class="expanded-field">
-                    <label class="expanded-field-label">Sous-titre</label>
-                    <ion-input
-                      :value="item.subtitle || ''"
-                      placeholder="Sous-titre..."
-                      class="expanded-field-input"
-                      @ionBlur="saveInlineSubtitle(item.id, ($event.target as HTMLIonInputElement).value as string)"
-                    />
-                  </div>
-
-                  <!-- Participants -->
-                  <div class="expanded-field">
-                    <label class="expanded-field-label">Participants</label>
-                    <ParticipantSelector
-                      :participants="item.participants || []"
-                      @update:participants="(val) => inlineUpdateParticipants(item.id, val)"
-                      :service-id="serviceId"
-                      :multiple="true"
-                    />
-                  </div>
-
-                  <!-- Duration -->
-                  <div class="expanded-field">
-                    <label class="expanded-field-label">Durée (min)</label>
-                    <DurationStepper
-                      :model-value="item.duration || 0"
-                      @update:model-value="(val) => inlineUpdateDuration(item.id, val)"
-                    />
-                  </div>
-
-                  <!-- Resource Link -->
-                  <div class="expanded-field expanded-field-full">
-                    <label class="expanded-field-label">Ressource</label>
-                    <div v-if="item.resourceId && getLinkedResource(item.resourceId)" class="expanded-resource-card">
-                      <span class="expanded-resource-title">{{ getLinkedResource(item.resourceId)?.title }}</span>
-                      <div class="expanded-resource-actions">
-                        <ion-button size="small" fill="outline" @click="openExpandedResourceSelector(item.id)">Changer</ion-button>
-                        <ion-button size="small" fill="outline" color="danger" @click="quickUnlinkResource(item.id)">Délier</ion-button>
-                      </div>
-                    </div>
-                    <ion-button v-else fill="outline" size="small" @click="openExpandedResourceSelector(item.id)">
-                      <ion-icon :icon="addOutline" slot="start" />
-                      Lier une ressource
-                    </ion-button>
-                  </div>
-
-                  <!-- Scripture (tucked) -->
-                  <div class="expanded-field tucked-section">
-                    <button class="tucked-toggle" @click="toggleTuckedSection(item.id, 'scripture')">
-                      <ion-icon :icon="isTuckedOpen(item.id, 'scripture') ? chevronDownOutline : chevronForwardOutline" />
-                      <span>Passage biblique</span>
-                      <span v-if="item.scriptureReference" class="tucked-badge">{{ item.scriptureReference }}</span>
-                    </button>
-                    <div v-if="isTuckedOpen(item.id, 'scripture')" class="tucked-content">
-                      <div class="scripture-input-row">
-                        <ion-input
-                          :value="item.scriptureReference || ''"
-                          placeholder="Ex: Jean 3:16-18"
-                          class="expanded-field-input"
-                          @ionBlur="inlineUpdateField(item.id, 'scriptureReference', ($event.target as HTMLIonInputElement).value as string)"
-                        />
-                        <ion-button
-                          size="small"
-                          fill="outline"
-                          @click="fetchScriptureForItem(item.id, item.scriptureReference || '')"
-                          :disabled="!item.scriptureReference"
-                        >
-                          <ion-icon :icon="searchOutline" slot="icon-only" />
-                        </ion-button>
-                      </div>
-                      <div v-if="item.scriptureText" class="expanded-scripture-preview">
-                        <div class="expanded-scripture-header">
-                          <span class="expanded-scripture-ref">{{ item.scriptureReference }}</span>
-                          <span class="expanded-scripture-version">{{ item.scriptureVersion || 'LSG' }}</span>
-                        </div>
-                        <div class="expanded-scripture-text" v-html="formatScriptureWithSuperscript(item.scriptureText)"></div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Notes -->
-                  <div class="expanded-field expanded-field-full">
-                    <label class="expanded-field-label">Notes</label>
-                    <textarea
-                      :value="item.notes || ''"
-                      placeholder="Notes..."
-                      class="expanded-notes-textarea"
-                      rows="2"
-                      @blur="saveInlineNotes(item.id, ($event.target as HTMLTextAreaElement).value)"
-                    ></textarea>
-                  </div>
-
-                  <!-- Actions row -->
-                  <div class="expanded-actions-row">
-                    <div></div>
-                    <ion-button
-                      fill="outline"
-                      size="small"
-                      color="danger"
-                      @click="deleteItem(item.id)"
-                    >
-                      <ion-icon :icon="trashOutline" slot="start" />
-                      Supprimer
-                    </ion-button>
-                  </div>
-                </div>
-
               </div>
               <!-- Start Slot: Reorder Handle -->
               <ion-reorder slot="start">
                 <ion-icon :icon="reorderThreeOutline" class="drag-handle-icon" />
               </ion-reorder>
-              <!-- End Slot: Expand/Collapse Chevron (not for group headers) -->
+              <!-- End Slot: 3-Dot Action Menu (edit mode only) -->
               <ion-button
-                v-if="isEditing && !item.isGroup"
+                v-if="isEditing"
                 slot="end"
                 fill="clear"
                 size="small"
-                class="item-expand-btn"
-                @click.stop="toggleEditExpansion(item.id)"
+                class="item-action-menu-btn"
+                @click.stop="openItemActionMenu($event, item)"
               >
-                <ion-icon :icon="isEditExpanded(item.id) ? chevronUpOutline : chevronDownOutline" slot="icon-only" />
+                <ion-icon :icon="ellipsisVerticalOutline" slot="icon-only" />
               </ion-button>
               </ion-item>
               </template>
@@ -504,15 +383,12 @@
 
         </div>
 
-        <!-- Inline Add Bar (always visible when program exists) -->
-        <InlineAddBar
-          v-if="isEditing && program"
-          ref="mainAddBarRef"
-          :all-resources="allResources"
-          :service-id="serviceId"
-          @add="handleInlineAdd"
-          @link-resource="handleInlineLinkResource"
-        />
+        <!-- Quick-add buttons (edit mode) -->
+        <div v-if="isEditing && program" class="quick-add-buttons">
+          <button class="quick-add-pill" @click="quickAddElement">+ Élément</button>
+          <button class="quick-add-pill" @click="quickAddGroup">+ Groupe</button>
+          <button class="quick-add-pill" @click="quickAddSection">+ Section</button>
+        </div>
       </div>
 
       <!-- Duration Popover -->
@@ -543,6 +419,142 @@
           />
         </div>
       </ion-popover>
+
+      <!-- Item Action Menu Popover (3-dot) -->
+      <ion-popover
+        :is-open="actionMenuOpen"
+        :event="actionMenuEvent"
+        @didDismiss="actionMenuOpen = false"
+        class="action-menu-popover"
+      >
+        <ion-list v-if="actionMenuItem" lines="none" class="action-menu-list">
+          <!-- Regular items: resource, scripture, notes, delete -->
+          <template v-if="!actionMenuItem.isGroup && !actionMenuItem.isSection">
+            <ion-item button @click="handleActionMenuResource">
+              <ion-icon :icon="musicalNoteOutline" slot="start" />
+              <ion-label>{{ actionMenuItem.resourceId ? 'Modifier la ressource' : '+ Ressource' }}</ion-label>
+            </ion-item>
+            <ion-item v-if="actionMenuItem.resourceId" button @click="handleActionMenuUnlinkResource" class="action-menu-unlink">
+              <ion-icon :icon="closeCircleOutline" slot="start" color="warning" />
+              <ion-label color="warning">Dissocier la ressource</ion-label>
+            </ion-item>
+            <ion-item button @click="handleActionMenuScripture">
+              <ion-icon :icon="bookOutline" slot="start" />
+              <ion-label>{{ actionMenuItem.scriptureText ? 'Modifier le passage' : '+ Passage biblique' }}</ion-label>
+            </ion-item>
+            <ion-item button @click="handleActionMenuNotes">
+              <ion-icon :icon="documentTextOutline" slot="start" />
+              <ion-label>{{ actionMenuItem.notes ? 'Modifier la note' : '+ Note' }}</ion-label>
+            </ion-item>
+          </template>
+          <!-- All items: delete -->
+          <ion-item button @click="handleActionMenuDelete" class="action-menu-delete">
+            <ion-icon :icon="trashOutline" slot="start" color="danger" />
+            <ion-label color="danger">Supprimer</ion-label>
+          </ion-item>
+        </ion-list>
+      </ion-popover>
+
+      <!-- Resource Edit Modal (from 3-dot menu) -->
+      <ResourceSelector
+        :modal-only="true"
+        :is-open="resourceModalOpen"
+        :model-value="resourceModalItemId ? program?.items.find(i => i.id === resourceModalItemId)?.resourceId ?? null : null"
+        @update:model-value="handleResourceModalSelect"
+        @update:is-open="(val: boolean) => { if (!val) resourceModalOpen = false; }"
+      />
+
+      <!-- Scripture Edit Modal (from 3-dot menu) -->
+      <ion-modal :is-open="scriptureModalOpen" @ionModalDidDismiss="scriptureModalOpen = false">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>{{ scriptureModalItem?.scriptureText ? 'Modifier le passage' : 'Passage biblique' }}</ion-title>
+            <ion-buttons slot="end">
+              <ion-button @click="scriptureModalOpen = false">
+                <ion-icon :icon="closeOutline" slot="icon-only" />
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="ion-padding">
+          <div class="scripture-modal-content">
+            <div class="scripture-modal-input-row">
+              <ion-input
+                v-model="scriptureModalRef"
+                placeholder="Ex: Jean 3:16-18"
+                class="scripture-modal-input"
+              />
+              <ion-button
+                @click="fetchScriptureInModal"
+                :disabled="!scriptureModalRef || scriptureModalLoading"
+                fill="outline"
+              >
+                <ion-icon :icon="searchOutline" slot="icon-only" />
+              </ion-button>
+            </div>
+            <div v-if="scriptureModalText" class="scripture-modal-preview">
+              <div class="scripture-modal-preview-header">
+                <span class="scripture-modal-ref">{{ scriptureModalRef }}</span>
+                <span class="scripture-modal-version">{{ scriptureModalVersion || 'LSG' }}</span>
+              </div>
+              <div class="scripture-modal-text" v-html="formatScriptureWithSuperscript(scriptureModalText)"></div>
+            </div>
+            <div class="scripture-modal-actions">
+              <ion-button expand="block" @click="saveScriptureModal" :disabled="!scriptureModalText">
+                Enregistrer
+              </ion-button>
+              <ion-button
+                v-if="scriptureModalItem?.scriptureText"
+                expand="block"
+                fill="outline"
+                color="danger"
+                @click="clearScriptureModal"
+              >
+                Supprimer le passage
+              </ion-button>
+            </div>
+          </div>
+        </ion-content>
+      </ion-modal>
+
+      <!-- Notes Edit Modal (from 3-dot menu) -->
+      <ion-modal :is-open="notesModalOpen" @ionModalDidDismiss="notesModalOpen = false">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>{{ notesModalItem?.notes ? 'Modifier la note' : 'Ajouter une note' }}</ion-title>
+            <ion-buttons slot="end">
+              <ion-button @click="notesModalOpen = false">
+                <ion-icon :icon="closeOutline" slot="icon-only" />
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="ion-padding">
+          <div class="notes-modal-content">
+            <ion-textarea
+              v-model="notesModalText"
+              placeholder="Écrire une note..."
+              :auto-grow="true"
+              :rows="4"
+              class="notes-modal-textarea"
+            />
+            <div class="notes-modal-actions">
+              <ion-button expand="block" @click="saveNotesModal">
+                Enregistrer
+              </ion-button>
+              <ion-button
+                v-if="notesModalItem?.notes"
+                expand="block"
+                fill="outline"
+                color="danger"
+                @click="clearNotesModal"
+              >
+                Supprimer la note
+              </ion-button>
+            </div>
+          </div>
+        </ion-content>
+      </ion-modal>
 
       <!-- Edit Program Modal -->
       <ion-modal :is-open="showEditProgramModalState" @ionModalDidDismiss="closeEditProgramModal">
@@ -681,13 +693,6 @@
         @update:model-value="handleInlineResourceSelect"
       />
 
-      <!-- Expanded Card Resource Selector -->
-      <ResourceSelector
-        :modal-only="true"
-        :is-open="showExpandedResourceSelector"
-        @update:is-open="(val) => { if (!val) { showExpandedResourceSelector = false; expandedResourceSelectorItemId = null; } }"
-        @update:model-value="handleExpandedResourceSelect"
-      />
     </ion-content>
   </ion-page>
 </template>
@@ -698,7 +703,7 @@ import { useRoute } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonBackButton,
   IonButton, IonIcon, IonCard, IonCardContent, IonLoading, IonModal, IonAvatar,
-  IonItem, IonLabel, IonInput,
+  IonItem, IonLabel, IonInput, IonList, IonTextarea,
   IonReorderGroup, IonReorder, toastController, alertController,
   IonPopover
 } from '@ionic/vue';
@@ -710,20 +715,20 @@ import {
   playCircleOutline, volumeHighOutline, documentOutline,
   chatboxEllipsesOutline, chevronDownOutline, chevronForwardOutline,
   logoYoutube,
-  removeOutline, bookOutline, copyOutline,
-  lockClosedOutline, chevronUpOutline,
+  bookOutline, copyOutline,
+  lockClosedOutline,
   easelOutline, downloadOutline,
   closeCircleOutline,
-  searchOutline,
   personAddOutline,
   textOutline,
-  chatbubbleOutline
+  chatbubbleOutline,
+  ellipsisVerticalOutline,
+  searchOutline
 } from 'ionicons/icons';
 import ResourceSelector from '@/components/ResourceSelector.vue';
 import ResourceBottomSheet from '@/components/ResourceBottomSheet.vue';
 import ParticipantSelector from '@/components/ParticipantSelector.vue';
 import SendProgramSMSModal from '@/components/SendProgramSMSModal.vue';
-import InlineAddBar from '@/components/InlineAddBar.vue';
 import DurationStepper from '@/components/DurationStepper.vue';
 import PresentationModal from '@/components/program/PresentationModal.vue';
 import YouTubePlaylistModal from '@/components/program/YouTubePlaylistModal.vue';
@@ -794,131 +799,6 @@ const toggleGroupCollapse = (groupId: string) => {
   }
 };
 
-// Expand/collapse for inline editing (expandable item cards)
-const expandedEditItemIds = ref<Set<string>>(new Set());
-
-const isMobileScreen = () => window.innerWidth < 768;
-
-const toggleEditExpansion = (itemId: string) => {
-  if (expandedEditItemIds.value.has(itemId)) {
-    expandedEditItemIds.value.delete(itemId);
-  } else {
-    // On mobile: auto-collapse others (single expand)
-    if (isMobileScreen()) {
-      expandedEditItemIds.value.clear();
-    }
-    expandedEditItemIds.value.add(itemId);
-  }
-  // Trigger reactivity
-  expandedEditItemIds.value = new Set(expandedEditItemIds.value);
-};
-
-const isEditExpanded = (itemId: string) => expandedEditItemIds.value.has(itemId);
-
-const collapseAllEditExpanded = () => {
-  expandedEditItemIds.value = new Set();
-};
-
-// Tucked sections state (scripture, type within expanded cards)
-const tuckedSections = ref<Map<string, Set<string>>>(new Map());
-
-const toggleTuckedSection = (itemId: string, section: string) => {
-  if (!tuckedSections.value.has(itemId)) {
-    tuckedSections.value.set(itemId, new Set());
-  }
-  const sections = tuckedSections.value.get(itemId)!;
-  if (sections.has(section)) {
-    sections.delete(section);
-  } else {
-    sections.add(section);
-  }
-  tuckedSections.value = new Map(tuckedSections.value);
-};
-
-const isTuckedOpen = (itemId: string, section: string) => {
-  return tuckedSections.value.get(itemId)?.has(section) ?? false;
-};
-
-// Scripture fetch for expanded card
-const fetchScriptureForItem = async (itemId: string, reference: string) => {
-  if (!reference) return;
-  try {
-    const result = await bibleService.getScripture(reference);
-    if (!result) {
-      showToast('Référence biblique non reconnue', 'warning');
-      return;
-    }
-    await inlineUpdateField(itemId, 'scriptureReference', result.reference);
-    await inlineUpdateField(itemId, 'scriptureText', result.text);
-    await inlineUpdateField(itemId, 'scriptureVersion', result.version);
-  } catch (error) {
-    console.error('Error fetching scripture:', error);
-    showToast('Erreur lors de la récupération des versets', 'danger');
-  }
-};
-
-// Resource selector for expanded card
-const expandedResourceSelectorItemId = ref<string | null>(null);
-const showExpandedResourceSelector = ref(false);
-
-const openExpandedResourceSelector = (itemId: string) => {
-  expandedResourceSelectorItemId.value = itemId;
-  showExpandedResourceSelector.value = true;
-};
-
-const handleExpandedResourceSelect = async (resourceId: string | null) => {
-  if (expandedResourceSelectorItemId.value && resourceId) {
-    await inlineUpdateField(expandedResourceSelectorItemId.value, 'resourceId', resourceId);
-    subscribeToLinkedResource(resourceId);
-  }
-  showExpandedResourceSelector.value = false;
-  expandedResourceSelectorItemId.value = null;
-};
-
-// Inter-item add zone
-const activeAddZoneIndex = ref<number | null>(null);
-
-const toggleAddZone = (index: number) => {
-  activeAddZoneIndex.value = activeAddZoneIndex.value === index ? null : index;
-};
-
-const addItemAtPosition = async (index: number) => {
-  activeAddZoneIndex.value = null;
-  if (!program.value || !user.value) return;
-  const sorted = sortedItems.value;
-  const insertOrder = sorted[index] ? sorted[index].order : sorted[sorted.length - 1].order + 1;
-  // Bump order of items at and after this position
-  for (const item of program.value.items) {
-    if (item.order >= insertOrder) {
-      item.order += 1;
-    }
-  }
-  try {
-    await addItemToProgram(program.value.id, { order: insertOrder, title: 'Nouvel élément' } as any, user.value.uid);
-  } catch (error) {
-    console.error('Error adding item at position:', error);
-  }
-};
-
-const addGroupAtPosition = async (index: number) => {
-  activeAddZoneIndex.value = null;
-  if (!program.value || !user.value) return;
-  const sorted = sortedItems.value;
-  const insertOrder = sorted[index] ? sorted[index].order : sorted[sorted.length - 1].order + 1;
-  for (const item of program.value.items) {
-    if (item.order >= insertOrder) {
-      item.order += 1;
-    }
-  }
-  try {
-    const createdId = await createGroup('Nouveau groupe', insertOrder);
-    if (createdId) {
-      setTimeout(() => startInlineTitleEdit(createdId), 500);
-    }
-  } catch (error) {
-    console.error('Error adding group at position:', error);
-  }
-};
 
 // Title Autocomplete State (needed by composable)
 const allResources = ref<Resource[]>([]);
@@ -928,8 +808,9 @@ const loadingResources = ref(false);
 const {
   deleteItem,
   createGroup,
+  createSection,
   handleItemReorder,
-  editingTitleItemId, startInlineTitleEdit, cancelInlineTitleEdit, inlineUpdateTitle,
+  editingTitleItemId, editingTitleInitialValue, startInlineTitleEdit, cancelInlineTitleEdit, inlineUpdateTitle,
   inlineUpdateDuration, inlineUpdateParticipants,
   quickAddItem,
   inlineUpdateField,
@@ -938,6 +819,24 @@ const {
   program, user, expandedItems, loading,
   loadProgram: async () => { await loadProgram(); }
 });
+
+// Quick-add handler functions
+const quickAddElement = async () => {
+  const itemId = await quickAddItem('Nouvel élément');
+  if (itemId) setTimeout(() => startInlineTitleEdit(itemId), 300);
+};
+
+const quickAddGroup = async () => {
+  if (!program.value) return;
+  const createdId = await createGroup('Nouveau groupe', program.value.items.length);
+  if (createdId) setTimeout(() => startInlineTitleEdit(createdId), 300);
+};
+
+const quickAddSection = async () => {
+  if (!program.value) return;
+  const createdId = await createSection('Nouvelle section', program.value.items.length);
+  if (createdId) setTimeout(() => startInlineTitleEdit(createdId), 300);
+};
 
 // Inline subtitle / notes editing
 const inlineSubtitleItemId = ref<string | null>(null);
@@ -1033,11 +932,6 @@ const showDraftViewersModal = ref(false);
 const draftViewerIds = ref<string[]>([]);
 const allMembers = ref<Member[]>([]);
 const loadingMembers = ref(false);
-
-// (ItemDetailSheet removed - all editing is now inline via expandable cards)
-
-// InlineAddBar refs
-const mainAddBarRef = ref<InstanceType<typeof InlineAddBar> | null>(null);
 
 // Inline Resource Selector State
 const showInlineResourceSelector = ref(false);
@@ -1150,7 +1044,7 @@ const getItemDisplayNumber = (index: number): number => {
   const sorted = sortedItems.value;
   let count = 0;
   for (let i = 0; i <= index; i++) {
-    if (!sorted[i].isGroup) {
+    if (!sorted[i].isGroup && !sorted[i].isSection) {
       count++;
     }
   }
@@ -1302,21 +1196,141 @@ const handleParticipantsPopoverDismiss = () => {
   }
 };
 
-// Inline Add Handlers
-const handleInlineAdd = async (data: { title: string, resourceId?: string }) => {
-  const itemId = await quickAddItem(data.title, data.resourceId);
-  if (itemId && data.resourceId) {
-    subscribeToLinkedResource(data.resourceId);
+// Item Action Menu (3-dot)
+const actionMenuOpen = ref(false);
+const actionMenuEvent = ref<Event | null>(null);
+const actionMenuItem = ref<ProgramItem | null>(null);
+
+const openItemActionMenu = (event: Event, item: ProgramItem) => {
+  actionMenuEvent.value = event;
+  actionMenuItem.value = item;
+  actionMenuOpen.value = true;
+};
+
+const handleActionMenuResource = () => {
+  actionMenuOpen.value = false;
+  if (!actionMenuItem.value) return;
+  openResourceModal(actionMenuItem.value);
+};
+
+const handleActionMenuScripture = () => {
+  actionMenuOpen.value = false;
+  if (!actionMenuItem.value) return;
+  openScriptureEditModal(actionMenuItem.value);
+};
+
+const handleActionMenuNotes = () => {
+  actionMenuOpen.value = false;
+  if (!actionMenuItem.value) return;
+  openNotesEditModal(actionMenuItem.value);
+};
+
+const handleActionMenuUnlinkResource = () => {
+  actionMenuOpen.value = false;
+  if (!actionMenuItem.value) return;
+  quickUnlinkResource(actionMenuItem.value.id);
+};
+
+const handleActionMenuDelete = () => {
+  actionMenuOpen.value = false;
+  if (!actionMenuItem.value) return;
+  deleteItem(actionMenuItem.value.id);
+};
+
+// Resource Modal (from action menu)
+const resourceModalOpen = ref(false);
+const resourceModalItemId = ref<string | null>(null);
+
+const openResourceModal = (item: ProgramItem) => {
+  resourceModalItemId.value = item.id;
+  resourceModalOpen.value = true;
+};
+
+const handleResourceModalSelect = async (resourceId: string | null) => {
+  if (resourceModalItemId.value && resourceId) {
+    await inlineUpdateField(resourceModalItemId.value, 'resourceId', resourceId);
+    subscribeToLinkedResource(resourceId);
   }
-  if (itemId && mainAddBarRef.value) {
-    mainAddBarRef.value.setLastCreatedItemId(itemId);
+  resourceModalOpen.value = false;
+  resourceModalItemId.value = null;
+};
+
+
+// Scripture Edit Modal (from action menu)
+const scriptureModalOpen = ref(false);
+const scriptureModalItem = ref<ProgramItem | null>(null);
+const scriptureModalRef = ref('');
+const scriptureModalText = ref('');
+const scriptureModalVersion = ref('');
+const scriptureModalLoading = ref(false);
+
+const openScriptureEditModal = (item: ProgramItem) => {
+  scriptureModalItem.value = item;
+  scriptureModalRef.value = item.scriptureReference || '';
+  scriptureModalText.value = item.scriptureText || '';
+  scriptureModalVersion.value = item.scriptureVersion || '';
+  scriptureModalOpen.value = true;
+};
+
+const fetchScriptureInModal = async () => {
+  if (!scriptureModalRef.value) return;
+  scriptureModalLoading.value = true;
+  try {
+    const result = await bibleService.getScripture(scriptureModalRef.value);
+    if (!result) {
+      showToast('Référence biblique non reconnue', 'warning');
+      return;
+    }
+    scriptureModalRef.value = result.reference;
+    scriptureModalText.value = result.text;
+    scriptureModalVersion.value = result.version;
+  } catch (error) {
+    console.error('Error fetching scripture:', error);
+    showToast('Erreur lors de la récupération des versets', 'danger');
+  } finally {
+    scriptureModalLoading.value = false;
   }
 };
 
-const handleInlineLinkResource = async (itemId: string, resourceId: string) => {
-  if (!itemId || !resourceId) return;
-  await inlineUpdateField(itemId, 'resourceId', resourceId);
-  subscribeToLinkedResource(resourceId);
+const saveScriptureModal = async () => {
+  if (!scriptureModalItem.value) return;
+  const itemId = scriptureModalItem.value.id;
+  await inlineUpdateField(itemId, 'scriptureReference', scriptureModalRef.value);
+  await inlineUpdateField(itemId, 'scriptureText', scriptureModalText.value);
+  await inlineUpdateField(itemId, 'scriptureVersion', scriptureModalVersion.value);
+  scriptureModalOpen.value = false;
+};
+
+const clearScriptureModal = async () => {
+  if (!scriptureModalItem.value) return;
+  const itemId = scriptureModalItem.value.id;
+  await inlineUpdateField(itemId, 'scriptureReference', '');
+  await inlineUpdateField(itemId, 'scriptureText', '');
+  await inlineUpdateField(itemId, 'scriptureVersion', '');
+  scriptureModalOpen.value = false;
+};
+
+// Notes Edit Modal (from action menu)
+const notesModalOpen = ref(false);
+const notesModalItem = ref<ProgramItem | null>(null);
+const notesModalText = ref('');
+
+const openNotesEditModal = (item: ProgramItem) => {
+  notesModalItem.value = item;
+  notesModalText.value = item.notes || '';
+  notesModalOpen.value = true;
+};
+
+const saveNotesModal = async () => {
+  if (!notesModalItem.value) return;
+  await inlineUpdateField(notesModalItem.value.id, 'notes', notesModalText.value.trim());
+  notesModalOpen.value = false;
+};
+
+const clearNotesModal = async () => {
+  if (!notesModalItem.value) return;
+  await inlineUpdateField(notesModalItem.value.id, 'notes', '');
+  notesModalOpen.value = false;
 };
 
 // Draft Mode Functions
@@ -2074,7 +2088,7 @@ onMounted(async () => {
   await Promise.all([loadService(), loadMusicOptions()]);
   await loadProgram();
   loading.value = false;
-  // Load resources for InlineAddBar autocomplete (non-blocking)
+  // Load resources for autocomplete (non-blocking)
   loadResourcesForAutocomplete();
   // Auto-acquire lock for draft programs
   if (isAdmin.value && program.value && isDraft.value) {
@@ -2187,24 +2201,6 @@ onUnmounted(() => {
   min-width: 150px;
 }
 
-/* Quick-Add Type Buttons */
-.quick-add-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 4px;
-}
-
-.quick-add-buttons ion-button {
-  --padding-start: 12px;
-  --padding-end: 12px;
-  font-size: 12px;
-  text-transform: none;
-}
-
-.quick-add-buttons ion-icon {
-  font-size: 16px;
-}
 
 /* Program Items */
 .program-content {
@@ -2303,6 +2299,45 @@ onUnmounted(() => {
 .group-header-actions ion-button {
   --color: rgba(255, 255, 255, 0.85);
   color: rgba(255, 255, 255, 0.85);
+}
+
+/* Section Banner Styles */
+.section-banner {
+  width: 100%;
+  text-align: center;
+  padding: 4px 0;
+}
+
+.section-title {
+  color: var(--ion-color-primary);
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  margin: 0;
+}
+
+.section-title.editable {
+  cursor: pointer;
+}
+
+.section-title-input {
+  text-align: center;
+  color: var(--ion-color-primary);
+  --color: var(--ion-color-primary);
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  --padding-start: 0;
+  --padding-end: 0;
+  --padding-top: 0;
+  --padding-bottom: 0;
+}
+
+.program-item-wrapper.is-section-item {
+  --background: var(--ion-color-primary-tint);
+  --border-color: transparent;
 }
 
 /* Grouped Item Styles (indented) */
@@ -3141,322 +3176,155 @@ onUnmounted(() => {
 
 /* (Slide/Presentation/YouTube CSS moved to child components) */
 
-/* ========================================
-   Expanded Edit Card
-   ======================================== */
-.expanded-edit-card {
+/* Quick-add buttons */
+.quick-add-buttons {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 12px 0;
-  border-top: 1px solid var(--ion-color-light-shade);
-  margin-top: 8px;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
 }
 
-.expanded-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.expanded-field-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--ion-color-medium-shade);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.expanded-field-input {
-  --background: var(--ion-color-light);
-  --border-radius: 8px;
-  --padding-start: 10px;
-  --padding-end: 10px;
-  font-size: 14px;
-}
-
-.expanded-notes-textarea {
-  width: 100%;
-  padding: 8px 10px;
+.quick-add-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: 20px;
   border: 1px solid var(--ion-color-light-shade);
-  border-radius: 8px;
-  background: var(--ion-color-light);
-  font-size: 14px;
-  font-family: inherit;
-  resize: vertical;
-  min-height: 48px;
+  background: var(--ion-background-color, #fff);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ion-color-primary);
+  cursor: pointer;
+  transition: all 0.15s;
 }
 
-.expanded-notes-textarea:focus {
-  outline: none;
+.quick-add-pill:hover {
+  background: var(--ion-color-primary-tint);
   border-color: var(--ion-color-primary);
 }
 
-/* Resource card in expanded view */
-.expanded-resource-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 10px;
-  background: var(--ion-color-light);
-  border-radius: 8px;
-  border: 1px solid var(--ion-color-light-shade);
+/* 3-Dot Action Menu Button */
+.item-action-menu-btn {
+  --color: var(--ion-color-medium);
+  --padding-start: 2px;
+  --padding-end: 2px;
+  min-width: 28px;
 }
 
-.expanded-resource-title {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--ion-color-dark);
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/* Action Menu Popover */
+.action-menu-list {
+  padding: 4px 0;
 }
 
-.expanded-resource-actions {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-/* Tucked sections */
-.tucked-section {
-  gap: 0;
-}
-
-.tucked-toggle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 0;
-  border: none;
-  background: none;
-  color: var(--ion-color-medium-shade);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  width: 100%;
-  text-align: left;
-}
-
-.tucked-toggle ion-icon {
+.action-menu-list ion-item {
+  --min-height: 40px;
   font-size: 14px;
-  flex-shrink: 0;
 }
 
-.tucked-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 11px;
-  color: var(--ion-color-medium);
-  background: var(--ion-color-light);
-  padding: 2px 6px;
-  border-radius: 4px;
-  margin-left: auto;
+.action-menu-list ion-icon {
+  font-size: 18px;
+  margin-right: 8px;
 }
 
-.tucked-badge ion-icon {
-  font-size: 12px;
-}
-
-.tucked-content {
-  padding: 8px 0 4px 0;
+/* Scripture Modal */
+.scripture-modal-content {
   display: flex;
   flex-direction: column;
+  gap: 16px;
+}
+
+.scripture-modal-input-row {
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 
-/* Scripture in expanded card */
-.scripture-input-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.scripture-input-row ion-input {
+.scripture-modal-input {
   flex: 1;
+  --background: var(--ion-color-light);
+  --border-radius: 8px;
+  --padding-start: 12px;
+  --padding-end: 12px;
 }
 
-.expanded-scripture-preview {
-  padding: 10px;
+.scripture-modal-preview {
+  padding: 12px;
   background: var(--ion-color-light);
   border-radius: 8px;
   border-left: 3px solid var(--ion-color-primary);
 }
 
-.expanded-scripture-header {
+.scripture-modal-preview-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 6px;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
-.expanded-scripture-ref {
+.scripture-modal-ref {
   font-weight: 600;
-  font-size: 12px;
-  color: var(--ion-color-dark);
+  font-size: 13px;
 }
 
-.expanded-scripture-version {
-  font-size: 10px;
+.scripture-modal-version {
+  font-size: 11px;
   color: var(--ion-color-medium);
   background: var(--ion-color-light-shade);
-  padding: 1px 5px;
+  padding: 2px 6px;
   border-radius: 4px;
 }
 
-.expanded-scripture-text {
-  font-size: 13px;
-  line-height: 1.5;
+.scripture-modal-text {
+  font-size: 14px;
+  line-height: 1.6;
   color: var(--ion-color-dark);
 }
 
-.expanded-scripture-text :deep(sup) {
+.scripture-modal-text :deep(sup) {
   color: var(--ion-color-primary);
   font-weight: 600;
   font-size: 10px;
   margin-right: 2px;
 }
 
-/* Type grid in expanded card */
-.expanded-type-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
-  gap: 6px;
-}
-
-.expanded-type-btn {
+.scripture-modal-actions {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 6px 4px;
-  border: 1px solid var(--ion-color-light-shade);
-  border-radius: 8px;
-  background: var(--ion-color-light);
-  cursor: pointer;
-  font-size: 10px;
-  color: var(--ion-color-dark);
-  transition: all 0.15s;
-}
-
-.expanded-type-btn ion-icon {
-  font-size: 16px;
-  color: var(--ion-color-medium);
-}
-
-.expanded-type-btn.active {
-  border-color: var(--ion-color-primary);
-  background: var(--ion-color-primary-tint);
-}
-
-.expanded-type-btn.active ion-icon {
-  color: var(--ion-color-primary);
-}
-
-/* Actions row */
-.expanded-actions-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  padding-top: 4px;
-}
-
-/* Expand button */
-.item-expand-btn {
-  --color: var(--ion-color-medium);
-  --padding-start: 4px;
-  --padding-end: 4px;
-  min-width: 32px;
-}
-
-/* Inter-item add zone */
-.inter-item-add-zone {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 8px;
-  margin: 0 16px;
-  position: relative;
-  cursor: pointer;
-  transition: height 0.2s;
-}
-
-.inter-item-add-zone:hover,
-.inter-item-add-zone.active {
-  height: 36px;
-}
-
-.add-zone-trigger {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: 1px dashed var(--ion-color-medium-tint);
-  background: var(--ion-background-color, #fff);
-  color: var(--ion-color-medium);
-  font-size: 14px;
-  opacity: 0.4;
-  transition: all 0.2s;
-}
-
-.inter-item-add-zone:hover .add-zone-trigger {
-  opacity: 1;
-  border-color: var(--ion-color-primary);
-  color: var(--ion-color-primary);
-}
-
-.add-zone-options {
-  display: flex;
   gap: 8px;
 }
 
-.add-zone-btn {
+/* Notes Modal */
+.notes-modal-content {
   display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.notes-modal-textarea {
+  --background: var(--ion-color-light);
+  --border-radius: 8px;
+  --padding-start: 12px;
+  --padding-end: 12px;
+  min-height: 120px;
+}
+
+.notes-modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Notes indicator on item row */
+.item-notes-indicator {
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  border-radius: 16px;
-  border: 1px solid var(--ion-color-light-shade);
-  background: var(--ion-background-color, #fff);
-  font-size: 12px;
-  color: var(--ion-color-dark);
-  cursor: pointer;
-  transition: all 0.15s;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--ion-color-medium);
 }
 
-.add-zone-btn:hover {
-  background: var(--ion-color-primary-tint);
-  border-color: var(--ion-color-primary);
-}
-
-.add-zone-btn ion-icon {
+.item-notes-indicator ion-icon {
   font-size: 14px;
-}
-
-/* Desktop 2-column layout for expanded cards */
-@media (min-width: 768px) {
-  .expanded-edit-card {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-  }
-
-  .expanded-edit-card .expanded-actions-row {
-    grid-column: 1 / -1;
-  }
-
-  .expanded-edit-card .tucked-section {
-    grid-column: 1 / -1;
-  }
-
-  .expanded-edit-card > .expanded-field-full {
-    grid-column: 1 / -1;
-  }
 }
 
 </style>

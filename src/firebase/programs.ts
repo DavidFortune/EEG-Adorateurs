@@ -38,20 +38,24 @@ const migrateProgram = (items: any[]): ProgramItem[] => {
   const migrated: ProgramItem[] = [];
 
   for (const item of items) {
-    // Convert Section-type items to group headers
-    const isSection = item.type === 'Section';
+    // Convert legacy items
+    const isLegacySection = item.type === 'Section';
     const hasSubItems = Array.isArray(item.subItems) && item.subItems.length > 0;
 
     const migratedItem: ProgramItem = {
       ...item,
-      isGroup: item.isGroup || isSection || hasSubItems || undefined,
+      // Legacy sections without sub-items become section dividers
+      isSection: item.isSection || (isLegacySection && !hasSubItems) || undefined,
+      // Items with sub-items become groups (legacy sections with sub-items too)
+      isGroup: item.isGroup || (isLegacySection && hasSubItems) || hasSubItems || undefined,
     };
 
     // Remove subItems from the migrated item (promoted below)
     delete migratedItem.subItems;
 
-    // Clean up: don't set isGroup to false/undefined noise
+    // Clean up: don't set flags to false/undefined noise
     if (!migratedItem.isGroup) delete migratedItem.isGroup;
+    if (!migratedItem.isSection) delete migratedItem.isSection;
 
     migrated.push(migratedItem);
 
@@ -480,6 +484,46 @@ export const createGroupItem = async (
     return newGroup;
   } catch (error) {
     console.error('Error creating group:', error);
+    throw error;
+  }
+};
+
+/**
+ * Create a section divider item
+ */
+export const createSectionItem = async (
+  programId: string,
+  title: string,
+  order: number,
+  userId: string
+): Promise<ProgramItem> => {
+  try {
+    const programRef = doc(db, PROGRAMS_COLLECTION, programId);
+    const programDoc = await getDoc(programRef);
+
+    if (!programDoc.exists()) {
+      throw new Error('Program not found');
+    }
+
+    const programData = programDoc.data() as FirestoreProgram;
+    const newSection: ProgramItem = {
+      id: `section_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+      order,
+      title,
+      isSection: true,
+    };
+
+    const updatedItems = [...programData.items, newSection];
+
+    await updateDoc(programRef, {
+      items: updatedItems,
+      updatedAt: serverTimestamp(),
+      updatedBy: userId
+    });
+
+    return newSection;
+  } catch (error) {
+    console.error('Error creating section:', error);
     throw error;
   }
 };

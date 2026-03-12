@@ -19,8 +19,9 @@ export interface ProgramItem {
   scriptureReference?: string;
   scriptureText?: string;
   scriptureVersion?: string;
-  // Group support
+  // Group & Section support
   isGroup?: boolean; // true = this item is a group header
+  isSection?: boolean; // true = this item is a visual section divider
   groupId?: string; // ID of parent group (if item belongs to a group)
   // Legacy fields (read-only, preserved for backward compatibility)
   type?: string; // Legacy item type, not used in new UI
