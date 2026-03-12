@@ -1,12 +1,3 @@
-export enum ProgramItemType {
-  SONG = 'Chant',
-  PRAYER = 'Prière',
-  SCRIPTURE = 'Lecture biblique',
-  SERMON = 'Prédication',
-  TITLE = 'Titre',
-  SECTION = 'Section'
-}
-
 export interface ProgramParticipant {
   id: string;
   name: string;
@@ -15,51 +6,27 @@ export interface ProgramParticipant {
   isCustom: boolean; // true for custom participants, false for members
 }
 
-// Sub-item for items that have children (e.g., songs under worship moment)
-export interface ProgramSubItem {
-  id: string;
-  title: string;
-  type?: ProgramItemType;
-  subtitle?: string;
-  resourceId?: string; // Link to a resource (song, etc.)
-  notes?: string;
-  participants?: ProgramParticipant[];
-  duration?: number; // in minutes
-  order: number;
-  // Scripture fields for sub-items
-  scriptureReference?: string; // Parsed reference (e.g., "Jean 3:16-18")
-  scriptureText?: string; // Fetched verse text from Bible API
-  scriptureVersion?: string; // Bible version used (default: "LSG")
-}
-
 export interface ProgramItem {
   id: string;
   order: number;
-  type: ProgramItemType;
   title: string;
   subtitle?: string;
   notes?: string;
-  participant?: ProgramParticipant; // DEPRECATED: use participants instead
-  participants?: ProgramParticipant[]; // Multiple participants
+  participants?: ProgramParticipant[];
   duration?: number; // in minutes
-  lyrics?: string; // For songs
+  lyrics?: string;
   resourceId?: string; // Link to a single resource (1:1 relationship)
-  subItems?: ProgramSubItem[]; // Optional sub-items (e.g., list of songs)
-  // Scripture fields for "Lecture biblique" items
-  scriptureReference?: string; // Parsed reference (e.g., "Jean 3:16-18")
-  scriptureText?: string; // Fetched verse text from Bible API
-  scriptureVersion?: string; // Bible version used (default: "LSG")
-  // DEPRECATED: sectionId is no longer used in flat structure
-  sectionId?: string; // Kept for backward compatibility
-}
-
-// DEPRECATED: Sections are no longer used in flat structure
-// Kept for backward compatibility
-export interface ProgramSection {
-  id: string;
-  title: string;
-  order: number;
-  color?: string;
+  scriptureReference?: string;
+  scriptureText?: string;
+  scriptureVersion?: string;
+  // Group support
+  isGroup?: boolean; // true = this item is a group header
+  groupId?: string; // ID of parent group (if item belongs to a group)
+  // Legacy fields (read-only, preserved for backward compatibility)
+  type?: string; // Legacy item type, not used in new UI
+  subItems?: any[]; // Read during migration, never written
+  sectionId?: string;
+  participant?: ProgramParticipant; // DEPRECATED: use participants
 }
 
 export type ProgramStatus = 'draft' | 'published';
@@ -75,9 +42,7 @@ export interface ServiceProgram {
   id: string;
   serviceId: string;
   items: ProgramItem[];
-  // DEPRECATED: sections are no longer used in flat structure
-  // Kept for backward compatibility
-  sections: ProgramSection[];
+  sections: any[]; // Legacy, kept for backward compatibility
   conductor?: ProgramParticipant; // Dirigeant/Leader of the service
   totalDuration: number; // calculated from items
   createdAt: Date;
@@ -96,5 +61,4 @@ export interface ServiceProgram {
 export interface CreateProgramRequest {
   serviceId: string;
   items: Omit<ProgramItem, 'id'>[];
-  sections?: Omit<ProgramSection, 'id'>[]; // Optional for backward compatibility
 }

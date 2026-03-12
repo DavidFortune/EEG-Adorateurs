@@ -91,7 +91,7 @@
 import { computed } from 'vue';
 import { IonSpinner, IonIcon, IonChip, IonButton } from '@ionic/vue';
 import { documentTextOutline, personOutline, listOutline, timeOutline, chevronForwardOutline, lockClosedOutline } from 'ionicons/icons';
-import type { ServiceProgram, ProgramItemType } from '@/types/program';
+import type { ServiceProgram } from '@/types/program';
 
 interface Props {
   program: ServiceProgram | null;
@@ -147,7 +147,7 @@ const getItemNumber = (index: number): number => {
   return count;
 };
 
-const getTypeColor = (type: ProgramItemType): string => {
+const getTypeColor = (type: string | undefined): string => {
   const colors: Record<string, string> = {
     'Chant': 'primary',
     'Prière': 'tertiary',
@@ -156,7 +156,7 @@ const getTypeColor = (type: ProgramItemType): string => {
     'Titre': 'medium',
     'Section': 'secondary'
   };
-  return colors[type] || 'medium';
+  return (type && colors[type]) || 'medium';
 };
 </script>
 

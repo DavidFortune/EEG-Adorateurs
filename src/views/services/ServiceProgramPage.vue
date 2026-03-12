@@ -7,30 +7,6 @@
         </ion-buttons>
         <ion-title>Programme</ion-title>
         <ion-buttons slot="end">
-            <!-- Edit Mode: Countdown Timer (published only, tappable to extend) -->
-            <ion-button
-              v-if="isEditing && isPublished"
-              fill="clear"
-              size="small"
-              class="countdown-timer-btn"
-              :class="{ 'timer-warning': isTimerWarning }"
-              @click="extendEditMode"
-            >
-              <ion-icon :icon="timerOutline" slot="start" />
-              {{ formattedLockTime }}
-            </ion-button>
-            <!-- Edit Mode: "Terminer" button (published only) -->
-            <ion-button
-              v-if="isEditing && isPublished"
-              fill="solid"
-              color="success"
-              size="small"
-              class="finish-edit-btn"
-              @click="exitEditMode"
-            >
-              <ion-icon :icon="checkmarkOutline" slot="start" />
-              Terminer
-            </ion-button>
             <ion-button v-if="program && program.items.length > 0" @click="showPresentation" fill="clear" color="primary">
               <ion-icon :icon="easelOutline" />
             </ion-button>
@@ -94,12 +70,31 @@
       </div>
 
       <div v-if="canViewProgram || !program" class="content-container">
-        <!-- "Modifier le programme" Button (admin, published, not editing, not locked) -->
-        <div v-if="isAdmin && program && isPublished && !isEditing && !isLockedByOther" class="edit-mode-controls">
-          <ion-button @click="enterEditMode" fill="solid" color="primary" expand="block" class="enter-edit-btn">
+        <!-- Edit Mode Controls (admin, published, not locked by other) -->
+        <div v-if="isAdmin && program && isPublished && !isLockedByOther" class="edit-mode-controls">
+          <!-- Not editing: Enter edit mode -->
+          <ion-button v-if="!isEditing" @click="enterEditMode" fill="solid" color="primary" expand="block" class="enter-edit-btn">
             <ion-icon :icon="pencilOutline" slot="start" />
             Modifier le programme
           </ion-button>
+          <!-- Editing: Timer + Finish button -->
+          <div v-else class="editing-controls">
+            <ion-button
+              fill="outline"
+              :color="isTimerWarning ? 'warning' : 'medium'"
+              size="small"
+              class="countdown-timer-btn"
+              :class="{ 'timer-warning': isTimerWarning }"
+              @click="extendEditMode"
+            >
+              <ion-icon :icon="timerOutline" slot="start" />
+              {{ formattedLockTime }}
+            </ion-button>
+            <ion-button @click="exitEditMode" fill="solid" color="success" expand="block" class="finish-edit-btn">
+              <ion-icon :icon="checkmarkOutline" slot="start" />
+              Terminer les modifications
+            </ion-button>
+          </div>
         </div>
 
         <!-- Lock Indicator (another user is editing, published only) -->
@@ -193,49 +188,72 @@
                     <ion-icon :icon="addOutline" />
                     Élément
                   </button>
-                  <button class="add-zone-btn" @click.stop="addSectionAtPosition(index)">
+                  <button class="add-zone-btn" @click.stop="addGroupAtPosition(index)">
                     <ion-icon :icon="removeOutline" />
-                    Section
+                    Groupe
                   </button>
                 </div>
               </div>
+              <!-- Skip items in collapsed groups -->
               <ion-item
+                v-if="!item.groupId || !collapsedGroupIds.has(item.groupId)"
                 lines="none"
                 class="program-item-wrapper"
-                :class="{ 'has-subitems': hasSubItems(item), 'expanded': isItemExpanded(item.id), 'is-section': isSectionItem(item) }"
+                :class="{ 'expanded': isItemExpanded(item.id), 'is-group-header': item.isGroup, 'is-grouped-item': !!item.groupId }"
               >
               <div
                 class="program-item"
-                :class="`item-${item.type.toLowerCase().replace(/\s+/g, '-')}`"
               >
-                <div class="item-layout">
-                  <!-- Order Number (hidden for Section items, excludes sections from count) -->
-                  <div v-if="!isSectionItem(item)" class="item-column item-order-column">
+                <!-- Group Header rendering -->
+                <div v-if="item.isGroup" class="group-header-layout">
+                  <div class="group-header-content">
+                    <ion-input
+                      v-if="editingTitleItemId === item.id"
+                      :value="item.title"
+                      class="group-header-title-input"
+                      autofocus
+                      @ionBlur="inlineUpdateTitle(item.id, ($event.target as HTMLIonInputElement).value as string || item.title)"
+                      @keydown.enter="inlineUpdateTitle(item.id, ($event.target as HTMLIonInputElement).value as string || item.title)"
+                      @keydown.escape="cancelInlineTitleEdit"
+                    />
+                    <h4
+                      v-else
+                      class="group-header-title"
+                      :class="{ 'editable': isEditing }"
+                      @click="isEditing && startInlineTitleEdit(item.id)"
+                    >
+                      {{ item.title }}
+                    </h4>
+                  </div>
+                  <div class="group-header-actions">
+                    <ion-button
+                      v-if="isEditing"
+                      fill="clear"
+                      size="small"
+                      color="danger"
+                      @click.stop="deleteItem(item.id)"
+                    >
+                      <ion-icon :icon="trashOutline" slot="icon-only" />
+                    </ion-button>
+                    <ion-button
+                      fill="clear"
+                      size="small"
+                      @click.stop="toggleGroupCollapse(item.id)"
+                    >
+                      <ion-icon :icon="collapsedGroupIds.has(item.id) ? chevronForwardOutline : chevronDownOutline" slot="icon-only" />
+                    </ion-button>
+                  </div>
+                </div>
+
+                <!-- Regular item rendering -->
+                <div v-else class="item-layout">
+                  <!-- Order Number -->
+                  <div class="item-column item-order-column">
                     <div class="item-order">{{ getItemDisplayNumber(index) }}</div>
                   </div>
 
                   <!-- Details -->
                   <div class="item-column item-details-column">
-                    <div class="item-header-row">
-                      <div class="item-type">
-                        <ion-icon :icon="getItemIcon(item.type)" />
-                        <span v-if="!isSectionItem(item)">{{ item.type }}</span>
-                      </div>
-
-                      <!-- Expand/Collapse Button for Sub-Items -->
-                      <ion-button
-                        v-if="hasSubItems(item)"
-                        @click="toggleItemExpansion(item.id)"
-                        fill="clear"
-                        size="small"
-                        class="expand-button"
-                      >
-                        <ion-icon
-                          :icon="isItemExpanded(item.id) ? chevronDownOutline : chevronForwardOutline"
-                        />
-                        {{ item.subItems!.length }}
-                      </ion-button>
-                    </div>
 
                     <ion-input
                       v-if="editingTitleItemId === item.id"
@@ -321,8 +339,8 @@
                       {{ item.notes }}
                     </div>
 
-                    <!-- Quick Action Buttons (Edit mode only, not for sections) -->
-                    <div v-if="isEditing && !isSectionItem(item)" class="item-quick-actions">
+                    <!-- Quick Action Buttons (Edit mode only) -->
+                    <div v-if="isEditing && !item.isGroup" class="item-quick-actions">
                       <button
                         class="quick-action-btn"
                         :class="{ 'has-value': item.participants && item.participants.length > 0 }"
@@ -402,25 +420,12 @@
                       </button>
                     </div>
 
-                    <!-- View All Lyrics Button (for items with sub-items) -->
-                    <div v-if="hasSubItems(item) && hasLyricsInSubItems(item)" class="item-lyrics-button">
-                      <ion-button
-                        @click="showItemLyricsView(item)"
-                        fill="solid"
-                        color="primary"
-                        size="small"
-                        class="view-lyrics-btn"
-                      >
-                        <ion-icon :icon="documentTextOutline" slot="start" />
-                        Voir toutes les paroles
-                      </ion-button>
-                    </div>
                   </div>
 
                 </div>
 
                 <!-- Expanded Edit Card (inline editing of all fields) -->
-                <div v-if="isEditing && isEditExpanded(item.id) && !isSectionItem(item)" class="expanded-edit-card">
+                <div v-if="isEditing && isEditExpanded(item.id) && !item.isGroup" class="expanded-edit-card">
                   <!-- Title -->
                   <div class="expanded-field">
                     <label class="expanded-field-label">Titre</label>
@@ -513,32 +518,6 @@
                     </div>
                   </div>
 
-                  <!-- Type Change (tucked) -->
-                  <div class="expanded-field tucked-section">
-                    <button class="tucked-toggle" @click="toggleTuckedSection(item.id, 'type')">
-                      <ion-icon :icon="isTuckedOpen(item.id, 'type') ? chevronDownOutline : chevronForwardOutline" />
-                      <span>Changer le type</span>
-                      <span class="tucked-badge">
-                        <ion-icon :icon="getItemIcon(item.type)" />
-                        {{ item.type }}
-                      </span>
-                    </button>
-                    <div v-if="isTuckedOpen(item.id, 'type')" class="tucked-content">
-                      <div class="expanded-type-grid">
-                        <button
-                          v-for="t in expandedTypeOptions"
-                          :key="t.value"
-                          class="expanded-type-btn"
-                          :class="{ active: item.type === t.value }"
-                          @click="inlineUpdateField(item.id, 'type', t.value)"
-                        >
-                          <ion-icon :icon="t.icon" />
-                          <span>{{ t.label }}</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
                   <!-- Notes -->
                   <div class="expanded-field expanded-field-full">
                     <label class="expanded-field-label">Notes</label>
@@ -553,16 +532,7 @@
 
                   <!-- Actions row -->
                   <div class="expanded-actions-row">
-                    <ion-button
-                      v-if="canHaveSubItems(item)"
-                      fill="outline"
-                      size="small"
-                      color="success"
-                      @click="expandedAddSubItem(item.id)"
-                    >
-                      <ion-icon :icon="addOutline" slot="start" />
-                      Sous-élément
-                    </ion-button>
+                    <div></div>
                     <ion-button
                       fill="outline"
                       size="small"
@@ -575,178 +545,14 @@
                   </div>
                 </div>
 
-                <!-- Sub-Items (Expanded) -->
-                <div v-if="(hasSubItems(item) && isItemExpanded(item.id)) || (isEditing && isEditExpanded(item.id) && canHaveSubItems(item))" class="sub-items-container">
-                  <ion-reorder-group :disabled="!isEditing" @ionItemReorder="(e) => handleSubItemReorder(e, item.id)">
-                    <div
-                      v-for="subItem in getSortedSubItems(item)"
-                      :key="subItem.id"
-                      class="sub-item"
-                    >
-                      <div class="sub-item-layout">
-                        <ion-reorder v-if="isEditing" class="sub-item-handle">
-                          <ion-icon :icon="reorderTwoOutline" />
-                        </ion-reorder>
-                        <div v-else class="sub-item-bullet">•</div>
-                        <div class="sub-item-content">
-                          <div class="sub-item-header-row">
-                            <ion-icon v-if="subItem.type" :icon="getItemIcon(subItem.type)" class="sub-item-type-icon" />
-                            <span class="sub-item-title">
-                              {{ subItem.resourceId && getLinkedResource(subItem.resourceId) ? getLinkedResource(subItem.resourceId)?.title : subItem.title }}
-                            </span>
-                            <span v-if="subItem.duration" class="sub-item-duration">
-                              <ion-icon :icon="timeOutline" />
-                              {{ subItem.duration }}min
-                            </span>
-                          </div>
-                          <div v-if="subItem.participants && subItem.participants.length > 0" class="sub-item-participants">
-                            <div v-for="participant in subItem.participants" :key="participant.id" class="sub-item-participant">
-                              <span class="participant-initials small">{{ getParticipantInitials(participant.name) }}</span>
-                              {{ participant.name }}
-                            </div>
-                          </div>
-                          <span v-if="subItem.notes" class="sub-item-notes">{{ subItem.notes }}</span>
-
-                          <!-- Scripture Reference for Sub-Item -->
-                          <div v-if="subItem.scriptureReference" class="sub-item-scripture" @click="openSubItemScriptureModal(subItem)">
-                            <ion-icon :icon="bookOutline" />
-                            <span>{{ subItem.scriptureReference }}</span>
-                          </div>
-
-                          <!-- Resource Links for Sub-Item -->
-                          <div v-if="subItem.resourceId && getLinkedResource(subItem.resourceId)" class="sub-item-resources">
-                            <button
-                              v-for="content in getLinkedResource(subItem.resourceId)?.contents"
-                              :key="content.type"
-                              @click="showMediaContent(content, getLinkedResource(subItem.resourceId)?.title || '')"
-                              class="media-chip-button small"
-                            >
-                              <ion-icon :icon="getMediaTypeIcon(content.type)" />
-                            </button>
-                            <!-- Music Properties for Sub-Item -->
-                            <span v-for="prop in getResourceMusicProps(subItem.resourceId)" :key="prop" class="music-prop small">{{ prop }}</span>
-                            <button
-                              v-if="isEditing"
-                              @click.stop="openMusicPropsModal(subItem.resourceId!)"
-                              class="music-props-edit-btn small"
-                            >
-                              <ion-icon :icon="createOutline" />
-                            </button>
-                          </div>
-                        </div>
-
-                        <!-- Expand/Collapse chevron for Sub-Item -->
-                        <ion-button
-                          v-if="isEditing"
-                          fill="clear"
-                          size="small"
-                          class="sub-item-expand-btn"
-                          @click.stop="toggleEditExpansion(subItem.id)"
-                        >
-                          <ion-icon :icon="isEditExpanded(subItem.id) ? chevronUpOutline : chevronDownOutline" slot="icon-only" />
-                        </ion-button>
-                      </div>
-
-                      <!-- Sub-Item Expanded Edit Card -->
-                      <div v-if="isEditing && isEditExpanded(subItem.id)" class="sub-item-expanded-edit-card">
-                        <div class="expanded-field">
-                          <label class="expanded-field-label">Titre</label>
-                          <ion-input
-                            :value="subItem.resourceId && getLinkedResource(subItem.resourceId) ? getLinkedResource(subItem.resourceId)?.title : subItem.title"
-                            placeholder="Titre..."
-                            class="expanded-field-input"
-                            @ionBlur="inlineUpdateSubItemField(item.id, subItem.id, 'title', ($event.target as HTMLIonInputElement).value as string || subItem.title)"
-                          />
-                        </div>
-                        <div class="expanded-field">
-                          <label class="expanded-field-label">Participants</label>
-                          <ParticipantSelector
-                            :participants="subItem.participants || []"
-                            @update:participants="(val) => inlineUpdateSubItemField(item.id, subItem.id, 'participants', val)"
-                            :service-id="serviceId"
-                            :multiple="true"
-                          />
-                        </div>
-                        <div class="expanded-field">
-                          <label class="expanded-field-label">Durée (min)</label>
-                          <DurationStepper
-                            :model-value="subItem.duration || 0"
-                            @update:model-value="(val) => inlineUpdateSubItemField(item.id, subItem.id, 'duration', val)"
-                          />
-                        </div>
-                        <div class="expanded-field">
-                          <label class="expanded-field-label">Notes</label>
-                          <textarea
-                            :value="subItem.notes || ''"
-                            placeholder="Notes..."
-                            class="expanded-notes-textarea"
-                            rows="2"
-                            @blur="inlineUpdateSubItemField(item.id, subItem.id, 'notes', ($event.target as HTMLTextAreaElement).value)"
-                          ></textarea>
-                        </div>
-                        <!-- Scripture (tucked) -->
-                        <div class="expanded-field tucked-section">
-                          <button class="tucked-toggle" @click="toggleTuckedSection(subItem.id, 'scripture')">
-                            <ion-icon :icon="isTuckedOpen(subItem.id, 'scripture') ? chevronDownOutline : chevronForwardOutline" />
-                            <span>Passage biblique</span>
-                            <span v-if="subItem.scriptureReference" class="tucked-badge">{{ subItem.scriptureReference }}</span>
-                          </button>
-                          <div v-if="isTuckedOpen(subItem.id, 'scripture')" class="tucked-content">
-                            <div class="scripture-input-row">
-                              <ion-input
-                                :value="subItem.scriptureReference || ''"
-                                placeholder="Ex: Jean 3:16-18"
-                                class="expanded-field-input"
-                                @ionBlur="inlineUpdateSubItemField(item.id, subItem.id, 'scriptureReference', ($event.target as HTMLIonInputElement).value as string)"
-                              />
-                              <ion-button
-                                size="small"
-                                fill="outline"
-                                @click="fetchScriptureForSubItem(item.id, subItem.id, subItem.scriptureReference || '')"
-                                :disabled="!subItem.scriptureReference"
-                              >
-                                <ion-icon :icon="searchOutline" slot="icon-only" />
-                              </ion-button>
-                            </div>
-                            <div v-if="subItem.scriptureText" class="expanded-scripture-preview">
-                              <div class="expanded-scripture-header">
-                                <span class="expanded-scripture-ref">{{ subItem.scriptureReference }}</span>
-                                <span class="expanded-scripture-version">{{ subItem.scriptureVersion || 'LSG' }}</span>
-                              </div>
-                              <div class="expanded-scripture-text" v-html="formatScriptureWithSuperscript(subItem.scriptureText)"></div>
-                            </div>
-                          </div>
-                        </div>
-                        <div class="expanded-actions-row">
-                          <div></div>
-                          <ion-button fill="outline" size="small" color="danger" @click="deleteSubItem(item.id, subItem.id)">
-                            <ion-icon :icon="trashOutline" slot="start" />
-                            Supprimer
-                          </ion-button>
-                        </div>
-                      </div>
-                    </div>
-                  </ion-reorder-group>
-
-                  <!-- Sub-Item Inline Add Bar -->
-                  <InlineAddBar
-                    v-if="isEditing && canHaveSubItems(item)"
-                    :ref="(el: any) => { if (el) subItemAddBarRefs[item.id] = el }"
-                    :parent-item-id="item.id"
-                    :all-resources="allResources"
-                    :service-id="serviceId"
-                    @add="(data) => handleInlineSubAdd(item.id, data)"
-                    @link-resource="(subItemId, resourceId) => handleInlineLinkSubResource(item.id, subItemId, resourceId)"
-                  />
-                </div>
               </div>
               <!-- Start Slot: Reorder Handle -->
               <ion-reorder slot="start">
                 <ion-icon :icon="reorderThreeOutline" class="drag-handle-icon" />
               </ion-reorder>
-              <!-- End Slot: Expand/Collapse Chevron -->
+              <!-- End Slot: Expand/Collapse Chevron (not for group headers) -->
               <ion-button
-                v-if="isEditing"
+                v-if="isEditing && !item.isGroup"
                 slot="end"
                 fill="clear"
                 size="small"
@@ -770,7 +576,6 @@
           :service-id="serviceId"
           @add="handleInlineAdd"
           @link-resource="handleInlineLinkResource"
-          @add-section="handleAddSectionAtEnd"
         />
       </div>
 
@@ -911,65 +716,6 @@
         </ion-content>
       </ion-modal>
 
-      <!-- Item Lyrics View Modal -->
-      <ion-modal :is-open="showItemLyricsModalState" @ionModalDidDismiss="closeItemLyricsView" class="lyrics-view-modal fullscreen-modal">
-        <ion-header>
-          <ion-toolbar>
-            <ion-title>{{ selectedItemForLyrics?.title }}</ion-title>
-            <ion-buttons slot="end">
-              <ion-button @click="closeItemLyricsView">
-                <ion-icon :icon="closeOutline" />
-              </ion-button>
-            </ion-buttons>
-          </ion-toolbar>
-        </ion-header>
-        <ion-content class="lyrics-view-modal-content fullscreen-content">
-          <div v-if="selectedItemForLyrics" class="lyrics-view-container">
-            <!-- Sub-Items with Titles and Lyrics -->
-            <div
-              v-for="(subItem, index) in getSortedSubItems(selectedItemForLyrics)"
-              :key="subItem.id"
-              class="lyrics-item-card"
-            >
-              <!-- Item Header -->
-              <div class="lyrics-item-header">
-                <div class="lyrics-item-number">{{ index + 1 }}</div>
-                <div class="lyrics-item-header-text">
-                  <h3 class="lyrics-item-title">
-                    {{ subItem.resourceId && getLinkedResource(subItem.resourceId) ? getLinkedResource(subItem.resourceId)?.title : subItem.title }}
-                  </h3>
-                  <p v-if="subItem.resourceId && getLinkedResource(subItem.resourceId)?.reference" class="lyrics-item-subtitle">
-                    {{ getLinkedResource(subItem.resourceId)?.reference }}
-                  </p>
-                  <p v-if="subItem.notes" class="lyrics-item-notes">
-                    {{ subItem.notes }}
-                  </p>
-                </div>
-              </div>
-
-              <!-- Scripture -->
-              <div v-if="subItem.scriptureText" class="scripture-content-display">
-                <div class="scripture-reference-header">
-                  <ion-icon :icon="bookOutline" />
-                  {{ subItem.scriptureReference }}
-                  <span class="scripture-version">{{ subItem.scriptureVersion || 'LSG' }}</span>
-                </div>
-                <div class="scripture-text" v-html="formatScriptureForDisplay(subItem.scriptureText)"></div>
-              </div>
-
-              <!-- Lyrics -->
-              <div v-if="getSubItemLyrics(subItem)" class="lyrics-content-display">
-                <pre>{{ getSubItemLyrics(subItem) }}</pre>
-              </div>
-
-              <!-- No content message -->
-              <div v-if="!subItem.scriptureText && !getSubItemLyrics(subItem)" class="no-lyrics">
-                Aucun contenu disponible
-              </div>
-            </div>
-          </div>
-        </ion-content>
-      </ion-modal>
 
       <!-- YouTube Playlist Modal -->
       <ion-modal :is-open="showYouTubePlaylistModalState" @ionModalDidDismiss="closeYouTubePlaylist" class="youtube-playlist-modal fullscreen-modal">
@@ -1165,7 +911,6 @@
                   <div class="slide-header-compact">
                     <div class="slide-parent-info">
                       <span v-if="currentSlide.parentTitle" class="parent-title">{{ currentSlide.parentTitle }}</span>
-                      <span v-if="currentSlide.isSubItem" class="subitem-counter">Chant {{ currentSlide.subItemIndex }} / {{ currentSlide.totalSubItems }}</span>
                     </div>
                     <div v-if="currentSlide.lyricsTotal && currentSlide.lyricsTotal > 1" class="lyrics-page-indicator">
                       Page {{ currentSlide.lyricsPage }} / {{ currentSlide.lyricsTotal }}
@@ -1199,8 +944,8 @@
                   <!-- Slide Header -->
                   <div class="slide-header">
                     <div class="slide-type-badge">
-                      <ion-icon :icon="getSlideTypeIcon(currentSlide?.type || ProgramItemType.SONG)" />
-                      <span>{{ getSlideTypeLabel(currentSlide?.type || ProgramItemType.SONG) }}</span>
+                      <ion-icon :icon="getSlideTypeIcon(currentSlide?.type || 'Chant')" />
+                      <span>{{ getSlideTypeLabel(currentSlide?.type || 'Chant') }}</span>
                     </div>
                     <div v-if="currentSlide && !currentSlide.isSection && currentSlide.itemNumber" class="slide-number">
                       #{{ currentSlide.itemNumber }}
@@ -1213,14 +958,6 @@
                     <p v-if="currentSlide?.subtitle" class="slide-subtitle">
                       {{ currentSlide.subtitle }}
                     </p>
-
-                    <!-- Sub-items list (e.g., songs in a worship moment) -->
-                    <div v-if="currentSlide?.subItems && currentSlide.subItems.length > 0" class="slide-subitems">
-                      <div v-for="(subItem, idx) in currentSlide.subItems" :key="idx" class="subitem">
-                        <span class="subitem-number">{{ idx + 1 }}.</span>
-                        <span class="subitem-title">{{ subItem.resourceTitle || subItem.title }}</span>
-                      </div>
-                    </div>
 
                     <!-- Notes -->
                     <div v-if="currentSlide?.notes" class="slide-notes">
@@ -1261,7 +998,7 @@
                   <div
                     v-for="(slide, index) in presentationSlides"
                     :key="index"
-                    :class="['slide-progress-dot', { 'active': index === currentSlideIndex, 'viewed': index < currentSlideIndex, 'is-section': slide.isSection, 'is-subitem': slide.isSubItem, 'is-lyrics': slide.isLyricsSlide }]"
+                    :class="['slide-progress-dot', { 'active': index === currentSlideIndex, 'viewed': index < currentSlideIndex, 'is-section': slide.isSection, 'is-lyrics': slide.isLyricsSlide }]"
                     @click="goToSlide(index)"
                     :title="slide.lyricsPage ? `${slide.title} (${slide.lyricsPage}/${slide.lyricsTotal})` : slide.title"
                   ></div>
@@ -1319,34 +1056,6 @@
         </ion-content>
       </ion-modal>
 
-      <!-- Sub-Item Scripture Modal -->
-      <ion-modal :is-open="showSubItemScriptureModalState" @ionModalDidDismiss="closeSubItemScriptureModal" :initial-breakpoint="0.5" :breakpoints="[0, 0.5, 0.75, 1]">
-        <ion-header>
-          <ion-toolbar>
-            <ion-title>Lecture biblique</ion-title>
-            <ion-buttons slot="end">
-              <ion-button @click="closeSubItemScriptureModal">
-                <ion-icon :icon="closeOutline" />
-              </ion-button>
-            </ion-buttons>
-          </ion-toolbar>
-        </ion-header>
-        <ion-content class="ion-padding">
-          <div v-if="selectedSubItemScripture" class="scripture-modal-content">
-            <div class="scripture-modal-header">
-              <span class="scripture-modal-reference">{{ selectedSubItemScripture.scriptureReference }}</span>
-              <span class="scripture-modal-version">{{ selectedSubItemScripture.scriptureVersion }}</span>
-            </div>
-            <div class="scripture-modal-text" v-html="formatScriptureWithSuperscript(selectedSubItemScripture.scriptureText || '')"></div>
-            <div class="scripture-modal-actions">
-              <ion-button @click="copySubItemScriptureToClipboard" expand="block" fill="outline" color="primary">
-                <ion-icon :icon="copyOutline" slot="start" />
-                Copier les versets
-              </ion-button>
-            </div>
-          </div>
-        </ion-content>
-      </ion-modal>
 
       <!-- SMS Notification Modal -->
       <SendProgramSMSModal
@@ -1541,10 +1250,10 @@ import {
 } from '@ionic/vue';
 import {
   calendarOutline, createOutline, listOutline, timeOutline,
-  personOutline, documentTextOutline, musicalNotesOutline,
+  personOutline, documentTextOutline,
   closeOutline, musicalNoteOutline, libraryOutline, micOutline,
-  megaphoneOutline, giftOutline, handLeftOutline, personCircleOutline,
-  reorderThreeOutline, reorderTwoOutline, addOutline, trashOutline,
+  handLeftOutline,
+  reorderThreeOutline, addOutline, trashOutline,
   playCircleOutline, volumeHighOutline, documentOutline,
   chatboxEllipsesOutline, chevronDownOutline, chevronForwardOutline,
   logoYoutube, playBackOutline, playForwardOutline,
@@ -1582,10 +1291,9 @@ import {
   forceAcquireEditLock
 } from '@/firebase/programs';
 import type { Service } from '@/types/service';
-import type { ServiceProgram, ProgramItem, ProgramParticipant, ProgramSubItem } from '@/types/program';
+import type { ServiceProgram, ProgramItem, ProgramParticipant } from '@/types/program';
 import type { Member } from '@/types/member';
 import { membersService } from '@/firebase/members';
-import { ProgramItemType } from '@/types/program';
 import type { Resource, ResourceOption } from '@/types/resource';
 import { getAllResourceOptions, updateResource, subscribeToResource, getResources } from '@/firebase/resources';
 import { deleteField, type Unsubscribe } from 'firebase/firestore';
@@ -1615,6 +1323,17 @@ const editProgramForm = ref({
 });
 
 const expandedItems = ref<Set<string>>(new Set());
+
+// Group collapse state (default all expanded)
+const collapsedGroupIds = reactive(new Set<string>());
+
+const toggleGroupCollapse = (groupId: string) => {
+  if (collapsedGroupIds.has(groupId)) {
+    collapsedGroupIds.delete(groupId);
+  } else {
+    collapsedGroupIds.add(groupId);
+  }
+};
 
 // Expand/collapse for inline editing (expandable item cards)
 const expandedEditItemIds = ref<Set<string>>(new Set());
@@ -1661,19 +1380,6 @@ const isTuckedOpen = (itemId: string, section: string) => {
   return tuckedSections.value.get(itemId)?.has(section) ?? false;
 };
 
-// Type options for expanded card
-const expandedTypeOptions = [
-  { value: ProgramItemType.SONG, label: 'Chant', icon: musicalNoteOutline },
-  { value: ProgramItemType.PRAYER, label: 'Prière', icon: handLeftOutline },
-  { value: ProgramItemType.SCRIPTURE, label: 'Lecture', icon: libraryOutline },
-  { value: ProgramItemType.SERMON, label: 'Prédication', icon: micOutline },
-  { value: ProgramItemType.TITLE, label: 'Titre', icon: documentTextOutline },
-  { value: 'Annonce' as ProgramItemType, label: 'Annonce', icon: megaphoneOutline },
-  { value: 'Offrande' as ProgramItemType, label: 'Offrande', icon: giftOutline },
-  { value: 'Bénédiction' as ProgramItemType, label: 'Bénédiction', icon: handLeftOutline },
-  { value: 'Autre' as ProgramItemType, label: 'Autre', icon: documentTextOutline },
-];
-
 // Scripture fetch for expanded card
 const fetchScriptureForItem = async (itemId: string, reference: string) => {
   if (!reference) return;
@@ -1686,24 +1392,6 @@ const fetchScriptureForItem = async (itemId: string, reference: string) => {
     await inlineUpdateField(itemId, 'scriptureReference', result.reference);
     await inlineUpdateField(itemId, 'scriptureText', result.text);
     await inlineUpdateField(itemId, 'scriptureVersion', result.version);
-  } catch (error) {
-    console.error('Error fetching scripture:', error);
-    showToast('Erreur lors de la récupération des versets', 'danger');
-  }
-};
-
-// Scripture fetch for sub-item expanded card
-const fetchScriptureForSubItem = async (parentId: string, subItemId: string, reference: string) => {
-  if (!reference) return;
-  try {
-    const result = await bibleService.getScripture(reference);
-    if (!result) {
-      showToast('Référence biblique non reconnue', 'warning');
-      return;
-    }
-    await inlineUpdateSubItemField(parentId, subItemId, 'scriptureReference', result.reference);
-    await inlineUpdateSubItemField(parentId, subItemId, 'scriptureText', result.text);
-    await inlineUpdateSubItemField(parentId, subItemId, 'scriptureVersion', result.version);
   } catch (error) {
     console.error('Error fetching scripture:', error);
     showToast('Erreur lors de la récupération des versets', 'danger');
@@ -1747,13 +1435,13 @@ const addItemAtPosition = async (index: number) => {
     }
   }
   try {
-    await addItemToProgram(program.value.id, { order: insertOrder, type: ProgramItemType.SONG, title: 'Nouvel élément' } as any, user.value.uid);
+    await addItemToProgram(program.value.id, { order: insertOrder, title: 'Nouvel élément' } as any, user.value.uid);
   } catch (error) {
     console.error('Error adding item at position:', error);
   }
 };
 
-const addSectionAtPosition = async (index: number) => {
+const addGroupAtPosition = async (index: number) => {
   activeAddZoneIndex.value = null;
   if (!program.value || !user.value) return;
   const sorted = sortedItems.value;
@@ -1764,25 +1452,13 @@ const addSectionAtPosition = async (index: number) => {
     }
   }
   try {
-    const created = await addItemToProgram(program.value.id, { order: insertOrder, type: 'Section' as any, title: 'Nouvelle section' } as any, user.value.uid);
-    if (created?.id) {
-      setTimeout(() => startInlineTitleEdit(created.id), 500);
+    const createdId = await createGroup('Nouveau groupe', insertOrder);
+    if (createdId) {
+      setTimeout(() => startInlineTitleEdit(createdId), 500);
     }
   } catch (error) {
-    console.error('Error adding section at position:', error);
+    console.error('Error adding group at position:', error);
   }
-};
-
-// Add sub-item from expanded card
-const expandedAddSubItem = (itemId: string) => {
-  expandedItems.value.add(itemId);
-  setTimeout(() => {
-    const addBar = subItemAddBarRefs[itemId];
-    if (addBar && addBar.$el) {
-      const input = addBar.$el.querySelector('ion-input');
-      if (input) input.setFocus();
-    }
-  }, 300);
 };
 
 // Title Autocomplete State (needed by composable)
@@ -1791,12 +1467,13 @@ const loadingResources = ref(false);
 
 // Program Items composable (unified form modal + CRUD + reorder)
 const {
-  deleteItem, deleteSubItem,
-  handleItemReorder, handleSubItemReorder,
+  deleteItem,
+  createGroup,
+  handleItemReorder,
   editingTitleItemId, startInlineTitleEdit, cancelInlineTitleEdit, inlineUpdateTitle,
   inlineUpdateDuration, inlineUpdateParticipants,
-  quickAddItem, quickAddSubItem,
-  inlineUpdateField, inlineUpdateSubItemField,
+  quickAddItem,
+  inlineUpdateField,
   quickUnlinkResource
 } = useProgramItems({
   program, user, expandedItems, loading,
@@ -1839,17 +1516,10 @@ const selectedMediaTitle = ref('');
 // SMS Modal
 const showSMSModalState = ref(false);
 
-// Item Lyrics View Modal
-const showItemLyricsModalState = ref(false);
-const selectedItemForLyrics = ref<ProgramItem | null>(null);
 
 // Scripture Modal
 const showScriptureModalState = ref(false);
 const selectedScriptureItem = ref<ProgramItem | null>(null);
-
-// Sub-Item Scripture Modal
-const showSubItemScriptureModalState = ref(false);
-const selectedSubItemScripture = ref<ProgramSubItem | null>(null);
 
 // YouTube Playlist Modal
 const showYouTubePlaylistModalState = ref(false);
@@ -1865,7 +1535,7 @@ const currentVideoIndex = ref(0);
 // Presentation Modal (PowerPoint-style 16:9)
 const showPresentationModalState = ref(false);
 const presentationSlides = ref<Array<{
-  type: ProgramItemType;
+  type?: string;
   title: string;
   subtitle?: string;
   participant?: string;
@@ -1881,15 +1551,8 @@ const presentationSlides = ref<Array<{
   isScriptureSlide?: boolean;
   itemNumber: number;
   isSection?: boolean;
-  isSubItem?: boolean;
   isLyricsSlide?: boolean;
   parentTitle?: string;
-  subItemIndex?: number;
-  totalSubItems?: number;
-  subItems?: Array<{
-    title: string;
-    resourceTitle?: string;
-  }>;
 }>>([]);
 const currentSlideIndex = ref(0);
 
@@ -1941,7 +1604,6 @@ const draftViewerSearchQuery = ref('');
 
 // InlineAddBar refs
 const mainAddBarRef = ref<InstanceType<typeof InlineAddBar> | null>(null);
-const subItemAddBarRefs = reactive<Record<string, InstanceType<typeof InlineAddBar>>>({});
 
 // Inline Resource Selector State
 const showInlineResourceSelector = ref(false);
@@ -2122,25 +1784,12 @@ const filteredDraftViewerMembers = computed(() => {
 const hasYouTubeVideos = computed(() => {
   if (!program.value) return false;
 
-  // Check all items and sub-items for YouTube videos
+  // Check all items for YouTube videos
   for (const item of program.value.items) {
-    // Check item resource
     if (item.resourceId) {
       const resource = getLinkedResource(item.resourceId);
       if (resource?.contents?.some(c => (c.type === 'video' || c.type === 'youtube') && c.url && isYouTubeUrl(c.url))) {
         return true;
-      }
-    }
-
-    // Check sub-items
-    if (item.subItems) {
-      for (const subItem of item.subItems) {
-        if (subItem.resourceId) {
-          const resource = getLinkedResource(subItem.resourceId);
-          if (resource?.contents?.some(c => (c.type === 'video' || c.type === 'youtube') && c.url && isYouTubeUrl(c.url))) {
-            return true;
-          }
-        }
       }
     }
   }
@@ -2170,30 +1819,6 @@ const formatScriptureWithSuperscript = (text: string): string => {
   return text.replace(/^(\d+)\s/gm, '<sup>$1</sup> ');
 };
 
-const getItemIcon = (type: ProgramItemType) => {
-  const iconMap: Record<string, string> = {
-    'Chant': musicalNoteOutline,
-    'Prière': handLeftOutline,
-    'Lecture biblique': libraryOutline,
-    'Prédication': micOutline,
-    'Titre': documentTextOutline,
-    'Section': removeOutline,
-    'Annonce': megaphoneOutline,
-    'Offrande': giftOutline,
-    'Bénédiction': handLeftOutline,
-    'Mot de bienvenue': personCircleOutline,
-    'Salutations': personOutline,
-    'Numéro spécial': musicalNotesOutline,
-    'Collecte': giftOutline,
-    'Adoration': musicalNotesOutline,
-    'Louange': musicalNotesOutline,
-    'Chant final': musicalNoteOutline,
-    'Chant de clôture': musicalNoteOutline,
-    'Autre': documentTextOutline
-  };
-  return iconMap[type as string] || documentTextOutline;
-};
-
 const getMediaTypeIcon = (type: string) => {
   const iconMap: Record<string, string> = {
     'video': playCircleOutline,
@@ -2220,26 +1845,14 @@ const getLinkedResource = (resourceId: string): Resource | undefined => {
   return linkedResources.value.get(resourceId);
 };
 
-const hasSubItems = (item: ProgramItem): boolean => {
-  return !!(item.subItems && item.subItems.length > 0);
-};
-
-const isSectionItem = (item: ProgramItem): boolean => {
-  return item.type === ProgramItemType.SECTION;
-};
-
-const canHaveSubItems = (item: ProgramItem): boolean => {
-  return item.type === ProgramItemType.TITLE;
-};
-
-// Get the display number for an item, excluding sections from the count
+// Get the display number for an item, excluding group headers from the count
 const getItemDisplayNumber = (index: number): number => {
   if (!program.value) return index + 1;
 
-  // Count how many non-section items come before and including this index
+  const sorted = sortedItems.value;
   let count = 0;
   for (let i = 0; i <= index; i++) {
-    if (!isSectionItem(program.value.items[i])) {
+    if (!sorted[i].isGroup) {
       count++;
     }
   }
@@ -2256,49 +1869,6 @@ const toggleItemExpansion = (itemId: string) => {
   } else {
     expandedItems.value.add(itemId);
   }
-};
-
-const getSortedSubItems = (item: ProgramItem): ProgramSubItem[] => {
-  if (!item.subItems) return [];
-  return [...item.subItems].sort((a, b) => a.order - b.order);
-};
-
-// Check if item has lyrics or scripture in any sub-items
-const hasLyricsInSubItems = (item: ProgramItem): boolean => {
-  if (!item.subItems || item.subItems.length === 0) return false;
-
-  return item.subItems.some(subItem => {
-    // Check for scripture
-    if (subItem.scriptureText) return true;
-    // Check for lyrics from linked resource
-    if (subItem.resourceId) {
-      const resource = getLinkedResource(subItem.resourceId);
-      return resource?.contents?.some(c => c.type === 'lyrics' && c.content);
-    }
-    return false;
-  });
-};
-
-// Get lyrics from a sub-item
-const getSubItemLyrics = (subItem: ProgramSubItem): string | null => {
-  if (subItem.resourceId) {
-    const resource = getLinkedResource(subItem.resourceId);
-    const lyricsContent = resource?.contents?.find(c => c.type === 'lyrics');
-    return lyricsContent?.content || null;
-  }
-  return null;
-};
-
-// Show item lyrics view
-const showItemLyricsView = (item: ProgramItem) => {
-  selectedItemForLyrics.value = item;
-  showItemLyricsModalState.value = true;
-};
-
-// Close item lyrics view
-const closeItemLyricsView = () => {
-  showItemLyricsModalState.value = false;
-  selectedItemForLyrics.value = null;
 };
 
 // Toast Helper
@@ -2327,9 +1897,6 @@ const subscribeToResourcesInProgram = (programData: ServiceProgram) => {
   const resourceIds = new Set<string>();
   programData.items.forEach(item => {
     if (item.resourceId) resourceIds.add(item.resourceId);
-    item.subItems?.forEach(subItem => {
-      if (subItem.resourceId) resourceIds.add(subItem.resourceId);
-    });
   });
 
   for (const resourceId of resourceIds) {
@@ -2398,24 +1965,6 @@ const createInitialProgram = async () => {
 };
 
 // Inline Duration Popover
-const handleAddSectionAtEnd = async () => {
-  if (!program.value || !user.value) return;
-  try {
-    const maxOrder = program.value.items.reduce((max, item) => Math.max(max, item.order), 0);
-    const newItem: any = {
-      order: maxOrder + 1,
-      type: 'Section',
-      title: 'Nouvelle section'
-    };
-    const created = await addItemToProgram(program.value.id, newItem, user.value.uid);
-    if (created?.id) {
-      setTimeout(() => startInlineTitleEdit(created.id), 500);
-    }
-  } catch (error) {
-    console.error('Error adding section:', error);
-  }
-};
-
 const durationPopoverOpen = ref(false);
 const durationPopoverEvent = ref<Event | null>(null);
 const durationPopoverItemId = ref<string | null>(null);
@@ -2456,51 +2005,19 @@ const handleParticipantsPopoverDismiss = () => {
 };
 
 // Inline Add Handlers
-const handleInlineAdd = async (data: { type: ProgramItemType | '', title: string, resourceId?: string, scriptureReference?: string }) => {
-  const itemId = await quickAddItem(data.type as ProgramItemType, data.title, data.resourceId);
+const handleInlineAdd = async (data: { title: string, resourceId?: string }) => {
+  const itemId = await quickAddItem(data.title, data.resourceId);
   if (itemId && data.resourceId) {
     subscribeToLinkedResource(data.resourceId);
   }
   if (itemId && mainAddBarRef.value) {
     mainAddBarRef.value.setLastCreatedItemId(itemId);
   }
-  // Auto-fetch scripture for Lecture biblique
-  if (itemId && data.type === ProgramItemType.SCRIPTURE) {
-    fetchScriptureForItem(itemId, data.title);
-  }
-  // Auto-fetch scripture for Prédication with reference
-  if (itemId && data.type === ProgramItemType.SERMON && data.scriptureReference) {
-    fetchScriptureForItem(itemId, data.scriptureReference);
-  }
-};
-
-const handleInlineSubAdd = async (parentId: string, data: { type: ProgramItemType | '', title: string, resourceId?: string, scriptureReference?: string }) => {
-  const subItemId = await quickAddSubItem(parentId, data.type as ProgramItemType | '', data.title, data.resourceId);
-  if (subItemId && data.resourceId) {
-    subscribeToLinkedResource(data.resourceId);
-  }
-  if (subItemId && subItemAddBarRefs[parentId]) {
-    subItemAddBarRefs[parentId].setLastCreatedItemId(subItemId);
-  }
-  // Auto-fetch scripture for Lecture biblique
-  if (subItemId && data.type === ProgramItemType.SCRIPTURE) {
-    fetchScriptureForSubItem(parentId, subItemId, data.title);
-  }
-  // Auto-fetch scripture for Prédication with reference
-  if (subItemId && data.type === ProgramItemType.SERMON && data.scriptureReference) {
-    fetchScriptureForSubItem(parentId, subItemId, data.scriptureReference);
-  }
 };
 
 const handleInlineLinkResource = async (itemId: string, resourceId: string) => {
   if (!itemId || !resourceId) return;
   await inlineUpdateField(itemId, 'resourceId', resourceId);
-  subscribeToLinkedResource(resourceId);
-};
-
-const handleInlineLinkSubResource = async (parentId: string, subItemId: string, resourceId: string) => {
-  if (!parentId || !subItemId || !resourceId) return;
-  await inlineUpdateSubItemField(parentId, subItemId, 'resourceId', resourceId);
   subscribeToLinkedResource(resourceId);
 };
 
@@ -2674,32 +2191,6 @@ const copyScriptureToClipboard = async () => {
   }
 };
 
-// Sub-Item Scripture Modal Functions
-const openSubItemScriptureModal = (subItem: ProgramSubItem) => {
-  if (subItem.scriptureText) {
-    selectedSubItemScripture.value = subItem;
-    showSubItemScriptureModalState.value = true;
-  }
-};
-
-const closeSubItemScriptureModal = () => {
-  showSubItemScriptureModalState.value = false;
-  selectedSubItemScripture.value = null;
-};
-
-const copySubItemScriptureToClipboard = async () => {
-  if (!selectedSubItemScripture.value?.scriptureText) return;
-
-  try {
-    const textToCopy = `${selectedSubItemScripture.value.scriptureReference}\n\n${selectedSubItemScripture.value.scriptureText}\n\n— ${selectedSubItemScripture.value.scriptureVersion}`;
-    await navigator.clipboard.writeText(textToCopy);
-    await showToast('Versets copiés dans le presse-papiers', 'success');
-  } catch (error) {
-    console.error('Error copying to clipboard:', error);
-    await showToast('Erreur lors de la copie', 'danger');
-  }
-};
-
 const closeInlineResourceSelector = () => {
   showInlineResourceSelector.value = false;
   // Don't clear inlineResourceItemId here - it's needed for follow-up actions
@@ -2847,32 +2338,6 @@ const collectYouTubeVideos = () => {
       }
     }
 
-    // Check sub-items
-    if (item.subItems && item.subItems.length > 0) {
-      const sortedSubItems = getSortedSubItems(item);
-      for (const subItem of sortedSubItems) {
-        if (subItem.resourceId) {
-          const resource = getLinkedResource(subItem.resourceId);
-          if (resource?.contents) {
-            for (const content of resource.contents) {
-              // Check for both 'video' and 'youtube' types
-              if ((content.type === 'video' || content.type === 'youtube') && content.url && isYouTubeUrl(content.url)) {
-                const embedUrl = getYouTubeEmbedUrl(content.url);
-                if (embedUrl) {
-                  videos.push({
-                    title: resource.title,
-                    subtitle: resource.reference,
-                    embedUrl,
-                    programItemNumber: itemNumber,
-                    programItemTitle: item.title
-                  });
-                }
-              }
-            }
-          }
-        }
-      }
-    }
   }
 
   return videos;
@@ -3151,7 +2616,7 @@ const collectPresentationSlides = () => {
   let itemNumber = 0;
 
   for (const item of sortedItems.value) {
-    const isSection = item.type === ProgramItemType.SECTION || item.type === ProgramItemType.TITLE;
+    const isSection = !!item.isGroup;
 
     if (!isSection) {
       itemNumber++;
@@ -3178,129 +2643,10 @@ const collectPresentationSlides = () => {
       participantName = item.participants.map(p => p.name).join(', ');
     }
 
-    // Check if item has sub-items (e.g., songs in a worship moment)
-    if (item.subItems && item.subItems.length > 0) {
-      // First, add the parent item as a "header" slide
-      const subItemsInfo = item.subItems.map(sub => {
-        const subResource = sub.resourceId ? getLinkedResource(sub.resourceId) : null;
-        return {
-          title: sub.title,
-          resourceTitle: subResource?.title
-        };
-      });
-
-      slides.push({
-        type: item.type,
-        title: resourceTitle || item.title,
-        subtitle: item.subtitle,
-        participant: participantName,
-        duration: item.duration,
-        notes: item.notes,
-        itemNumber: isSection ? 0 : itemNumber,
-        isSection: isSection,
-        subItems: subItemsInfo
-      });
-
-      // Then, create individual slides for each sub-item with lyrics or scripture
-      const sortedSubItems = [...item.subItems].sort((a, b) => a.order - b.order);
-      sortedSubItems.forEach((subItem, subIndex) => {
-        let subLyrics = '';
-        let subTitle = subItem.title;
-
-        if (subItem.resourceId) {
-          const subResource = getLinkedResource(subItem.resourceId);
-          if (subResource) {
-            subTitle = subResource.title;
-            const lyricsContent = subResource.contents?.find(c => c.type === 'lyrics');
-            if (lyricsContent?.content) {
-              subLyrics = lyricsContent.content;
-            }
-          }
-        }
-
-        // Check if sub-item has scripture
-        if (subItem.scriptureText && subItem.scriptureReference) {
-          // Create scripture slides for sub-item
-          const scripturePages = splitScriptureIntoPages(subItem.scriptureText, 1);
-
-          if (scripturePages.length > 1) {
-            // Multiple pages
-            scripturePages.forEach((page, pageIndex) => {
-              slides.push({
-                type: item.type,
-                title: subTitle,
-                scriptureReference: subItem.scriptureReference,
-                scriptureText: page,
-                scripturePage: pageIndex + 1,
-                scriptureTotal: scripturePages.length,
-                isScriptureSlide: true,
-                itemNumber: itemNumber,
-                isSubItem: true,
-                parentTitle: resourceTitle || item.title,
-                subItemIndex: subIndex + 1,
-                totalSubItems: sortedSubItems.length,
-                notes: pageIndex === 0 ? subItem.notes : undefined
-              });
-            });
-          } else {
-            // Single page
-            slides.push({
-              type: item.type,
-              title: subTitle,
-              scriptureReference: subItem.scriptureReference,
-              scriptureText: formatScriptureForPresentation(subItem.scriptureText),
-              isScriptureSlide: true,
-              itemNumber: itemNumber,
-              isSubItem: true,
-              parentTitle: resourceTitle || item.title,
-              subItemIndex: subIndex + 1,
-              totalSubItems: sortedSubItems.length,
-              notes: subItem.notes
-            });
-          }
-        } else {
-          // Handle lyrics or empty sub-item
-          const lyricsPages = splitLyricsIntoPages(subLyrics);
-
-          if (lyricsPages.length === 0) {
-            // No lyrics - add single slide
-            slides.push({
-              type: item.type,
-              title: subTitle,
-              lyrics: '',
-              itemNumber: itemNumber,
-              isSubItem: true,
-              isLyricsSlide: subLyrics !== '',
-              parentTitle: resourceTitle || item.title,
-              subItemIndex: subIndex + 1,
-              totalSubItems: sortedSubItems.length,
-              notes: subItem.notes
-            });
-          } else {
-            // Add a slide for each lyrics page
-            lyricsPages.forEach((page, pageIndex) => {
-              slides.push({
-                type: item.type,
-                title: subTitle,
-                lyrics: page,
-                lyricsPage: pageIndex + 1,
-                lyricsTotal: lyricsPages.length,
-                itemNumber: itemNumber,
-                isSubItem: true,
-                isLyricsSlide: true,
-                parentTitle: resourceTitle || item.title,
-                subItemIndex: subIndex + 1,
-                totalSubItems: sortedSubItems.length,
-                notes: pageIndex === 0 ? subItem.notes : undefined
-              });
-            });
-          }
-        }
-      });
-    } else {
-      // Regular item without sub-items
-      // For songs with lyrics, split into pages
-      if (item.type === ProgramItemType.SONG && lyrics) {
+    {
+      // Regular item (flat, no sub-items)
+      // For items with lyrics, split into pages
+      if (lyrics) {
         const lyricsPages = splitLyricsIntoPages(lyrics);
 
         // First slide with song info
@@ -3327,7 +2673,7 @@ const collectPresentationSlides = () => {
             isLyricsSlide: true
           });
         });
-      } else if ((item.type === ProgramItemType.SCRIPTURE || item.type === ProgramItemType.SERMON) && item.scriptureText) {
+      } else if (item.scriptureText) {
         // Scripture or sermon with scripture text - split into pages
         const scripturePages = splitScriptureIntoPages(item.scriptureText, 1);
 
@@ -3410,10 +2756,10 @@ const exportProgramText = async () => {
   // Process each item
   let itemNumber = 0;
   for (const item of sortedItems.value) {
-    const isSection = item.type === ProgramItemType.SECTION || item.type === ProgramItemType.TITLE;
+    const isGroupHeader = !!item.isGroup;
 
-    if (isSection) {
-      // Section header
+    if (isGroupHeader) {
+      // Group header
       lines.push('');
       lines.push('─'.repeat(40));
       lines.push(item.title.toUpperCase());
@@ -3437,7 +2783,7 @@ const exportProgramText = async () => {
       }
 
       const title = resourceTitle || item.title;
-      const hasContent = lyrics || item.scriptureText || (item.subItems && item.subItems.length > 0);
+      const hasContent = lyrics || item.scriptureText;
 
       if (hasContent) {
         lines.push(`${itemNumber}. ${title}`);
@@ -3458,46 +2804,6 @@ const exportProgramText = async () => {
           lines.push('');
           lines.push(lyrics.split('\n').map(l => `   ${l}`).join('\n'));
           lines.push('');
-        }
-
-        // Sub-items
-        if (item.subItems && item.subItems.length > 0) {
-          const sortedSubs = [...item.subItems].sort((a, b) => a.order - b.order);
-          for (const subItem of sortedSubs) {
-            let subTitle = subItem.title;
-            let subLyrics = '';
-
-            if (subItem.resourceId) {
-              const subResource = getLinkedResource(subItem.resourceId);
-              if (subResource) {
-                subTitle = subResource.title;
-                const lyricsContent = subResource.contents?.find(c => c.type === 'lyrics');
-                if (lyricsContent?.content) {
-                  subLyrics = lyricsContent.content;
-                }
-              }
-            }
-
-            const hasSubContent = subLyrics || subItem.scriptureText;
-            if (hasSubContent) {
-              lines.push(`   • ${subTitle}`);
-              lines.push('');
-
-              // Sub-item scripture
-              if (subItem.scriptureReference && subItem.scriptureText) {
-                lines.push(`     📖 ${subItem.scriptureReference}`);
-                lines.push('');
-                lines.push(subItem.scriptureText.split('\n').map(l => `     ${l}`).join('\n'));
-                lines.push('');
-              }
-
-              // Sub-item lyrics
-              if (subLyrics) {
-                lines.push(subLyrics.split('\n').map(l => `     ${l}`).join('\n'));
-                lines.push('');
-              }
-            }
-          }
         }
 
         lines.push('');
@@ -3577,28 +2883,28 @@ const handlePresentationTouchEnd = () => {
   presentationTouchEndY.value = 0;
 };
 
-const getSlideTypeIcon = (type: ProgramItemType): string => {
-  switch (type) {
-    case ProgramItemType.SONG: return musicalNoteOutline;
-    case ProgramItemType.PRAYER: return handLeftOutline;
-    case ProgramItemType.SCRIPTURE: return libraryOutline;
-    case ProgramItemType.SERMON: return micOutline;
-    case ProgramItemType.SECTION: return bookOutline;
-    case ProgramItemType.TITLE: return bookOutline;
-    default: return documentTextOutline;
-  }
+const getSlideTypeIcon = (type: string): string => {
+  const iconMap: Record<string, string> = {
+    'Chant': musicalNoteOutline,
+    'Prière': handLeftOutline,
+    'Lecture biblique': libraryOutline,
+    'Prédication': micOutline,
+    'Section': bookOutline,
+    'Titre': bookOutline,
+  };
+  return iconMap[type] || documentTextOutline;
 };
 
-const getSlideTypeLabel = (type: ProgramItemType): string => {
-  switch (type) {
-    case ProgramItemType.SONG: return 'Chant';
-    case ProgramItemType.PRAYER: return 'Prière';
-    case ProgramItemType.SCRIPTURE: return 'Lecture biblique';
-    case ProgramItemType.SERMON: return 'Prédication';
-    case ProgramItemType.SECTION: return 'Section';
-    case ProgramItemType.TITLE: return 'Titre';
-    default: return type;
-  }
+const getSlideTypeLabel = (type: string): string => {
+  const labelMap: Record<string, string> = {
+    'Chant': 'Chant',
+    'Prière': 'Prière',
+    'Lecture biblique': 'Lecture biblique',
+    'Prédication': 'Prédication',
+    'Section': 'Section',
+    'Titre': 'Titre',
+  };
+  return labelMap[type] || type;
 };
 
 
@@ -3991,12 +3297,89 @@ onUnmounted(() => {
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
-.program-item-wrapper.has-subitems {
-  border-left: 3px solid var(--ion-color-primary);
-}
-
 .program-item-wrapper.expanded {
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Group Header Styles */
+.program-item-wrapper.is-group-header {
+  --background: var(--ion-color-primary);
+  --background-hover: var(--ion-color-primary);
+  margin-left: -1rem;
+  margin-right: -1rem;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  border-left: none !important;
+  overflow: visible;
+}
+
+.program-item-wrapper.is-group-header::part(native) {
+  background: var(--ion-color-primary);
+  padding: 0;
+}
+
+.program-item-wrapper.is-group-header .program-item {
+  background: var(--ion-color-primary);
+  border-radius: 0;
+  padding: 0.5rem 1rem;
+  width: 100%;
+}
+
+.group-header-layout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.group-header-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.group-header-title {
+  color: white;
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin: 0;
+}
+
+.group-header-title.editable {
+  cursor: pointer;
+}
+
+.group-header-title-input {
+  color: white;
+  --color: white;
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  --placeholder-color: rgba(255, 255, 255, 0.6);
+  --padding-start: 0;
+  --padding-end: 0;
+  --padding-top: 0;
+  --padding-bottom: 0;
+}
+
+.group-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+}
+
+.group-header-actions ion-button {
+  --color: rgba(255, 255, 255, 0.85);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* Grouped Item Styles (indented) */
+.program-item-wrapper.is-grouped-item {
+  padding-left: 1rem;
+  border-left: 3px solid var(--ion-color-primary);
 }
 
 .program-item {
@@ -4026,33 +3409,6 @@ onUnmounted(() => {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   border-radius: 8px;
   z-index: 100;
-}
-
-/* Sub-item reorder handle */
-.sub-item-handle {
-  cursor: grab;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.125rem;
-  flex-shrink: 0;
-  width: 24px;
-}
-
-.sub-item-handle:active {
-  cursor: grabbing;
-}
-
-.sub-item-handle ion-icon {
-  font-size: 1rem;
-  color: var(--ion-color-medium);
-}
-
-/* Sub-item visual feedback during drag */
-.sub-item.item-reorder-active {
-  background: var(--ion-color-light-tint);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  border-radius: 4px;
 }
 
 .item-order-column {
@@ -4304,14 +3660,6 @@ onUnmounted(() => {
   background: rgba(var(--ion-color-danger-rgb), 0.1);
 }
 
-.sub-item-resources {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.25rem;
-  margin-top: 0.25rem;
-}
-
 /* Quick Action Buttons */
 .item-quick-actions {
   display: flex;
@@ -4518,141 +3866,6 @@ onUnmounted(() => {
   margin: 0;
   color: var(--ion-color-medium);
 }
-
-.sub-item-action-menu-btn {
-  --padding-start: 2px;
-  --padding-end: 2px;
-  margin: 0;
-  margin-left: auto;
-  color: var(--ion-color-medium);
-  flex-shrink: 0;
-}
-
-/* Sub-Items */
-.sub-items-container {
-  margin: 1rem 0 0 3rem;
-  padding: 0.75rem 0 0 1rem;
-  border-left: 2px solid var(--ion-color-light-shade);
-}
-
-.sub-item {
-  margin-bottom: 0.75rem;
-}
-
-.sub-item:last-child {
-  margin-bottom: 0;
-}
-
-.sub-item-layout {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-}
-
-.sub-item-bullet {
-  flex-shrink: 0;
-  font-size: 1.2rem;
-  color: var(--ion-color-primary);
-  margin-top: 0.1rem;
-}
-
-.sub-item-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.sub-item-header-row {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.sub-item-type-icon {
-  font-size: 0.85rem;
-  color: var(--ion-color-primary);
-  flex-shrink: 0;
-}
-
-.sub-item-title {
-  font-size: 0.95rem;
-  color: var(--ion-color-dark);
-  font-weight: 500;
-}
-
-.sub-item-duration {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.15rem;
-  font-size: 0.75rem;
-  color: var(--ion-color-medium);
-  margin-left: auto;
-  flex-shrink: 0;
-}
-
-.sub-item-duration ion-icon {
-  font-size: 0.75rem;
-}
-
-.sub-item-participants {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  margin-top: 0.15rem;
-}
-
-.sub-item-participant {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  font-size: 0.8rem;
-  color: var(--ion-color-medium);
-}
-
-.participant-initials.small {
-  font-size: 0.6rem;
-  width: 18px;
-  height: 18px;
-  line-height: 18px;
-}
-
-.sub-item-notes {
-  font-size: 0.85rem;
-  color: var(--ion-color-medium);
-  font-style: italic;
-}
-
-.sub-item-scripture {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.2rem 0.5rem;
-  background: rgba(var(--ion-color-tertiary-rgb), 0.12);
-  color: var(--ion-color-tertiary-shade);
-  border-radius: 12px;
-  font-size: 0.8rem;
-  cursor: pointer;
-  margin-top: 0.25rem;
-}
-
-.sub-item-scripture ion-icon {
-  font-size: 0.85rem;
-}
-
-.sub-item-scripture:hover {
-  background: rgba(var(--ion-color-tertiary-rgb), 0.2);
-}
-
-.sub-item-resources {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-  align-items: center;
-}
-
 
 /* Media Modal */
 .media-modal {
@@ -5353,33 +4566,12 @@ onUnmounted(() => {
     font-size: 1.25rem;
   }
 
-  /* Task 7.1 & 7.2 & 7.3: Sub-item container styling */
-  .sub-items-container {
-    margin-left: 24px;
-    padding: 0.75rem 0 0 1rem;
-    border-left: 2px solid rgba(var(--ion-color-primary-rgb), 0.3);
-    background: rgba(var(--ion-color-primary-rgb), 0.03);
-    border-radius: 0 8px 8px 0;
-  }
-
   /* Task 7.4: Expand/collapse toggle touch target */
   .expand-button {
     min-width: var(--program-touch-target);
     min-height: var(--program-touch-target);
   }
 
-  /* Task 8.1 & 8.2: Section dividers */
-  .program-item-wrapper.is-section {
-    margin-top: 16px;
-  }
-
-  .program-item-wrapper.is-section .program-item {
-    padding: 12px 1rem;
-  }
-
-  .program-item-wrapper.is-section .item-title {
-    font-size: 15px;
-  }
 }
 
 /* Task 1.2: Small phone breakpoint */
@@ -5413,81 +4605,6 @@ onUnmounted(() => {
   }
 }
 
-
-/* Section Divider Styles */
-.program-item-wrapper.is-section {
-  margin-left: -1rem;
-  margin-right: -1rem;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  border-left: none !important;
-  overflow: visible;
-  --background: var(--ion-color-danger, #c0392b);
-  --background-hover: var(--ion-color-danger, #c0392b);
-}
-
-.program-item-wrapper.is-section::part(native) {
-  background: var(--ion-color-danger, #c0392b);
-  padding: 0;
-}
-
-.program-item-wrapper.is-section .program-item {
-  background: var(--ion-color-danger, #c0392b);
-  border-radius: 0;
-  padding: 0.6rem 1rem;
-  width: 100%;
-}
-
-.program-item-wrapper.is-section .item-layout {
-  justify-content: center;
-}
-
-.program-item-wrapper.is-section .item-details-column {
-  text-align: center;
-  flex: 1;
-}
-
-.program-item-wrapper.is-section .item-header-row {
-  display: none;
-}
-
-.program-item-wrapper.is-section .item-title {
-  color: white;
-  font-size: 1rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
-  margin: 0;
-  cursor: pointer;
-}
-
-.program-item-wrapper.is-section .inline-title-input {
-  color: white;
-  --color: white;
-  font-size: 1rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
-  text-align: center;
-  --placeholder-color: rgba(255, 255, 255, 0.6);
-}
-
-.program-item-wrapper.is-section .item-subtitle,
-.program-item-wrapper.is-section .item-notes,
-.program-item-wrapper.is-section .item-resources,
-.program-item-wrapper.is-section .item-scripture,
-.program-item-wrapper.is-section .item-lyrics-button {
-  display: none;
-}
-
-.program-item-wrapper.is-section .sub-items-container {
-  display: none;
-}
-
-.program-item-wrapper.is-section .item-action-menu-btn {
-  color: rgba(255, 255, 255, 0.8) !important;
-  --color: rgba(255, 255, 255, 0.8) !important;
-}
 
 /* Scripture Fetch Section */
 .scripture-fetch-section {
@@ -5653,16 +4770,21 @@ onUnmounted(() => {
   font-weight: 600;
 }
 
-/* Countdown Timer in Toolbar */
+.editing-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .countdown-timer-btn {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
-  font-size: 0.85rem;
-  --color: var(--ion-color-medium);
+  font-size: 0.8rem;
+  --border-radius: 12px;
+  flex-shrink: 0;
 }
 
 .countdown-timer-btn.timer-warning {
-  --color: var(--ion-color-warning-shade);
   animation: pulse-warning 1s ease-in-out infinite;
 }
 
@@ -5672,9 +4794,9 @@ onUnmounted(() => {
 }
 
 .finish-edit-btn {
-  --border-radius: 8px;
+  --border-radius: 12px;
   font-weight: 600;
-  font-size: 0.8rem;
+  flex: 1;
 }
 
 /* Lock Indicator */
@@ -5891,10 +5013,6 @@ onUnmounted(() => {
   flex-direction: column;
   overflow: hidden;
   position: relative;
-}
-
-.slide-fullscreen.is-section {
-  background: linear-gradient(145deg, var(--ion-color-primary) 0%, var(--ion-color-primary-shade) 100%);
 }
 
 /* Lyrics Mode Slide */
@@ -6122,14 +5240,6 @@ onUnmounted(() => {
   color: rgba(255, 255, 255, 0.6);
 }
 
-.slide-fullscreen.is-section .slide-header {
-  background: rgba(0, 0, 0, 0.2);
-}
-
-.slide-fullscreen.is-section .slide-type-badge {
-  background: rgba(255, 255, 255, 0.2);
-}
-
 /* Song Header for Lyrics Mode */
 .slide-song-header {
   display: flex;
@@ -6305,10 +5415,6 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
-.slide-fullscreen.is-section .slide-footer {
-  background: rgba(0, 0, 0, 0.2);
-}
-
 .slide-participant, .slide-duration {
   display: flex;
   align-items: center;
@@ -6375,29 +5481,6 @@ onUnmounted(() => {
 
 .slide-progress-dot.viewed {
   background: rgba(255, 255, 255, 0.6);
-}
-
-.slide-progress-dot.is-section {
-  border-radius: 4px;
-  width: 18px;
-  height: 10px;
-}
-
-.slide-progress-dot.is-section.active {
-  width: 22px;
-  height: 12px;
-}
-
-.slide-progress-dot.is-subitem {
-  background: rgba(var(--ion-color-primary-rgb), 0.4);
-  width: 8px;
-  height: 8px;
-}
-
-.slide-progress-dot.is-subitem.active {
-  background: var(--ion-color-primary);
-  width: 12px;
-  height: 12px;
 }
 
 .slide-progress-dot.is-lyrics {
@@ -6936,21 +6019,4 @@ onUnmounted(() => {
   }
 }
 
-/* Sub-item expanded edit card */
-.sub-item-expanded-edit-card {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 10px 0 4px 0;
-  border-top: 1px solid var(--ion-color-light-shade);
-  margin-top: 6px;
-}
-
-.sub-item-expand-btn {
-  --color: var(--ion-color-medium);
-  --padding-start: 2px;
-  --padding-end: 2px;
-  min-width: 24px;
-  height: 24px;
-}
 </style>

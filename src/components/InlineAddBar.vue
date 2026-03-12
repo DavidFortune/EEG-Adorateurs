@@ -2,29 +2,7 @@
   <div class="inline-add-bar">
     <!-- Label -->
     <div class="add-bar-label">
-      {{ parentItemId ? 'Ajouter un sous-élément' : 'Ajouter un élément' }}
-    </div>
-
-    <!-- Type Icon Row -->
-    <div class="type-row">
-      <button
-        v-for="t in primaryTypes"
-        :key="t.value"
-        class="type-icon-btn"
-        :class="{ active: selectedType === t.value }"
-        @click="selectType(t.value)"
-        :title="t.label"
-      >
-        <ion-icon :icon="t.icon" />
-      </button>
-      <button
-        v-if="!parentItemId"
-        class="type-icon-btn section-btn"
-        @click="emit('addSection')"
-        title="Section"
-      >
-        <ion-icon :icon="removeOutline" />
-      </button>
+      Ajouter un élément
     </div>
 
     <!-- Title Input -->
@@ -33,7 +11,7 @@
         <ion-input
           ref="titleInputRef"
           v-model="titleText"
-          :placeholder="inputPlaceholder"
+          placeholder="Titre de l'élément..."
           class="title-input"
           @keydown.enter="handleEnter"
           @ionInput="handleTitleInput"
@@ -85,19 +63,6 @@
       </div>
     </div>
 
-    <!-- Scripture Reference (for Prédication) -->
-    <div v-if="isSermonType" class="input-row scripture-ref-input">
-      <div class="input-wrapper">
-        <ion-icon :icon="libraryOutline" class="field-icon" />
-        <ion-input
-          v-model="scriptureRef"
-          placeholder="Passage biblique (ex: Jean 3:16)..."
-          class="title-input"
-          @keydown.enter="handleScriptureEnter"
-        />
-      </div>
-    </div>
-
     <!-- Resource Selector Modal (for sticky create) -->
     <ResourceSelector
       v-model="pendingResourceId"
@@ -115,43 +80,26 @@
 import { ref, computed } from 'vue';
 import { IonInput, IonIcon, IonSpinner } from '@ionic/vue';
 import {
-  musicalNoteOutline, handLeftOutline, libraryOutline, micOutline,
-  arrowForwardOutline, sparklesOutline, addCircleOutline,
-  documentTextOutline, removeOutline
+  arrowForwardOutline, sparklesOutline, addCircleOutline
 } from 'ionicons/icons';
-import { ProgramItemType } from '@/types/program';
 import type { Resource } from '@/types/resource';
 import { getSmartSuggestions } from '@/utils/resource-suggestions';
 import ResourceSelector from '@/components/ResourceSelector.vue';
 
 interface Props {
-  parentItemId?: string | null;
   allResources: Resource[];
   serviceId: string;
 }
 
-const props = withDefaults(defineProps<Props>(), {
-  parentItemId: null
-});
+const props = defineProps<Props>();
 
 const emit = defineEmits<{
-  add: [data: { type: ProgramItemType | '', title: string, resourceId?: string, scriptureReference?: string }];
+  add: [data: { title: string, resourceId?: string }];
   linkResource: [itemId: string, resourceId: string];
-  addSection: [];
 }>();
 
-const primaryTypes = [
-  { value: ProgramItemType.TITLE, label: 'Titre', icon: documentTextOutline },
-  { value: ProgramItemType.SONG, label: 'Chant', icon: musicalNoteOutline },
-  { value: ProgramItemType.PRAYER, label: 'Prière', icon: handLeftOutline },
-  { value: ProgramItemType.SCRIPTURE, label: 'Lecture', icon: libraryOutline },
-  { value: ProgramItemType.SERMON, label: 'Prédication', icon: micOutline },
-];
-
 // State
-const selectedType = ref<ProgramItemType | ''>(ProgramItemType.TITLE);
 const titleText = ref('');
-const scriptureRef = ref('');
 const showSuggestions = ref(false);
 const searching = ref(false);
 const titleInputRef = ref<InstanceType<typeof IonInput> | null>(null);
@@ -164,58 +112,22 @@ const lastCreatedItemId = ref<string | null>(null);
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-const inputPlaceholder = computed(() => {
-  if (props.parentItemId) return 'Ajouter un sous-élément...';
-  if (selectedType.value === ProgramItemType.TITLE) return 'Titre de l\'élément...';
-  if (selectedType.value === ProgramItemType.SONG) return 'Titre du chant...';
-  if (selectedType.value === ProgramItemType.PRAYER) return 'Titre de la prière...';
-  if (selectedType.value === ProgramItemType.SCRIPTURE) return 'Référence biblique...';
-  if (selectedType.value === ProgramItemType.SERMON) return 'Titre de la prédication...';
-  return 'Titre de l\'élément...';
-});
-
 const suggestions = computed(() => {
   if (!titleText.value || titleText.value.length < 2) return [];
-  return getSmartSuggestions(selectedType.value || '', titleText.value, props.allResources);
+  return getSmartSuggestions('', titleText.value, props.allResources);
 });
-
-const selectType = (type: ProgramItemType) => {
-  selectedType.value = type;
-  if (type !== ProgramItemType.SONG) {
-    showSuggestions.value = false;
-  }
-  titleInputRef.value?.$el?.setFocus();
-};
 
 const handleEnter = () => {
   if (!titleText.value.trim()) return;
-  // For sermon, if title filled but scripture field empty, focus scripture field
-  if (isSermonType.value && !scriptureRef.value && titleText.value.trim()) {
-    setTimeout(() => {
-      const el = document.querySelector('.scripture-ref-input ion-input');
-      if (el) (el as any).setFocus();
-    }, 50);
-    return;
-  }
   showSuggestions.value = false;
-  const data: { type: ProgramItemType | '', title: string, scriptureReference?: string } = {
-    type: props.parentItemId ? selectedType.value : (selectedType.value || ProgramItemType.TITLE),
-    title: titleText.value.trim(),
-  };
-  if (isSermonType.value && scriptureRef.value.trim()) {
-    data.scriptureReference = scriptureRef.value.trim();
-  }
-  emit('add', data);
+  emit('add', { title: titleText.value.trim() });
   titleText.value = '';
-  scriptureRef.value = '';
-  // Re-focus after next tick
   setTimeout(() => titleInputRef.value?.$el?.setFocus(), 100);
 };
 
 const selectSuggestion = (resource: Resource) => {
   showSuggestions.value = false;
   emit('add', {
-    type: props.parentItemId ? selectedType.value : (selectedType.value || ProgramItemType.TITLE),
     title: resource.title,
     resourceId: resource.id,
   });
@@ -228,13 +140,8 @@ const handleCreateResource = () => {
   const title = titleText.value.trim();
   showSuggestions.value = false;
 
-  // Create the item first
-  emit('add', {
-    type: props.parentItemId ? selectedType.value : (selectedType.value || ProgramItemType.TITLE),
-    title,
-  });
+  emit('add', { title });
 
-  // Then open ResourceSelector in create mode
   pendingCreateTitle.value = title;
   titleText.value = '';
   showResourceSelector.value = true;
@@ -256,16 +163,9 @@ const setLastCreatedItemId = (id: string) => {
   lastCreatedItemId.value = id;
 };
 
-const isSongType = computed(() => selectedType.value === ProgramItemType.SONG);
-const isSermonType = computed(() => selectedType.value === ProgramItemType.SERMON);
-
-const handleScriptureEnter = () => {
-  handleEnter();
-};
-
 const handleTitleInput = () => {
   if (debounceTimer) clearTimeout(debounceTimer);
-  if (isSongType.value && titleText.value && titleText.value.length >= 2) {
+  if (titleText.value && titleText.value.length >= 2) {
     searching.value = true;
     debounceTimer = setTimeout(() => {
       showSuggestions.value = true;
@@ -280,14 +180,13 @@ const handleTitleInput = () => {
 const handleInputBlur = (event: CustomEvent<FocusEvent>) => {
   const relatedTarget = (event.detail?.relatedTarget ?? (event as any).relatedTarget) as HTMLElement | null;
   if (relatedTarget?.closest('.suggestions-dropdown')) return;
-  // Delay to allow click events on suggestions
   setTimeout(() => {
     showSuggestions.value = false;
   }, 200);
 };
 
 const handleInputFocus = () => {
-  if (isSongType.value && titleText.value && titleText.value.length >= 2) {
+  if (titleText.value && titleText.value.length >= 2) {
     showSuggestions.value = true;
   }
 };
@@ -312,68 +211,6 @@ defineExpose({ setLastCreatedItemId });
   margin-bottom: 8px;
 }
 
-.type-row {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 8px;
-  flex-wrap: wrap;
-}
-
-.type-row.secondary {
-  margin-top: 4px;
-}
-
-.type-icon-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 36px;
-  border-radius: 8px;
-  border: 1px solid var(--ion-color-light-shade);
-  background: var(--ion-background-color, #fff);
-  cursor: pointer;
-  transition: all 0.15s;
-  padding: 0;
-}
-
-.type-icon-btn ion-icon {
-  font-size: 18px;
-  color: var(--ion-color-medium);
-}
-
-.type-icon-btn.active {
-  border-color: var(--ion-color-primary);
-  background: var(--ion-color-primary-tint);
-}
-
-.type-icon-btn.active ion-icon {
-  color: var(--ion-color-primary);
-}
-
-.type-icon-btn.secondary {
-  width: auto;
-  padding: 0 10px;
-  gap: 4px;
-}
-
-.type-label {
-  font-size: 11px;
-  color: var(--ion-color-medium);
-}
-
-.type-icon-btn.secondary.active .type-label {
-  color: var(--ion-color-primary);
-}
-
-.section-btn {
-  border-style: dashed;
-}
-
-.more-btn ion-icon {
-  font-size: 16px;
-}
-
 .input-row {
   position: relative;
 }
@@ -386,17 +223,6 @@ defineExpose({ setLastCreatedItemId });
   border-radius: 8px;
   border: 1px solid var(--ion-color-light-shade);
   padding-right: 4px;
-}
-
-.field-icon {
-  margin-left: 12px;
-  color: var(--ion-color-medium);
-  font-size: 1.1rem;
-  flex-shrink: 0;
-}
-
-.scripture-ref-input {
-  margin-top: 6px;
 }
 
 .title-input {
@@ -495,19 +321,11 @@ defineExpose({ setLastCreatedItemId });
 
 /* Mobile optimizations */
 @media (max-width: 768px) {
-  /* Task 9.1: Increased vertical padding */
   .inline-add-bar {
     padding: 12px;
     padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   }
 
-  /* Task 9.2: Type selector touch targets */
-  .type-icon-btn {
-    width: 44px;
-    height: 44px;
-  }
-
-  /* Task 9.3: Text input minimum height */
   .title-input {
     min-height: 44px;
   }

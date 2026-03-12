@@ -486,9 +486,6 @@ const loadResources = async () => {
       const programResourceIds: string[] = [];
       program.value.items.forEach(item => {
         if (item.resourceId) programResourceIds.push(item.resourceId);
-        item.subItems?.forEach(sub => {
-          if (sub.resourceId) programResourceIds.push(sub.resourceId);
-        });
       });
 
       for (const id of programResourceIds) {

@@ -15,7 +15,7 @@ import {
   type Unsubscribe
 } from 'firebase/firestore';
 import { db } from './config';
-import type { ServiceProgram, ProgramSection, ProgramItem, EditLock, ProgramStatus } from '@/types/program';
+import type { ServiceProgram, ProgramItem, EditLock, ProgramStatus } from '@/types/program';
 
 export interface FirestoreProgram extends Omit<ServiceProgram, 'createdAt' | 'updatedAt' | 'publishedAt'> {
   createdAt: Timestamp;
@@ -28,6 +28,70 @@ export interface FirestoreProgram extends Omit<ServiceProgram, 'createdAt' | 'up
 }
 
 const PROGRAMS_COLLECTION = 'programs';
+
+/**
+ * Read-time migration: promote legacy sub-items to grouped items,
+ * convert Section-type items to group headers.
+ * Idempotent — safe to call on already-migrated data.
+ */
+const migrateProgram = (items: any[]): ProgramItem[] => {
+  const migrated: ProgramItem[] = [];
+
+  for (const item of items) {
+    // Convert Section-type items to group headers
+    const isSection = item.type === 'Section';
+    const hasSubItems = Array.isArray(item.subItems) && item.subItems.length > 0;
+
+    const migratedItem: ProgramItem = {
+      ...item,
+      isGroup: item.isGroup || isSection || hasSubItems || undefined,
+    };
+
+    // Remove subItems from the migrated item (promoted below)
+    delete migratedItem.subItems;
+
+    // Clean up: don't set isGroup to false/undefined noise
+    if (!migratedItem.isGroup) delete migratedItem.isGroup;
+
+    migrated.push(migratedItem);
+
+    // Promote sub-items to top-level items within the group
+    if (hasSubItems) {
+      const baseOrder = migratedItem.order;
+      for (let i = 0; i < item.subItems.length; i++) {
+        const sub = item.subItems[i];
+        const promotedItem: ProgramItem = {
+          id: sub.id,
+          order: baseOrder + 0.001 * (i + 1), // Place after parent, before next item
+          title: sub.title,
+          subtitle: sub.subtitle,
+          notes: sub.notes,
+          participants: sub.participants,
+          duration: sub.duration,
+          resourceId: sub.resourceId,
+          scriptureReference: sub.scriptureReference,
+          scriptureText: sub.scriptureText,
+          scriptureVersion: sub.scriptureVersion,
+          groupId: item.id,
+          type: sub.type, // Preserve legacy type
+        };
+        // Clean undefined values
+        Object.keys(promotedItem).forEach(key => {
+          if ((promotedItem as any)[key] === undefined) {
+            delete (promotedItem as any)[key];
+          }
+        });
+        migrated.push(promotedItem);
+      }
+    }
+  }
+
+  // Re-sort by order and re-index
+  migrated.sort((a, b) => a.order - b.order);
+  migrated.forEach((item, index) => { item.order = index; });
+
+  return migrated;
+};
 
 /**
  * Get program by service ID
@@ -58,6 +122,7 @@ export const getProgramByServiceId = async (serviceId: string): Promise<ServiceP
     return {
       ...data,
       id: doc.id,
+      items: migrateProgram(data.items || []),
       createdAt: data.createdAt.toDate(),
       updatedAt: data.updatedAt.toDate(),
       // Migration: derive status from legacy isDraft if status field is absent
@@ -107,6 +172,7 @@ export const subscribeToProgramByServiceId = (
       const program: ServiceProgram = {
         ...data,
         id: docSnapshot.id,
+        items: migrateProgram(data.items || []),
         createdAt: data.createdAt?.toDate() || new Date(),
         updatedAt: data.updatedAt?.toDate() || new Date(),
         // Migration: derive status from legacy isDraft if status field is absent
@@ -142,37 +208,16 @@ export const createProgram = async (
 
     console.log('Program ref created:', programRef.id);
 
-    // Generate IDs for items and their sub-items
-    const itemsWithIds = (program.items || []).map(item => {
-      const itemId = item.id || `item_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-
-      // Generate IDs for sub-items if they exist
-      const subItemsWithIds = (item.subItems || []).map(subItem => ({
-        ...subItem,
-        id: subItem.id || `subitem_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
-      }));
-
-      return {
-        ...item,
-        id: itemId,
-        subItems: subItemsWithIds.length > 0 ? subItemsWithIds : undefined,
-        // Remove sectionId for new flat structure
-        sectionId: undefined
-      };
-    });
-
-    console.log('Items with IDs:', itemsWithIds);
-
-    // Sections are now optional and deprecated
-    const sectionsWithIds = (program.sections || []).map(section => ({
-      ...section,
-      id: section.id || `section_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
+    // Generate IDs for items
+    const itemsWithIds = (program.items || []).map(item => ({
+      ...item,
+      id: item.id || `item_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
     }));
 
     const programData: any = {
       ...program,
       items: itemsWithIds,
-      sections: sectionsWithIds, // Keep for backward compatibility, but will be empty for new programs
+      sections: [], // Legacy field, kept empty for backward compatibility
       status: 'draft' as ProgramStatus, // New programs are drafts by default
       draftViewerIds: [userId], // Creator can always view their own draft
       createdAt: now,
@@ -241,111 +286,6 @@ export const deleteProgram = async (programId: string): Promise<void> => {
     await deleteDoc(programRef);
   } catch (error) {
     console.error('Error deleting program:', error);
-    throw error;
-  }
-};
-
-/**
- * Add section to program
- */
-export const addSectionToProgram = async (
-  programId: string, 
-  section: Omit<ProgramSection, 'id'>, 
-  userId: string
-): Promise<ProgramSection> => {
-  try {
-    const programRef = doc(db, PROGRAMS_COLLECTION, programId);
-    const programDoc = await getDoc(programRef);
-    
-    if (!programDoc.exists()) {
-      throw new Error('Program not found');
-    }
-    
-    const programData = programDoc.data() as FirestoreProgram;
-    const newSection: ProgramSection = {
-      ...section,
-      id: `section_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
-    };
-    
-    const updatedSections = [...programData.sections, newSection];
-    
-    await updateDoc(programRef, {
-      sections: updatedSections,
-      updatedAt: serverTimestamp(),
-      updatedBy: userId
-    });
-    
-    return newSection;
-  } catch (error) {
-    console.error('Error adding section:', error);
-    throw error;
-  }
-};
-
-/**
- * Update section in program
- */
-export const updateSectionInProgram = async (
-  programId: string, 
-  sectionId: string, 
-  updates: Partial<Omit<ProgramSection, 'id'>>,
-  userId: string
-): Promise<void> => {
-  try {
-    const programRef = doc(db, PROGRAMS_COLLECTION, programId);
-    const programDoc = await getDoc(programRef);
-    
-    if (!programDoc.exists()) {
-      throw new Error('Program not found');
-    }
-    
-    const programData = programDoc.data() as FirestoreProgram;
-    const updatedSections = programData.sections.map(section => 
-      section.id === sectionId 
-        ? { ...section, ...updates }
-        : section
-    );
-    
-    await updateDoc(programRef, {
-      sections: updatedSections,
-      updatedAt: serverTimestamp(),
-      updatedBy: userId
-    });
-  } catch (error) {
-    console.error('Error updating section:', error);
-    throw error;
-  }
-};
-
-/**
- * Delete section from program
- */
-export const deleteSectionFromProgram = async (
-  programId: string, 
-  sectionId: string, 
-  userId: string
-): Promise<void> => {
-  try {
-    const programRef = doc(db, PROGRAMS_COLLECTION, programId);
-    const programDoc = await getDoc(programRef);
-    
-    if (!programDoc.exists()) {
-      throw new Error('Program not found');
-    }
-    
-    const programData = programDoc.data() as FirestoreProgram;
-    const updatedSections = programData.sections.filter(section => section.id !== sectionId);
-    // Also remove all items from this section
-    const updatedItems = programData.items.filter(item => item.sectionId !== sectionId);
-    
-    await updateDoc(programRef, {
-      sections: updatedSections,
-      items: updatedItems,
-      updatedAt: serverTimestamp(),
-      updatedBy: userId
-    });
-  } catch (error) {
-    console.error('Error deleting section:', error);
     throw error;
   }
 };
@@ -456,8 +396,21 @@ export const deleteItemFromProgram = async (
     }
     
     const programData = programDoc.data() as FirestoreProgram;
-    const updatedItems = programData.items.filter(item => item.id !== itemId);
-    
+    const deletedItem = programData.items.find(item => item.id === itemId);
+
+    let updatedItems = programData.items.filter(item => item.id !== itemId);
+
+    // If deleting a group, ungroup its children (remove groupId)
+    if (deletedItem?.isGroup) {
+      updatedItems = updatedItems.map(item =>
+        item.groupId === itemId ? { ...item, groupId: undefined } : item
+      );
+      // Clean undefined groupId values for Firestore
+      updatedItems.forEach(item => {
+        if (item.groupId === undefined) delete (item as any).groupId;
+      });
+    }
+
     await updateDoc(programRef, {
       items: updatedItems,
       updatedAt: serverTimestamp(),
@@ -474,7 +427,6 @@ export const deleteItemFromProgram = async (
  */
 export const updateProgramOrder = async (
   programId: string,
-  sections: ProgramSection[],
   items: ProgramItem[],
   userId: string
 ): Promise<void> => {
@@ -482,7 +434,6 @@ export const updateProgramOrder = async (
     const programRef = doc(db, PROGRAMS_COLLECTION, programId);
 
     await updateDoc(programRef, {
-      sections,
       items,
       updatedAt: serverTimestamp(),
       updatedBy: userId
@@ -494,14 +445,14 @@ export const updateProgramOrder = async (
 };
 
 /**
- * Add sub-item to a program item
+ * Create a group header item
  */
-export const addSubItemToItem = async (
+export const createGroupItem = async (
   programId: string,
-  itemId: string,
-  subItem: Omit<import('@/types/program').ProgramSubItem, 'id'>,
+  title: string,
+  order: number,
   userId: string
-): Promise<import('@/types/program').ProgramSubItem> => {
+): Promise<ProgramItem> => {
   try {
     const programRef = doc(db, PROGRAMS_COLLECTION, programId);
     const programDoc = await getDoc(programRef);
@@ -511,20 +462,14 @@ export const addSubItemToItem = async (
     }
 
     const programData = programDoc.data() as FirestoreProgram;
-    const newSubItem: import('@/types/program').ProgramSubItem = {
-      ...subItem,
-      id: `subitem_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
+    const newGroup: ProgramItem = {
+      id: `group_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+      order,
+      title,
+      isGroup: true,
     };
 
-    const updatedItems = programData.items.map(item => {
-      if (item.id === itemId) {
-        return {
-          ...item,
-          subItems: [...(item.subItems || []), newSubItem]
-        };
-      }
-      return item;
-    });
+    const updatedItems = [...programData.items, newGroup];
 
     await updateDoc(programRef, {
       items: updatedItems,
@@ -532,94 +477,9 @@ export const addSubItemToItem = async (
       updatedBy: userId
     });
 
-    return newSubItem;
+    return newGroup;
   } catch (error) {
-    console.error('Error adding sub-item:', error);
-    throw error;
-  }
-};
-
-/**
- * Update sub-item in a program item
- */
-export const updateSubItemInItem = async (
-  programId: string,
-  itemId: string,
-  subItemId: string,
-  updates: Partial<Omit<import('@/types/program').ProgramSubItem, 'id'>>,
-  userId: string
-): Promise<void> => {
-  try {
-    const programRef = doc(db, PROGRAMS_COLLECTION, programId);
-    const programDoc = await getDoc(programRef);
-
-    if (!programDoc.exists()) {
-      throw new Error('Program not found');
-    }
-
-    const programData = programDoc.data() as FirestoreProgram;
-
-    const updatedItems = programData.items.map(item => {
-      if (item.id === itemId) {
-        return {
-          ...item,
-          subItems: (item.subItems || []).map(subItem =>
-            subItem.id === subItemId
-              ? { ...subItem, ...updates }
-              : subItem
-          )
-        };
-      }
-      return item;
-    });
-
-    await updateDoc(programRef, {
-      items: updatedItems,
-      updatedAt: serverTimestamp(),
-      updatedBy: userId
-    });
-  } catch (error) {
-    console.error('Error updating sub-item:', error);
-    throw error;
-  }
-};
-
-/**
- * Delete sub-item from a program item
- */
-export const deleteSubItemFromItem = async (
-  programId: string,
-  itemId: string,
-  subItemId: string,
-  userId: string
-): Promise<void> => {
-  try {
-    const programRef = doc(db, PROGRAMS_COLLECTION, programId);
-    const programDoc = await getDoc(programRef);
-
-    if (!programDoc.exists()) {
-      throw new Error('Program not found');
-    }
-
-    const programData = programDoc.data() as FirestoreProgram;
-
-    const updatedItems = programData.items.map(item => {
-      if (item.id === itemId) {
-        return {
-          ...item,
-          subItems: (item.subItems || []).filter(subItem => subItem.id !== subItemId)
-        };
-      }
-      return item;
-    });
-
-    await updateDoc(programRef, {
-      items: updatedItems,
-      updatedAt: serverTimestamp(),
-      updatedBy: userId
-    });
-  } catch (error) {
-    console.error('Error deleting sub-item:', error);
+    console.error('Error creating group:', error);
     throw error;
   }
 };
