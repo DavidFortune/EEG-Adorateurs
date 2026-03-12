@@ -82,28 +82,6 @@
         </div>
       </div>
 
-      <!-- "Modifier le programme" Button (admin, published, not editing, not locked) -->
-      <div v-if="isAdmin && program && isPublished && !isEditing && !isLockedByOther" class="edit-mode-controls">
-        <ion-button @click="enterEditMode" fill="solid" color="primary" expand="block" class="enter-edit-btn">
-          <ion-icon :icon="pencilOutline" slot="start" />
-          Modifier le programme
-        </ion-button>
-      </div>
-
-      <!-- Lock Indicator (another user is editing, published only) -->
-      <div v-if="isPublished && isLockedByOther && lockHolder" class="lock-indicator">
-        <div class="lock-indicator-content">
-          <ion-icon :icon="lockClosedOutline" class="lock-indicator-icon" />
-          <div class="lock-indicator-text">
-            <strong>{{ lockHolder.userName }}</strong> est en train de modifier ce programme
-          </div>
-        </div>
-        <ion-button v-if="isAdmin" @click="forceEnterEditMode" fill="outline" color="warning" size="small">
-          <ion-icon :icon="handRightOutline" slot="start" />
-          Prendre le contrôle
-        </ion-button>
-      </div>
-
       <!-- Access Denied Message (Non-Admin, Not in Viewers) -->
       <div v-if="program && !canViewProgram" class="access-denied">
         <ion-card>
@@ -115,9 +93,29 @@
         </ion-card>
       </div>
 
-
-
       <div v-if="canViewProgram || !program" class="content-container">
+        <!-- "Modifier le programme" Button (admin, published, not editing, not locked) -->
+        <div v-if="isAdmin && program && isPublished && !isEditing && !isLockedByOther" class="edit-mode-controls">
+          <ion-button @click="enterEditMode" fill="solid" color="primary" expand="block" class="enter-edit-btn">
+            <ion-icon :icon="pencilOutline" slot="start" />
+            Modifier le programme
+          </ion-button>
+        </div>
+
+        <!-- Lock Indicator (another user is editing, published only) -->
+        <div v-if="isPublished && isLockedByOther && lockHolder" class="lock-indicator">
+          <div class="lock-indicator-content">
+            <ion-icon :icon="lockClosedOutline" class="lock-indicator-icon" />
+            <div class="lock-indicator-text">
+              <strong>{{ lockHolder.userName }}</strong> est en train de modifier ce programme
+            </div>
+          </div>
+          <ion-button v-if="isAdmin" @click="forceEnterEditMode" fill="outline" color="warning" size="small">
+            <ion-icon :icon="handRightOutline" slot="start" />
+            Prendre le contrôle
+          </ion-button>
+        </div>
+
         <!-- Program Summary -->
         <div v-if="program" class="program-summary">
           <div class="summary-stats">
@@ -178,10 +176,30 @@
         <!-- Program Items (Flat List) -->
         <div v-if="program && program.items.length > 0" class="program-content">
           <div class="flat-items-view">
-            <ion-reorder-group :disabled="!isEditing" @ionItemReorder="handleItemReorder">
+            <ion-reorder-group :disabled="!isEditing" @ionItemReorder="(e) => { collapseAllEditExpanded(); handleItemReorder(e); }">
+              <template v-for="(item, index) in sortedItems" :key="item.id">
+              <!-- Inter-item add zone (between items, edit mode only) -->
+              <div
+                v-if="isEditing && index > 0"
+                class="inter-item-add-zone"
+                :class="{ active: activeAddZoneIndex === index }"
+                @click.stop="toggleAddZone(index)"
+              >
+                <div v-if="activeAddZoneIndex !== index" class="add-zone-trigger">
+                  <ion-icon :icon="addOutline" />
+                </div>
+                <div v-else class="add-zone-options">
+                  <button class="add-zone-btn" @click.stop="addItemAtPosition(index)">
+                    <ion-icon :icon="addOutline" />
+                    Élément
+                  </button>
+                  <button class="add-zone-btn" @click.stop="addSectionAtPosition(index)">
+                    <ion-icon :icon="removeOutline" />
+                    Section
+                  </button>
+                </div>
+              </div>
               <ion-item
-                v-for="(item, index) in sortedItems"
-                :key="item.id"
                 lines="none"
                 class="program-item-wrapper"
                 :class="{ 'has-subitems': hasSubItems(item), 'expanded': isItemExpanded(item.id), 'is-section': isSectionItem(item) }"
@@ -401,8 +419,164 @@
 
                 </div>
 
+                <!-- Expanded Edit Card (inline editing of all fields) -->
+                <div v-if="isEditing && isEditExpanded(item.id) && !isSectionItem(item)" class="expanded-edit-card">
+                  <!-- Title -->
+                  <div class="expanded-field">
+                    <label class="expanded-field-label">Titre</label>
+                    <ion-input
+                      :value="item.resourceId && getLinkedResource(item.resourceId) ? getLinkedResource(item.resourceId)?.title : item.title"
+                      placeholder="Titre..."
+                      class="expanded-field-input"
+                      @ionBlur="inlineUpdateTitle(item.id, ($event.target as HTMLIonInputElement).value as string || item.title)"
+                    />
+                  </div>
+
+                  <!-- Subtitle -->
+                  <div class="expanded-field">
+                    <label class="expanded-field-label">Sous-titre</label>
+                    <ion-input
+                      :value="item.subtitle || ''"
+                      placeholder="Sous-titre..."
+                      class="expanded-field-input"
+                      @ionBlur="saveInlineSubtitle(item.id, ($event.target as HTMLIonInputElement).value as string)"
+                    />
+                  </div>
+
+                  <!-- Participants -->
+                  <div class="expanded-field">
+                    <label class="expanded-field-label">Participants</label>
+                    <ParticipantSelector
+                      :participants="item.participants || []"
+                      @update:participants="(val) => inlineUpdateParticipants(item.id, val)"
+                      :service-id="serviceId"
+                      :multiple="true"
+                    />
+                  </div>
+
+                  <!-- Duration -->
+                  <div class="expanded-field">
+                    <label class="expanded-field-label">Durée (min)</label>
+                    <DurationStepper
+                      :model-value="item.duration || 0"
+                      @update:model-value="(val) => inlineUpdateDuration(item.id, val)"
+                    />
+                  </div>
+
+                  <!-- Resource Link -->
+                  <div class="expanded-field expanded-field-full">
+                    <label class="expanded-field-label">Ressource</label>
+                    <div v-if="item.resourceId && getLinkedResource(item.resourceId)" class="expanded-resource-card">
+                      <span class="expanded-resource-title">{{ getLinkedResource(item.resourceId)?.title }}</span>
+                      <div class="expanded-resource-actions">
+                        <ion-button size="small" fill="outline" @click="openExpandedResourceSelector(item.id)">Changer</ion-button>
+                        <ion-button size="small" fill="outline" color="danger" @click="quickUnlinkResource(item.id)">Délier</ion-button>
+                      </div>
+                    </div>
+                    <ion-button v-else fill="outline" size="small" @click="openExpandedResourceSelector(item.id)">
+                      <ion-icon :icon="addOutline" slot="start" />
+                      Lier une ressource
+                    </ion-button>
+                  </div>
+
+                  <!-- Scripture (tucked) -->
+                  <div class="expanded-field tucked-section">
+                    <button class="tucked-toggle" @click="toggleTuckedSection(item.id, 'scripture')">
+                      <ion-icon :icon="isTuckedOpen(item.id, 'scripture') ? chevronDownOutline : chevronForwardOutline" />
+                      <span>Passage biblique</span>
+                      <span v-if="item.scriptureReference" class="tucked-badge">{{ item.scriptureReference }}</span>
+                    </button>
+                    <div v-if="isTuckedOpen(item.id, 'scripture')" class="tucked-content">
+                      <div class="scripture-input-row">
+                        <ion-input
+                          :value="item.scriptureReference || ''"
+                          placeholder="Ex: Jean 3:16-18"
+                          class="expanded-field-input"
+                          @ionBlur="inlineUpdateField(item.id, 'scriptureReference', ($event.target as HTMLIonInputElement).value as string)"
+                        />
+                        <ion-button
+                          size="small"
+                          fill="outline"
+                          @click="fetchScriptureForItem(item.id, item.scriptureReference || '')"
+                          :disabled="!item.scriptureReference"
+                        >
+                          <ion-icon :icon="searchOutline" slot="icon-only" />
+                        </ion-button>
+                      </div>
+                      <div v-if="item.scriptureText" class="expanded-scripture-preview">
+                        <div class="expanded-scripture-header">
+                          <span class="expanded-scripture-ref">{{ item.scriptureReference }}</span>
+                          <span class="expanded-scripture-version">{{ item.scriptureVersion || 'LSG' }}</span>
+                        </div>
+                        <div class="expanded-scripture-text" v-html="formatScriptureWithSuperscript(item.scriptureText)"></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Type Change (tucked) -->
+                  <div class="expanded-field tucked-section">
+                    <button class="tucked-toggle" @click="toggleTuckedSection(item.id, 'type')">
+                      <ion-icon :icon="isTuckedOpen(item.id, 'type') ? chevronDownOutline : chevronForwardOutline" />
+                      <span>Changer le type</span>
+                      <span class="tucked-badge">
+                        <ion-icon :icon="getItemIcon(item.type)" />
+                        {{ item.type }}
+                      </span>
+                    </button>
+                    <div v-if="isTuckedOpen(item.id, 'type')" class="tucked-content">
+                      <div class="expanded-type-grid">
+                        <button
+                          v-for="t in expandedTypeOptions"
+                          :key="t.value"
+                          class="expanded-type-btn"
+                          :class="{ active: item.type === t.value }"
+                          @click="inlineUpdateField(item.id, 'type', t.value)"
+                        >
+                          <ion-icon :icon="t.icon" />
+                          <span>{{ t.label }}</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Notes -->
+                  <div class="expanded-field expanded-field-full">
+                    <label class="expanded-field-label">Notes</label>
+                    <textarea
+                      :value="item.notes || ''"
+                      placeholder="Notes..."
+                      class="expanded-notes-textarea"
+                      rows="2"
+                      @blur="saveInlineNotes(item.id, ($event.target as HTMLTextAreaElement).value)"
+                    ></textarea>
+                  </div>
+
+                  <!-- Actions row -->
+                  <div class="expanded-actions-row">
+                    <ion-button
+                      v-if="canHaveSubItems(item)"
+                      fill="outline"
+                      size="small"
+                      color="success"
+                      @click="expandedAddSubItem(item.id)"
+                    >
+                      <ion-icon :icon="addOutline" slot="start" />
+                      Sous-élément
+                    </ion-button>
+                    <ion-button
+                      fill="outline"
+                      size="small"
+                      color="danger"
+                      @click="deleteItem(item.id)"
+                    >
+                      <ion-icon :icon="trashOutline" slot="start" />
+                      Supprimer
+                    </ion-button>
+                  </div>
+                </div>
+
                 <!-- Sub-Items (Expanded) -->
-                <div v-if="hasSubItems(item) && isItemExpanded(item.id)" class="sub-items-container">
+                <div v-if="(hasSubItems(item) && isItemExpanded(item.id)) || (isEditing && isEditExpanded(item.id) && canHaveSubItems(item))" class="sub-items-container">
                   <ion-reorder-group :disabled="!isEditing" @ionItemReorder="(e) => handleSubItemReorder(e, item.id)">
                     <div
                       v-for="subItem in getSortedSubItems(item)"
@@ -461,16 +635,95 @@
                           </div>
                         </div>
 
-                        <!-- 3-dot Action Menu for Sub-Item -->
+                        <!-- Expand/Collapse chevron for Sub-Item -->
                         <ion-button
                           v-if="isEditing"
                           fill="clear"
                           size="small"
-                          class="sub-item-action-menu-btn"
-                          @click.stop="openSubItemActionPopover($event, item.id, subItem)"
+                          class="sub-item-expand-btn"
+                          @click.stop="toggleEditExpansion(subItem.id)"
                         >
-                          <ion-icon :icon="ellipsisVertical" slot="icon-only" />
+                          <ion-icon :icon="isEditExpanded(subItem.id) ? chevronUpOutline : chevronDownOutline" slot="icon-only" />
                         </ion-button>
+                      </div>
+
+                      <!-- Sub-Item Expanded Edit Card -->
+                      <div v-if="isEditing && isEditExpanded(subItem.id)" class="sub-item-expanded-edit-card">
+                        <div class="expanded-field">
+                          <label class="expanded-field-label">Titre</label>
+                          <ion-input
+                            :value="subItem.resourceId && getLinkedResource(subItem.resourceId) ? getLinkedResource(subItem.resourceId)?.title : subItem.title"
+                            placeholder="Titre..."
+                            class="expanded-field-input"
+                            @ionBlur="inlineUpdateSubItemField(item.id, subItem.id, 'title', ($event.target as HTMLIonInputElement).value as string || subItem.title)"
+                          />
+                        </div>
+                        <div class="expanded-field">
+                          <label class="expanded-field-label">Participants</label>
+                          <ParticipantSelector
+                            :participants="subItem.participants || []"
+                            @update:participants="(val) => inlineUpdateSubItemField(item.id, subItem.id, 'participants', val)"
+                            :service-id="serviceId"
+                            :multiple="true"
+                          />
+                        </div>
+                        <div class="expanded-field">
+                          <label class="expanded-field-label">Durée (min)</label>
+                          <DurationStepper
+                            :model-value="subItem.duration || 0"
+                            @update:model-value="(val) => inlineUpdateSubItemField(item.id, subItem.id, 'duration', val)"
+                          />
+                        </div>
+                        <div class="expanded-field">
+                          <label class="expanded-field-label">Notes</label>
+                          <textarea
+                            :value="subItem.notes || ''"
+                            placeholder="Notes..."
+                            class="expanded-notes-textarea"
+                            rows="2"
+                            @blur="inlineUpdateSubItemField(item.id, subItem.id, 'notes', ($event.target as HTMLTextAreaElement).value)"
+                          ></textarea>
+                        </div>
+                        <!-- Scripture (tucked) -->
+                        <div class="expanded-field tucked-section">
+                          <button class="tucked-toggle" @click="toggleTuckedSection(subItem.id, 'scripture')">
+                            <ion-icon :icon="isTuckedOpen(subItem.id, 'scripture') ? chevronDownOutline : chevronForwardOutline" />
+                            <span>Passage biblique</span>
+                            <span v-if="subItem.scriptureReference" class="tucked-badge">{{ subItem.scriptureReference }}</span>
+                          </button>
+                          <div v-if="isTuckedOpen(subItem.id, 'scripture')" class="tucked-content">
+                            <div class="scripture-input-row">
+                              <ion-input
+                                :value="subItem.scriptureReference || ''"
+                                placeholder="Ex: Jean 3:16-18"
+                                class="expanded-field-input"
+                                @ionBlur="inlineUpdateSubItemField(item.id, subItem.id, 'scriptureReference', ($event.target as HTMLIonInputElement).value as string)"
+                              />
+                              <ion-button
+                                size="small"
+                                fill="outline"
+                                @click="fetchScriptureForSubItem(item.id, subItem.id, subItem.scriptureReference || '')"
+                                :disabled="!subItem.scriptureReference"
+                              >
+                                <ion-icon :icon="searchOutline" slot="icon-only" />
+                              </ion-button>
+                            </div>
+                            <div v-if="subItem.scriptureText" class="expanded-scripture-preview">
+                              <div class="expanded-scripture-header">
+                                <span class="expanded-scripture-ref">{{ subItem.scriptureReference }}</span>
+                                <span class="expanded-scripture-version">{{ subItem.scriptureVersion || 'LSG' }}</span>
+                              </div>
+                              <div class="expanded-scripture-text" v-html="formatScriptureWithSuperscript(subItem.scriptureText)"></div>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="expanded-actions-row">
+                          <div></div>
+                          <ion-button fill="outline" size="small" color="danger" @click="deleteSubItem(item.id, subItem.id)">
+                            <ion-icon :icon="trashOutline" slot="start" />
+                            Supprimer
+                          </ion-button>
+                        </div>
                       </div>
                     </div>
                   </ion-reorder-group>
@@ -487,21 +740,23 @@
                   />
                 </div>
               </div>
-              <!-- End Slot: Action Menu + Reorder Handle -->
+              <!-- Start Slot: Reorder Handle -->
+              <ion-reorder slot="start">
+                <ion-icon :icon="reorderThreeOutline" class="drag-handle-icon" />
+              </ion-reorder>
+              <!-- End Slot: Expand/Collapse Chevron -->
               <ion-button
                 v-if="isEditing"
                 slot="end"
                 fill="clear"
                 size="small"
-                class="item-action-menu-btn"
-                @click.stop="openItemActionPopover($event, item)"
+                class="item-expand-btn"
+                @click.stop="toggleEditExpansion(item.id)"
               >
-                <ion-icon :icon="ellipsisVertical" slot="icon-only" />
+                <ion-icon :icon="isEditExpanded(item.id) ? chevronUpOutline : chevronDownOutline" slot="icon-only" />
               </ion-button>
-              <ion-reorder slot="end">
-                <ion-icon :icon="reorderThreeOutline" class="drag-handle-icon" />
-              </ion-reorder>
               </ion-item>
+              </template>
             </ion-reorder-group>
           </div>
 
@@ -518,45 +773,6 @@
           @add-section="handleAddSectionAtEnd"
         />
       </div>
-
-      <!-- Action Popover (3-dot menu) -->
-      <ion-popover
-        :is-open="actionPopoverOpen"
-        :event="actionPopoverEvent"
-        @didDismiss="closeActionPopover"
-        class="action-popover"
-      >
-        <!-- Item Actions -->
-        <ion-list v-if="actionPopoverItem" lines="none">
-          <ion-item button @click="handleItemAction('edit')">
-            <ion-icon :icon="createOutline" slot="start" color="primary" />
-            <ion-label>Modifier</ion-label>
-          </ion-item>
-          <ion-item v-if="actionPopoverItem && canHaveSubItems(actionPopoverItem)" button @click="handleItemAction('add-sub')">
-            <ion-icon :icon="addOutline" slot="start" color="success" />
-            <ion-label>Ajouter un sous-élément</ion-label>
-          </ion-item>
-          <ion-item v-if="actionPopoverItem && !isSectionItem(actionPopoverItem)" button @click="handleItemAction('add-section')">
-            <ion-icon :icon="removeOutline" slot="start" color="medium" />
-            <ion-label>Ajouter une section</ion-label>
-          </ion-item>
-          <ion-item button @click="handleItemAction('delete')">
-            <ion-icon :icon="trashOutline" slot="start" color="danger" />
-            <ion-label color="danger">Supprimer</ion-label>
-          </ion-item>
-        </ion-list>
-        <!-- Sub-Item Actions -->
-        <ion-list v-else-if="actionPopoverSubItem" lines="none">
-          <ion-item button @click="handleSubItemAction('edit')">
-            <ion-icon :icon="createOutline" slot="start" color="primary" />
-            <ion-label>Modifier</ion-label>
-          </ion-item>
-          <ion-item button @click="handleSubItemAction('delete')">
-            <ion-icon :icon="trashOutline" slot="start" color="danger" />
-            <ion-label color="danger">Supprimer</ion-label>
-          </ion-item>
-        </ion-list>
-      </ion-popover>
 
       <!-- Duration Popover -->
       <ion-popover
@@ -614,18 +830,6 @@
         </ion-content>
       </ion-modal>
 
-      <!-- Item Detail Bottom Sheet -->
-      <ItemDetailSheet
-        :is-open="detailSheetOpen"
-        :item="detailSheetItem"
-        :parent-item-id="detailSheetParentItemId"
-        :service-id="serviceId"
-        :linked-resources="linkedResources"
-        @dismiss="closeDetailSheet"
-        @update-field="handleDetailSheetUpdateField"
-        @delete="handleDetailSheetDelete"
-        @add-sub-item="handleDetailSheetAddSubItem"
-      />
       <!-- Media Modal (for displaying lyrics, videos, etc.) -->
       <ion-modal :is-open="showMediaModalState" @ionModalDidDismiss="closeMediaModal" class="media-modal fullscreen-modal">
         <ion-header>
@@ -1312,6 +1516,14 @@
         @update:is-open="(val) => { if (!val) closeFullResourceSelector(); }"
         @update:model-value="handleInlineResourceSelect"
       />
+
+      <!-- Expanded Card Resource Selector -->
+      <ResourceSelector
+        :modal-only="true"
+        :is-open="showExpandedResourceSelector"
+        @update:is-open="(val) => { if (!val) { showExpandedResourceSelector = false; expandedResourceSelectorItemId = null; } }"
+        @update:model-value="handleExpandedResourceSelect"
+      />
     </ion-content>
   </ion-page>
 </template>
@@ -1337,11 +1549,11 @@ import {
   chatboxEllipsesOutline, chevronDownOutline, chevronForwardOutline,
   logoYoutube, playBackOutline, playForwardOutline,
   removeOutline, bookOutline, copyOutline,
-  lockClosedOutline, peopleOutline, checkmarkCircleOutline,
+  lockClosedOutline, peopleOutline, checkmarkCircleOutline, chevronUpOutline,
   easelOutline, downloadOutline, checkmarkOutline, timerOutline,
   pencilOutline, handRightOutline,
   closeCircleOutline,
-  ellipsisVertical,
+  searchOutline,
   personAddOutline,
   textOutline,
   chatbubbleOutline
@@ -1351,7 +1563,6 @@ import ResourceBottomSheet from '@/components/ResourceBottomSheet.vue';
 import ParticipantSelector from '@/components/ParticipantSelector.vue';
 import SendProgramSMSModal from '@/components/SendProgramSMSModal.vue';
 import InlineAddBar from '@/components/InlineAddBar.vue';
-import ItemDetailSheet from '@/components/ItemDetailSheet.vue';
 import DurationStepper from '@/components/DurationStepper.vue';
 import { useProgramItems } from '@/composables/useProgramItems';
 import { serviceService } from '@/services/serviceService';
@@ -1404,6 +1615,175 @@ const editProgramForm = ref({
 });
 
 const expandedItems = ref<Set<string>>(new Set());
+
+// Expand/collapse for inline editing (expandable item cards)
+const expandedEditItemIds = ref<Set<string>>(new Set());
+
+const isMobileScreen = () => window.innerWidth < 768;
+
+const toggleEditExpansion = (itemId: string) => {
+  if (expandedEditItemIds.value.has(itemId)) {
+    expandedEditItemIds.value.delete(itemId);
+  } else {
+    // On mobile: auto-collapse others (single expand)
+    if (isMobileScreen()) {
+      expandedEditItemIds.value.clear();
+    }
+    expandedEditItemIds.value.add(itemId);
+  }
+  // Trigger reactivity
+  expandedEditItemIds.value = new Set(expandedEditItemIds.value);
+};
+
+const isEditExpanded = (itemId: string) => expandedEditItemIds.value.has(itemId);
+
+const collapseAllEditExpanded = () => {
+  expandedEditItemIds.value = new Set();
+};
+
+// Tucked sections state (scripture, type within expanded cards)
+const tuckedSections = ref<Map<string, Set<string>>>(new Map());
+
+const toggleTuckedSection = (itemId: string, section: string) => {
+  if (!tuckedSections.value.has(itemId)) {
+    tuckedSections.value.set(itemId, new Set());
+  }
+  const sections = tuckedSections.value.get(itemId)!;
+  if (sections.has(section)) {
+    sections.delete(section);
+  } else {
+    sections.add(section);
+  }
+  tuckedSections.value = new Map(tuckedSections.value);
+};
+
+const isTuckedOpen = (itemId: string, section: string) => {
+  return tuckedSections.value.get(itemId)?.has(section) ?? false;
+};
+
+// Type options for expanded card
+const expandedTypeOptions = [
+  { value: ProgramItemType.SONG, label: 'Chant', icon: musicalNoteOutline },
+  { value: ProgramItemType.PRAYER, label: 'Prière', icon: handLeftOutline },
+  { value: ProgramItemType.SCRIPTURE, label: 'Lecture', icon: libraryOutline },
+  { value: ProgramItemType.SERMON, label: 'Prédication', icon: micOutline },
+  { value: ProgramItemType.TITLE, label: 'Titre', icon: documentTextOutline },
+  { value: 'Annonce' as ProgramItemType, label: 'Annonce', icon: megaphoneOutline },
+  { value: 'Offrande' as ProgramItemType, label: 'Offrande', icon: giftOutline },
+  { value: 'Bénédiction' as ProgramItemType, label: 'Bénédiction', icon: handLeftOutline },
+  { value: 'Autre' as ProgramItemType, label: 'Autre', icon: documentTextOutline },
+];
+
+// Scripture fetch for expanded card
+const fetchScriptureForItem = async (itemId: string, reference: string) => {
+  if (!reference) return;
+  try {
+    const result = await bibleService.getScripture(reference);
+    if (!result) {
+      showToast('Référence biblique non reconnue', 'warning');
+      return;
+    }
+    await inlineUpdateField(itemId, 'scriptureReference', result.reference);
+    await inlineUpdateField(itemId, 'scriptureText', result.text);
+    await inlineUpdateField(itemId, 'scriptureVersion', result.version);
+  } catch (error) {
+    console.error('Error fetching scripture:', error);
+    showToast('Erreur lors de la récupération des versets', 'danger');
+  }
+};
+
+// Scripture fetch for sub-item expanded card
+const fetchScriptureForSubItem = async (parentId: string, subItemId: string, reference: string) => {
+  if (!reference) return;
+  try {
+    const result = await bibleService.getScripture(reference);
+    if (!result) {
+      showToast('Référence biblique non reconnue', 'warning');
+      return;
+    }
+    await inlineUpdateSubItemField(parentId, subItemId, 'scriptureReference', result.reference);
+    await inlineUpdateSubItemField(parentId, subItemId, 'scriptureText', result.text);
+    await inlineUpdateSubItemField(parentId, subItemId, 'scriptureVersion', result.version);
+  } catch (error) {
+    console.error('Error fetching scripture:', error);
+    showToast('Erreur lors de la récupération des versets', 'danger');
+  }
+};
+
+// Resource selector for expanded card
+const expandedResourceSelectorItemId = ref<string | null>(null);
+const showExpandedResourceSelector = ref(false);
+
+const openExpandedResourceSelector = (itemId: string) => {
+  expandedResourceSelectorItemId.value = itemId;
+  showExpandedResourceSelector.value = true;
+};
+
+const handleExpandedResourceSelect = async (resourceId: string | null) => {
+  if (expandedResourceSelectorItemId.value && resourceId) {
+    await inlineUpdateField(expandedResourceSelectorItemId.value, 'resourceId', resourceId);
+    subscribeToLinkedResource(resourceId);
+  }
+  showExpandedResourceSelector.value = false;
+  expandedResourceSelectorItemId.value = null;
+};
+
+// Inter-item add zone
+const activeAddZoneIndex = ref<number | null>(null);
+
+const toggleAddZone = (index: number) => {
+  activeAddZoneIndex.value = activeAddZoneIndex.value === index ? null : index;
+};
+
+const addItemAtPosition = async (index: number) => {
+  activeAddZoneIndex.value = null;
+  if (!program.value || !user.value) return;
+  const sorted = sortedItems.value;
+  const insertOrder = sorted[index] ? sorted[index].order : sorted[sorted.length - 1].order + 1;
+  // Bump order of items at and after this position
+  for (const item of program.value.items) {
+    if (item.order >= insertOrder) {
+      item.order += 1;
+    }
+  }
+  try {
+    await addItemToProgram(program.value.id, { order: insertOrder, type: ProgramItemType.SONG, title: 'Nouvel élément' } as any, user.value.uid);
+  } catch (error) {
+    console.error('Error adding item at position:', error);
+  }
+};
+
+const addSectionAtPosition = async (index: number) => {
+  activeAddZoneIndex.value = null;
+  if (!program.value || !user.value) return;
+  const sorted = sortedItems.value;
+  const insertOrder = sorted[index] ? sorted[index].order : sorted[sorted.length - 1].order + 1;
+  for (const item of program.value.items) {
+    if (item.order >= insertOrder) {
+      item.order += 1;
+    }
+  }
+  try {
+    const created = await addItemToProgram(program.value.id, { order: insertOrder, type: 'Section' as any, title: 'Nouvelle section' } as any, user.value.uid);
+    if (created?.id) {
+      setTimeout(() => startInlineTitleEdit(created.id), 500);
+    }
+  } catch (error) {
+    console.error('Error adding section at position:', error);
+  }
+};
+
+// Add sub-item from expanded card
+const expandedAddSubItem = (itemId: string) => {
+  expandedItems.value.add(itemId);
+  setTimeout(() => {
+    const addBar = subItemAddBarRefs[itemId];
+    if (addBar && addBar.$el) {
+      const input = addBar.$el.querySelector('ion-input');
+      if (input) input.setFocus();
+    }
+  }, 300);
+};
 
 // Title Autocomplete State (needed by composable)
 const allResources = ref<Resource[]>([]);
@@ -1557,10 +1937,7 @@ const allMembers = ref<Member[]>([]);
 const loadingMembers = ref(false);
 const draftViewerSearchQuery = ref('');
 
-// Item Detail Sheet State
-const detailSheetOpen = ref(false);
-const detailSheetItem = ref<ProgramItem | ProgramSubItem | null>(null);
-const detailSheetParentItemId = ref<string | null>(null);
+// (ItemDetailSheet removed - all editing is now inline via expandable cards)
 
 // InlineAddBar refs
 const mainAddBarRef = ref<InstanceType<typeof InlineAddBar> | null>(null);
@@ -2021,81 +2398,6 @@ const createInitialProgram = async () => {
 };
 
 // Inline Duration Popover
-// Action Popover for item/sub-item actions
-const actionPopoverOpen = ref(false);
-const actionPopoverEvent = ref<Event | null>(null);
-const actionPopoverItem = ref<ProgramItem | null>(null);
-const actionPopoverSubItem = ref<{ itemId: string; subItem: ProgramSubItem } | null>(null);
-
-const openItemActionPopover = (event: Event, item: ProgramItem) => {
-  actionPopoverEvent.value = event;
-  actionPopoverItem.value = item;
-  actionPopoverSubItem.value = null;
-  actionPopoverOpen.value = true;
-};
-
-const openSubItemActionPopover = (event: Event, itemId: string, subItem: ProgramSubItem) => {
-  actionPopoverEvent.value = event;
-  actionPopoverItem.value = null;
-  actionPopoverSubItem.value = { itemId, subItem };
-  actionPopoverOpen.value = true;
-};
-
-const closeActionPopover = () => {
-  actionPopoverOpen.value = false;
-};
-
-const handleItemAction = (action: string) => {
-  const item = actionPopoverItem.value;
-  if (!item) return;
-  closeActionPopover();
-  if (action === 'edit') {
-    if (isSectionItem(item)) {
-      startInlineTitleEdit(item.id);
-    } else {
-      openDetailSheet(item);
-    }
-  } else if (action === 'add-sub') {
-    expandedItems.value.add(item.id);
-    setTimeout(() => {
-      const addBar = subItemAddBarRefs[item.id];
-      if (addBar && addBar.$el) {
-        const input = addBar.$el.querySelector('ion-input');
-        if (input) input.setFocus();
-      }
-    }, 300);
-  } else if (action === 'add-section') {
-    handleAddSectionAfterItem(item);
-  } else if (action === 'delete') {
-    deleteItem(item.id);
-  }
-};
-
-const handleAddSectionAfterItem = async (afterItem: ProgramItem) => {
-  if (!program.value || !user.value) return;
-  try {
-    // Insert section at afterItem.order + 1, shift others
-    const insertOrder = afterItem.order + 1;
-    // Bump order of all items after this one
-    for (const item of program.value.items) {
-      if (item.order >= insertOrder) {
-        item.order += 1;
-      }
-    }
-    const newItem: any = {
-      order: insertOrder,
-      type: 'Section',
-      title: 'Nouvelle section'
-    };
-    const created = await addItemToProgram(program.value.id, newItem, user.value.uid);
-    if (created?.id) {
-      setTimeout(() => startInlineTitleEdit(created.id), 500);
-    }
-  } catch (error) {
-    console.error('Error adding section:', error);
-  }
-};
-
 const handleAddSectionAtEnd = async () => {
   if (!program.value || !user.value) return;
   try {
@@ -2111,17 +2413,6 @@ const handleAddSectionAtEnd = async () => {
     }
   } catch (error) {
     console.error('Error adding section:', error);
-  }
-};
-
-const handleSubItemAction = (action: string) => {
-  const data = actionPopoverSubItem.value;
-  if (!data) return;
-  closeActionPopover();
-  if (action === 'edit') {
-    openDetailSheet(data.subItem, data.itemId);
-  } else if (action === 'delete') {
-    deleteSubItem(data.itemId, data.subItem.id);
   }
 };
 
@@ -2201,32 +2492,6 @@ const handleInlineSubAdd = async (parentId: string, data: { type: ProgramItemTyp
   }
 };
 
-const fetchScriptureForItem = async (itemId: string, reference: string) => {
-  try {
-    const result = await bibleService.getScripture(reference);
-    if (result) {
-      await inlineUpdateField(itemId, 'scriptureReference', result.reference);
-      await inlineUpdateField(itemId, 'scriptureText', result.text);
-      await inlineUpdateField(itemId, 'scriptureVersion', result.version);
-    }
-  } catch (error) {
-    console.error('Error auto-fetching scripture:', error);
-  }
-};
-
-const fetchScriptureForSubItem = async (parentId: string, subItemId: string, reference: string) => {
-  try {
-    const result = await bibleService.getScripture(reference);
-    if (result) {
-      await inlineUpdateSubItemField(parentId, subItemId, 'scriptureReference', result.reference);
-      await inlineUpdateSubItemField(parentId, subItemId, 'scriptureText', result.text);
-      await inlineUpdateSubItemField(parentId, subItemId, 'scriptureVersion', result.version);
-    }
-  } catch (error) {
-    console.error('Error auto-fetching scripture:', error);
-  }
-};
-
 const handleInlineLinkResource = async (itemId: string, resourceId: string) => {
   if (!itemId || !resourceId) return;
   await inlineUpdateField(itemId, 'resourceId', resourceId);
@@ -2237,55 +2502,6 @@ const handleInlineLinkSubResource = async (parentId: string, subItemId: string, 
   if (!parentId || !subItemId || !resourceId) return;
   await inlineUpdateSubItemField(parentId, subItemId, 'resourceId', resourceId);
   subscribeToLinkedResource(resourceId);
-};
-
-// Item Detail Sheet
-const openDetailSheet = (item: ProgramItem | ProgramSubItem, parentItemId?: string) => {
-  detailSheetItem.value = item;
-  detailSheetParentItemId.value = parentItemId || null;
-  detailSheetOpen.value = true;
-};
-
-const closeDetailSheet = () => {
-  detailSheetOpen.value = false;
-  detailSheetItem.value = null;
-  detailSheetParentItemId.value = null;
-};
-
-const handleDetailSheetUpdateField = async (field: string, value: any) => {
-  if (!detailSheetItem.value) return;
-  if (detailSheetParentItemId.value) {
-    await inlineUpdateSubItemField(detailSheetParentItemId.value, detailSheetItem.value.id, field, value);
-  } else {
-    await inlineUpdateField(detailSheetItem.value.id, field, value);
-  }
-  if (field === 'resourceId' && value) {
-    subscribeToLinkedResource(value);
-  }
-};
-
-const handleDetailSheetDelete = async () => {
-  if (!detailSheetItem.value) return;
-  if (detailSheetParentItemId.value) {
-    await deleteSubItem(detailSheetParentItemId.value, detailSheetItem.value.id);
-  } else {
-    await deleteItem(detailSheetItem.value.id);
-  }
-  closeDetailSheet();
-};
-
-const handleDetailSheetAddSubItem = () => {
-  if (!detailSheetItem.value) return;
-  const itemId = detailSheetItem.value.id;
-  closeDetailSheet();
-  expandedItems.value.add(itemId);
-  setTimeout(() => {
-    const addBar = subItemAddBarRefs[itemId];
-    if (addBar && addBar.$el) {
-      const input = addBar.$el.querySelector('ion-input');
-      if (input) input.setFocus();
-    }
-  }, 300);
 };
 
 // Draft Mode Functions
@@ -5429,7 +5645,7 @@ onUnmounted(() => {
 
 /* Edit Mode Controls */
 .edit-mode-controls {
-  padding: 12px 16px;
+  margin-bottom: 1rem;
 }
 
 .enter-edit-btn {
@@ -6390,7 +6606,7 @@ onUnmounted(() => {
 }
 
 /* Hide/Show mobile elements */
-@media (min-width: 769px) {
+@media (min-width: 768px) {
   .presentation-controls .show-mobile {
     display: none !important;
   }
@@ -6400,5 +6616,341 @@ onUnmounted(() => {
   .presentation-controls .hide-mobile {
     display: none !important;
   }
+}
+
+/* ========================================
+   Expanded Edit Card
+   ======================================== */
+.expanded-edit-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--ion-color-light-shade);
+  margin-top: 8px;
+}
+
+.expanded-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.expanded-field-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ion-color-medium-shade);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.expanded-field-input {
+  --background: var(--ion-color-light);
+  --border-radius: 8px;
+  --padding-start: 10px;
+  --padding-end: 10px;
+  font-size: 14px;
+}
+
+.expanded-notes-textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--ion-color-light-shade);
+  border-radius: 8px;
+  background: var(--ion-color-light);
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 48px;
+}
+
+.expanded-notes-textarea:focus {
+  outline: none;
+  border-color: var(--ion-color-primary);
+}
+
+/* Resource card in expanded view */
+.expanded-resource-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: var(--ion-color-light);
+  border-radius: 8px;
+  border: 1px solid var(--ion-color-light-shade);
+}
+
+.expanded-resource-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ion-color-dark);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.expanded-resource-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* Tucked sections */
+.tucked-section {
+  gap: 0;
+}
+
+.tucked-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0;
+  border: none;
+  background: none;
+  color: var(--ion-color-medium-shade);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+
+.tucked-toggle ion-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.tucked-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--ion-color-medium);
+  background: var(--ion-color-light);
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: auto;
+}
+
+.tucked-badge ion-icon {
+  font-size: 12px;
+}
+
+.tucked-content {
+  padding: 8px 0 4px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Scripture in expanded card */
+.scripture-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.scripture-input-row ion-input {
+  flex: 1;
+}
+
+.expanded-scripture-preview {
+  padding: 10px;
+  background: var(--ion-color-light);
+  border-radius: 8px;
+  border-left: 3px solid var(--ion-color-primary);
+}
+
+.expanded-scripture-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.expanded-scripture-ref {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--ion-color-dark);
+}
+
+.expanded-scripture-version {
+  font-size: 10px;
+  color: var(--ion-color-medium);
+  background: var(--ion-color-light-shade);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.expanded-scripture-text {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ion-color-dark);
+}
+
+.expanded-scripture-text :deep(sup) {
+  color: var(--ion-color-primary);
+  font-weight: 600;
+  font-size: 10px;
+  margin-right: 2px;
+}
+
+/* Type grid in expanded card */
+.expanded-type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 6px;
+}
+
+.expanded-type-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 4px;
+  border: 1px solid var(--ion-color-light-shade);
+  border-radius: 8px;
+  background: var(--ion-color-light);
+  cursor: pointer;
+  font-size: 10px;
+  color: var(--ion-color-dark);
+  transition: all 0.15s;
+}
+
+.expanded-type-btn ion-icon {
+  font-size: 16px;
+  color: var(--ion-color-medium);
+}
+
+.expanded-type-btn.active {
+  border-color: var(--ion-color-primary);
+  background: var(--ion-color-primary-tint);
+}
+
+.expanded-type-btn.active ion-icon {
+  color: var(--ion-color-primary);
+}
+
+/* Actions row */
+.expanded-actions-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+/* Expand button */
+.item-expand-btn {
+  --color: var(--ion-color-medium);
+  --padding-start: 4px;
+  --padding-end: 4px;
+  min-width: 32px;
+}
+
+/* Inter-item add zone */
+.inter-item-add-zone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 8px;
+  margin: 0 16px;
+  position: relative;
+  cursor: pointer;
+  transition: height 0.2s;
+}
+
+.inter-item-add-zone:hover,
+.inter-item-add-zone.active {
+  height: 36px;
+}
+
+.add-zone-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px dashed var(--ion-color-medium-tint);
+  background: var(--ion-background-color, #fff);
+  color: var(--ion-color-medium);
+  font-size: 14px;
+  opacity: 0.4;
+  transition: all 0.2s;
+}
+
+.inter-item-add-zone:hover .add-zone-trigger {
+  opacity: 1;
+  border-color: var(--ion-color-primary);
+  color: var(--ion-color-primary);
+}
+
+.add-zone-options {
+  display: flex;
+  gap: 8px;
+}
+
+.add-zone-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 16px;
+  border: 1px solid var(--ion-color-light-shade);
+  background: var(--ion-background-color, #fff);
+  font-size: 12px;
+  color: var(--ion-color-dark);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.add-zone-btn:hover {
+  background: var(--ion-color-primary-tint);
+  border-color: var(--ion-color-primary);
+}
+
+.add-zone-btn ion-icon {
+  font-size: 14px;
+}
+
+/* Desktop 2-column layout for expanded cards */
+@media (min-width: 768px) {
+  .expanded-edit-card {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .expanded-edit-card .expanded-actions-row {
+    grid-column: 1 / -1;
+  }
+
+  .expanded-edit-card .tucked-section {
+    grid-column: 1 / -1;
+  }
+
+  .expanded-edit-card > .expanded-field-full {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Sub-item expanded edit card */
+.sub-item-expanded-edit-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 0 4px 0;
+  border-top: 1px solid var(--ion-color-light-shade);
+  margin-top: 6px;
+}
+
+.sub-item-expand-btn {
+  --color: var(--ion-color-medium);
+  --padding-start: 2px;
+  --padding-end: 2px;
+  min-width: 24px;
+  height: 24px;
 }
 </style>
