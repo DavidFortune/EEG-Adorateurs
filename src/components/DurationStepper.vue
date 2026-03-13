@@ -48,7 +48,7 @@ const emit = defineEmits<{
   'update:modelValue': [value: number];
 }>();
 
-const presets = [3, 5, 10, 15, 20];
+const presets = [5, 10, 15, 30, 45];
 const isDirectEntry = ref(false);
 
 const increment = () => {

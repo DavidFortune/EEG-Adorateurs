@@ -109,6 +109,48 @@ export function useProgramItems(params: UseProgramItemsParams) {
     }
   };
 
+  // --- Add Item to Group ---
+
+  const quickAddItemToGroup = async (groupId: string): Promise<string | null> => {
+    if (!program.value || !user.value) return null;
+    try {
+      // Find the last child of this group by order, or the group header itself
+      const sorted = [...program.value.items].sort((a, b) => a.order - b.order);
+      const groupHeader = sorted.find(i => i.id === groupId);
+      if (!groupHeader) return null;
+
+      const children = sorted.filter(i => i.groupId === groupId);
+      const lastChild = children.length > 0 ? children[children.length - 1] : groupHeader;
+      const insertOrder = lastChild.order + 1;
+
+      // Create new item
+      const newItem: ProgramItem = {
+        id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+        order: insertOrder,
+        title: 'Nouvel élément',
+        duration: 5,
+        groupId
+      };
+
+      // Build full items array: bump orders at/after insert position, add new item
+      const allItems = program.value.items.map(item => ({
+        ...item,
+        order: item.order >= insertOrder ? item.order + 1 : item.order
+      }));
+      allItems.push(newItem);
+
+      // Single atomic write with all items
+      await updateProgramOrder(program.value.id, allItems, user.value.uid);
+      await showToast('Élément ajouté au groupe', 'success');
+
+      return newItem.id;
+    } catch (error) {
+      console.error('Error adding item to group:', error);
+      await showToast('Erreur lors de l\'ajout dans le groupe', 'danger');
+      return null;
+    }
+  };
+
   // --- Reorder Handlers ---
 
   const handleItemReorder = async (event: CustomEvent) => {
@@ -173,10 +215,13 @@ export function useProgramItems(params: UseProgramItemsParams) {
 
   const editingTitleItemId = ref<string | null>(null);
   const editingTitleInitialValue = ref('');
+  const editingTitleValue = ref('');
 
   const startInlineTitleEdit = (itemId: string) => {
     const item = program.value?.items.find(i => i.id === itemId);
-    editingTitleInitialValue.value = item?.title || '';
+    const title = item?.title || '';
+    editingTitleInitialValue.value = title;
+    editingTitleValue.value = title;
     editingTitleItemId.value = itemId;
   };
 
@@ -184,7 +229,14 @@ export function useProgramItems(params: UseProgramItemsParams) {
     editingTitleItemId.value = null;
   };
 
-  const inlineUpdateTitle = async (itemId: string, newTitle: string) => {
+  const updateEditingTitleValue = (value: string) => {
+    editingTitleValue.value = value;
+  };
+
+  const commitTitleEdit = async (itemId: string) => {
+    // Ignore stale blur events from a previous edit
+    if (editingTitleItemId.value !== itemId) return;
+    const newTitle = editingTitleValue.value;
     editingTitleItemId.value = null;
     if (!program.value || !user.value || !newTitle.trim()) return;
     try {
@@ -226,7 +278,8 @@ export function useProgramItems(params: UseProgramItemsParams) {
     try {
       const newItem: any = {
         order: program.value.items.length,
-        title: title.trim()
+        title: title.trim(),
+        duration: 5
       };
       if (resourceId) newItem.resourceId = resourceId;
       const created = await addItemToProgram(program.value.id, newItem, user.value.uid);
@@ -272,14 +325,18 @@ export function useProgramItems(params: UseProgramItemsParams) {
     createGroup,
     // Sections
     createSection,
+    // Add to group
+    quickAddItemToGroup,
     // Reorder
     handleItemReorder,
     // Inline editing
     editingTitleItemId,
     editingTitleInitialValue,
+    editingTitleValue,
     startInlineTitleEdit,
     cancelInlineTitleEdit,
-    inlineUpdateTitle,
+    updateEditingTitleValue,
+    commitTitleEdit,
     inlineUpdateDuration,
     inlineUpdateParticipants,
     // Quick add (inline)

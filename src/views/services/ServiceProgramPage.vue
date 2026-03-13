@@ -79,7 +79,7 @@
         <!-- Program Summary -->
         <ProgramSummary
           v-if="program"
-          :item-count="program.items.length"
+          :item-count="program.items.filter(i => !i.isGroup && !i.isSection).length"
           :total-duration="totalDuration"
           :conductor="program.conductor"
           :is-editing="isEditing"
@@ -126,21 +126,38 @@
                       v-if="editingTitleItemId === item.id"
                       :value="editingTitleInitialValue"
                       class="group-header-title-input"
-                      autofocus
-                      @ionBlur="inlineUpdateTitle(item.id, ($event.target as HTMLIonInputElement).value as string || item.title)"
-                      @keydown.enter="inlineUpdateTitle(item.id, ($event.target as HTMLIonInputElement).value as string || item.title)"
+                      ref="inlineTitleInputRef"
+                      @ionInput="updateEditingTitleValue($event.detail.value || '')"
+                      @ionBlur="commitTitleEdit(item.id)"
+                      @keydown.enter.prevent="commitTitleEdit(item.id)"
                       @keydown.escape="cancelInlineTitleEdit"
                     />
                     <h4
                       v-else
                       class="group-header-title"
                       :class="{ 'editable': isEditing }"
-                      @click="isEditing && startInlineTitleEdit(item.id)"
+                      @click.stop="isEditing && startInlineTitleEdit(item.id)"
                     >
                       {{ item.title }}
                     </h4>
                   </div>
                   <div class="group-header-actions">
+                    <ion-button
+                      v-if="isEditing"
+                      fill="clear"
+                      size="small"
+                      @click.stop="handleAddItemToGroup(item.id)"
+                    >
+                      <ion-icon :icon="addOutline" slot="icon-only" />
+                    </ion-button>
+                    <ion-button
+                      v-if="groupHasContent(item.id)"
+                      fill="clear"
+                      size="small"
+                      @click.stop="openGroupContentModal(item.id)"
+                    >
+                      <ion-icon :icon="readerOutline" slot="icon-only" />
+                    </ion-button>
                     <ion-button
                       v-if="isEditing"
                       fill="clear"
@@ -166,16 +183,17 @@
                     v-if="editingTitleItemId === item.id"
                     :value="editingTitleInitialValue"
                     class="section-title-input"
-                    autofocus
-                    @ionBlur="inlineUpdateTitle(item.id, ($event.target as HTMLIonInputElement).value as string || item.title)"
-                    @keydown.enter="inlineUpdateTitle(item.id, ($event.target as HTMLIonInputElement).value as string || item.title)"
+                    ref="inlineTitleInputRef"
+                    @ionInput="updateEditingTitleValue($event.detail.value || '')"
+                    @ionBlur="commitTitleEdit(item.id)"
+                    @keydown.enter.prevent="commitTitleEdit(item.id)"
                     @keydown.escape="cancelInlineTitleEdit"
                   />
                   <h4
                     v-else
                     class="section-title"
                     :class="{ 'editable': isEditing }"
-                    @click="isEditing && startInlineTitleEdit(item.id)"
+                    @click.stop="isEditing && startInlineTitleEdit(item.id)"
                   >
                     {{ item.title }}
                   </h4>
@@ -195,16 +213,17 @@
                       v-if="editingTitleItemId === item.id"
                       :value="editingTitleInitialValue"
                       class="inline-title-input"
-                      autofocus
-                      @ionBlur="inlineUpdateTitle(item.id, ($event.target as HTMLIonInputElement).value as string || item.title)"
-                      @keydown.enter="inlineUpdateTitle(item.id, ($event.target as HTMLIonInputElement).value as string || item.title)"
+                      ref="inlineTitleInputRef"
+                      @ionInput="updateEditingTitleValue($event.detail.value || '')"
+                      @ionBlur="commitTitleEdit(item.id)"
+                      @keydown.enter.prevent="commitTitleEdit(item.id)"
                       @keydown.escape="cancelInlineTitleEdit"
                     />
                     <h4
                       v-else
                       class="item-title"
                       :class="{ 'editable': isEditing }"
-                      @click="isEditing && startInlineTitleEdit(item.id)"
+                      @click.stop="isEditing && startInlineTitleEdit(item.id)"
                     >
                       {{ item.resourceId && getLinkedResource(item.resourceId) ? getLinkedResource(item.resourceId)?.title : item.title }}
                     </h4>
@@ -556,6 +575,52 @@
         </ion-content>
       </ion-modal>
 
+      <!-- Group Content Modal -->
+      <ion-modal :is-open="groupContentModalOpen" @ionModalDidDismiss="groupContentModalOpen = false">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>Contenu du groupe</ion-title>
+            <ion-buttons slot="end">
+              <ion-button @click="groupContentModalOpen = false">
+                <ion-icon :icon="closeOutline" slot="icon-only" />
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content class="ion-padding">
+          <div class="group-content-list">
+            <template v-for="(item, idx) in groupContentItems" :key="item.id">
+              <div v-if="item.notes || item.scriptureText || getItemLyrics(item)" class="group-content-item">
+                <div class="group-content-item-header">
+                  <span class="group-content-item-number">{{ idx + 1 }}</span>
+                  <span class="group-content-item-title">{{ item.resourceId && getLinkedResource(item.resourceId) ? getLinkedResource(item.resourceId)?.title : item.title }}</span>
+                </div>
+
+                <!-- Lyrics -->
+                <div v-if="getItemLyrics(item)" class="group-content-lyrics">
+                  <pre>{{ getItemLyrics(item) }}</pre>
+                </div>
+
+                <!-- Scripture -->
+                <div v-if="item.scriptureText" class="group-content-scripture">
+                  <div class="group-content-scripture-header">
+                    <span class="group-content-scripture-ref">{{ item.scriptureReference }}</span>
+                    <span class="group-content-scripture-version">{{ item.scriptureVersion || 'LSG' }}</span>
+                  </div>
+                  <div class="group-content-scripture-text" v-html="formatScriptureWithSuperscript(item.scriptureText)"></div>
+                </div>
+
+                <!-- Notes -->
+                <div v-if="item.notes" class="group-content-notes">
+                  <ion-icon :icon="documentTextOutline" />
+                  <span>{{ item.notes }}</span>
+                </div>
+              </div>
+            </template>
+          </div>
+        </ion-content>
+      </ion-modal>
+
       <!-- Edit Program Modal -->
       <ion-modal :is-open="showEditProgramModalState" @ionModalDidDismiss="closeEditProgramModal">
         <ion-header>
@@ -698,7 +763,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, reactive, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonBackButton,
@@ -723,7 +788,8 @@ import {
   textOutline,
   chatbubbleOutline,
   ellipsisVerticalOutline,
-  searchOutline
+  searchOutline,
+  readerOutline
 } from 'ionicons/icons';
 import ResourceSelector from '@/components/ResourceSelector.vue';
 import ResourceBottomSheet from '@/components/ResourceBottomSheet.vue';
@@ -809,8 +875,9 @@ const {
   deleteItem,
   createGroup,
   createSection,
+  quickAddItemToGroup,
   handleItemReorder,
-  editingTitleItemId, editingTitleInitialValue, startInlineTitleEdit, cancelInlineTitleEdit, inlineUpdateTitle,
+  editingTitleItemId, editingTitleInitialValue, editingTitleValue, startInlineTitleEdit, cancelInlineTitleEdit, updateEditingTitleValue, commitTitleEdit,
   inlineUpdateDuration, inlineUpdateParticipants,
   quickAddItem,
   inlineUpdateField,
@@ -836,6 +903,73 @@ const quickAddSection = async () => {
   if (!program.value) return;
   const createdId = await createSection('Nouvelle section', program.value.items.length);
   if (createdId) setTimeout(() => startInlineTitleEdit(createdId), 300);
+};
+
+// Add item to group
+const handleAddItemToGroup = async (groupId: string) => {
+  // Expand group if collapsed
+  if (collapsedGroupIds.has(groupId)) {
+    collapsedGroupIds.delete(groupId);
+  }
+  const itemId = await quickAddItemToGroup(groupId);
+  if (itemId) setTimeout(() => startInlineTitleEdit(itemId), 300);
+};
+
+// Auto-focus inline title input when editing starts
+const inlineTitleInputRef = ref<any>(null);
+watch(editingTitleItemId, (newVal) => {
+  if (newVal) {
+    nextTick(() => {
+      setTimeout(() => {
+        const inputEl = inlineTitleInputRef.value;
+        if (inputEl && typeof inputEl.setFocus === 'function') {
+          inputEl.setFocus();
+        }
+      }, 50);
+    });
+  }
+});
+
+// Group content helpers
+const getGroupChildren = (groupId: string) => {
+  if (!program.value) return [];
+  return [...program.value.items]
+    .filter(i => i.groupId === groupId)
+    .sort((a, b) => a.order - b.order);
+};
+
+const groupHasContent = (groupId: string): boolean => {
+  const children = getGroupChildren(groupId);
+  return children.some(item => {
+    if (item.scriptureText || item.notes) return true;
+    if (item.resourceId) {
+      const resource = getLinkedResource(item.resourceId);
+      if (resource?.contents?.some(c => c.type === 'lyrics')) return true;
+    }
+    return false;
+  });
+};
+
+// Group content modal
+const groupContentModalOpen = ref(false);
+const groupContentModalId = ref<string | null>(null);
+
+const openGroupContentModal = (groupId: string) => {
+  groupContentModalId.value = groupId;
+  groupContentModalOpen.value = true;
+};
+
+const groupContentItems = computed(() => {
+  if (!groupContentModalId.value) return [];
+  return getGroupChildren(groupContentModalId.value);
+});
+
+const getItemLyrics = (item: ProgramItem): string | null => {
+  if (!item.resourceId) return null;
+  const resource = getLinkedResource(item.resourceId);
+  if (!resource) return null;
+  const lyricsContent = resource.contents?.find(c => c.type === 'lyrics');
+  return lyricsContent?.content || null;
 };
 
 // Inline subtitle / notes editing
@@ -950,7 +1084,9 @@ const sortedItems = computed(() => {
 
 const totalDuration = computed(() => {
   if (!program.value) return 0;
-  return program.value.items.reduce((sum, item) => sum + (item.duration || 0), 0);
+  return program.value.items
+    .filter(item => !item.isGroup && !item.isSection)
+    .reduce((sum, item) => sum + (item.duration || 0), 0);
 });
 
 // Draft Mode Computed Properties
@@ -3325,6 +3461,116 @@ onUnmounted(() => {
 
 .item-notes-indicator ion-icon {
   font-size: 14px;
+}
+
+/* Group Content Modal */
+.group-content-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.group-content-item {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.group-content-item-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.group-content-item-number {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ion-color-primary);
+  color: white;
+  font-weight: 600;
+  font-size: 0.8rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.group-content-item-title {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--ion-color-dark);
+}
+
+.group-content-lyrics {
+  background: var(--ion-color-light);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.group-content-lyrics pre {
+  margin: 0;
+  font-family: inherit;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  color: var(--ion-color-dark);
+}
+
+.group-content-scripture {
+  background: var(--ion-color-primary-tint);
+  border-left: 3px solid var(--ion-color-primary);
+  border-radius: 0 8px 8px 0;
+  padding: 12px;
+}
+
+.group-content-scripture-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.group-content-scripture-ref {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--ion-color-dark);
+}
+
+.group-content-scripture-version {
+  font-size: 0.7rem;
+  color: var(--ion-color-medium);
+  background: var(--ion-color-light-shade);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.group-content-scripture-text {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--ion-color-dark);
+}
+
+.group-content-scripture-text :deep(sup) {
+  color: var(--ion-color-primary);
+  font-weight: 600;
+  font-size: 0.65rem;
+  margin-right: 2px;
+}
+
+.group-content-notes {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--ion-color-medium);
+  font-style: italic;
+}
+
+.group-content-notes ion-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 </style>
