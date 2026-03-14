@@ -2,6 +2,26 @@
 
 All notable changes to EEG Adorateurs will be documented in this file.
 
+## [1.15.4] - 2026-03-13
+
+### Added
+- **Streamlined Edit Mode**: Quick-add buttons, 3-dot action menu, and section support for faster program editing
+- **Inline Expandable Item Cards**: Items expand inline to show details, replacing 3-dot menu and detail sheet
+- **Program Groups**: New group system replacing sub-items and types for simpler program organization
+
+### Enhanced
+- **Inline Title Editing**: Edit item titles directly in the program list without opening a modal
+- **Group UX Improvements**: Better visual organization and interaction patterns for program groups
+- **Duration Presets**: Quick-select duration options for common time intervals
+- **Program Status Lifecycle**: Replaced boolean isDraft with a status enum for richer program state management
+
+### Refactored
+- **Component Extraction**: Extracted 9 components and useEditLock composable from ServiceProgramPage for better maintainability
+
+### Fixed
+- **Edit Mode for Draft Programs**: Edit mode button now correctly appears for draft programs
+- **isDraft Default**: Programs default to isDraft=false to prevent access issues
+
 ## [1.14.3] - 2026-02-08
 
 ### Fixed
